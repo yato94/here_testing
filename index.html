@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HERE Maps Route Planner</title>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
+    <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css"/>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+        }
+
+        #sidebar {
+            width: 300px;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #map-container {
+            flex: 1;
+            height: 100%;
+        }
+
+        .waypoint-number {
+            position: absolute;
+            left: -18px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            background: #0066CC;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: move;
+            cursor: grab;
+            user-select: none;
+            z-index: 10;
+        }
+
+        .waypoint-number:active {
+            cursor: grabbing;
+        }
+
+        .waypoint-container {
+            position: relative;
+            padding-left: 18px;
+            margin-bottom: 10px;
+        }
+
+        .waypoint-container.dragging {
+            opacity: 1;
+            position: fixed;
+            z-index: 1000;
+            width: calc(100% - 40px); /* Dostosuj szerokość do kontenera */
+            pointer-events: none;
+            transform: translateY(var(--y));
+        }
+
+        .waypoint-container.shift-up {
+            transform: translateY(-20px);
+        }
+
+        .waypoint-container.shift-down {
+            transform: translateY(20px);
+        }
+
+
+        .waypoint-box {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            transition: border-color 0.3s;
+            background: white;
+            position: relative;
+        }
+
+        .waypoint {
+            width: 100%;
+            border: none;
+            font-size: 14px;
+            background: transparent;
+            margin-bottom: 2px;
+        }
+
+        .waypoint:focus {
+            outline: none;
+        }
+
+        .coordinates-display {
+            font-size: 11px;
+            color: #666;
+            display: block;
+            width: 100%;
+        }
+
+        .suggestions-container {
+            position: absolute;
+            top: 100%;
+            left: 30px;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .suggestion-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .suggestion-item.selected {
+            background-color: #e6e6e6;
+        }
+
+        #route-info {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .remove-waypoint {
+            position: absolute;
+            right: -18px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #ff4444;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            padding: 2px;
+            z-index: 1;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .remove-waypoint:hover {
+            color: #cc0000;
+        }
+
+        .error-message {
+            color: #ff4444;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div id="waypoints-container"></div>
+        <div id="route-info"></div>
+    </div>
+    <div id="map-container"></div>
+	<script>
+        let geocodedPoints = new Map();
+
+        function getPreferredLanguage() {
+            const supportedLanguages = ['de', 'fr', 'it', 'es', 'pl'];
+            let browserLang = navigator.language.slice(0, 2).toLowerCase();
+            return supportedLanguages.includes(browserLang) ? browserLang : 'en';
+        }
+
+        function getUITranslations(lang) {
+            const translations = {
+                en: {
+                    inputPlaceholder: 'Enter address or GPS coordinates',
+                    routeInfo: 'Route information:',
+                    distance: 'Distance',
+                    time: 'Time',
+                    minutes: 'minutes',
+                    routeError: 'An error occurred while calculating the route',
+                    addressNotFound: 'Address not found',
+                    geocodingError: 'Geocoding error',
+                    addStartPoint: 'Add start point',
+                    addViaPoint: 'Add via point',
+                    addEndPoint: 'Add end point',
+                    coordinates: 'Coordinates',
+                    addStartFirst: 'Add start point first'
+                },
+                de: {
+                    inputPlaceholder: 'Adresse oder GPS-Koordinaten eingeben',
+                    routeInfo: 'Routeninformation:',
+                    distance: 'Entfernung',
+                    time: 'Zeit',
+                    minutes: 'Minuten',
+                    routeError: 'Bei der Routenberechnung ist ein Fehler aufgetreten',
+                    addressNotFound: 'Adresse nicht gefunden',
+                    geocodingError: 'Geokodierungsfehler',
+                    addStartPoint: 'Startpunkt hinzufügen',
+                    addViaPoint: 'Viapunkt hinzufügen',
+                    addEndPoint: 'Endpunkt hinzufügen',
+                    coordinates: 'Koordinaten',
+                    addStartFirst: 'Fügen Sie zuerst den Startpunkt hinzu'
+                },
+                fr: {
+                    inputPlaceholder: 'Entrez l\'adresse ou les coordonnées GPS',
+                    routeInfo: 'Informations sur l\'itinéraire :',
+                    distance: 'Distance',
+                    time: 'Temps',
+                    minutes: 'minutes',
+                    routeError: 'Une erreur s\'est produite lors du calcul de l\'itinéraire',
+                    addressNotFound: 'Adresse introuvable',
+                    geocodingError: 'Erreur de géocodage',
+                    addStartPoint: 'Ajouter le point de départ',
+                    addViaPoint: 'Ajouter un point intermédiaire',
+                    addEndPoint: 'Ajouter le point d\'arrivée',
+                    coordinates: 'Coordonnées',
+                    addStartFirst: 'Ajoutez d\'abord le point de départ'
+                },
+                it: {
+                    inputPlaceholder: 'Inserisci indirizzo o coordinate GPS',
+                    routeInfo: 'Informazioni sul percorso:',
+                    distance: 'Distanza',
+                    time: 'Tempo',
+                    minutes: 'minuti',
+                    routeError: 'Si è verificato un errore durante il calcolo del percorso',
+                    addressNotFound: 'Indirizzo non trovato',
+                    geocodingError: 'Errore di geocodifica',
+                    addStartPoint: 'Aggiungi punto di partenza',
+                    addViaPoint: 'Aggiungi punto intermedio',
+                    addEndPoint: 'Aggiungi punto di arrivo',
+                    coordinates: 'Coordinate',
+                    addStartFirst: 'Aggiungi prima il punto di partenza'
+                },
+                es: {
+                    inputPlaceholder: 'Introduce la dirección o coordenadas GPS',
+                    routeInfo: 'Información de la ruta:',
+                    distance: 'Distancia',
+                    time: 'Tiempo',
+                    minutes: 'minutos',
+                    routeError: 'Se produjo un error al calcular la ruta',
+                    addressNotFound: 'Dirección no encontrada',
+                    geocodingError: 'Error de geocodificación', 
+                    addStartPoint: 'Añadir punto de inicio',
+                    addViaPoint: 'Añadir punto intermedio',
+                    addEndPoint: 'Añadir punto final',
+                    coordinates: 'Coordenadas',
+                    addStartFirst: 'Añade primero el punto de inicio'
+                },
+                pl: {
+                    inputPlaceholder: 'Wpisz adres lub współrzędne GPS',
+                    routeInfo: 'Informacje o trasie:',
+                    distance: 'Dystans',
+                    time: 'Czas',
+                    minutes: 'minut',
+                    routeError: 'Wystąpił błąd podczas wyznaczania trasy',
+                    addressNotFound: 'Nie znaleziono adresu',
+                    geocodingError: 'Błąd geokodowania', 
+                    addStartPoint: 'Dodaj punkt startowy',
+                    addViaPoint: 'Dodaj punkt pośredni',
+                    addEndPoint: 'Dodaj punkt końcowy',
+                    coordinates: 'Koordynaty',
+                    addStartFirst: 'Najpierw dodaj punkt startowy'
+                }
+            };
+            return translations[lang] || translations.en;
+        }
+
+        const currentLang = getPreferredLanguage();
+        const translations = getUITranslations(currentLang);
+        const API_KEY = 'yuwY_LTItp881XAaYOHShjcBhdc0sHWuj4TQwGKwjms';
+
+        function isGPSCoordinates(text) {
+            const cleanText = text.trim();
+            
+            const patterns = {
+                decimal: /^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/,
+                dms: /^(-?\d+)°(\d+)'(\d+(\.\d+)?)"([NS])\s*(-?\d+)°(\d+)'(\d+(\.\d+)?)"([EW])$/
+            };
+            
+            const decimalMatch = cleanText.match(patterns.decimal);
+            if (decimalMatch) {
+                const lat = parseFloat(decimalMatch[1]);
+                const lng = parseFloat(decimalMatch[2]);
+                return isValidLatLng(lat, lng) ? { lat, lng } : null;
+            }
+            
+            const dmsMatch = cleanText.match(patterns.dms);
+            if (dmsMatch) {
+                const lat = convertDMSToDecimal(
+                    parseFloat(dmsMatch[1]),
+                    parseFloat(dmsMatch[2]),
+                    parseFloat(dmsMatch[3]),
+                    dmsMatch[5]
+                );
+                const lng = convertDMSToDecimal(
+                    parseFloat(dmsMatch[6]),
+                    parseFloat(dmsMatch[7]),
+                    parseFloat(dmsMatch[8]),
+                    dmsMatch[10]
+                );
+                return isValidLatLng(lat, lng) ? { lat, lng } : null;
+            }
+            
+            return null;
+        }
+
+        function isValidLatLng(lat, lng) {
+            return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+        }
+
+        function convertDMSToDecimal(degrees, minutes, seconds, direction) {
+            let decimal = degrees + (minutes / 60) + (seconds / 3600);
+            if (direction === 'S' || direction === 'W') {
+                decimal = -decimal;
+            }
+            return decimal;
+        }
+
+        const platform = new H.service.Platform({
+            apikey: API_KEY
+        });
+
+        class HERECacheManager {
+            constructor() {
+                this.etagStore = new Map();
+            }
+
+            generateTileKey(x, y, z) {
+                return `${z}/${x}/${y}`;
+            }
+
+            setETag(tileKey, etag) {
+                this.etagStore.set(tileKey, etag);
+            }
+
+            getETag(tileKey) {
+                return this.etagStore.get(tileKey);
+            }
+        }
+
+        // Inicjalizacja managera cache
+        const cacheManager = new HERECacheManager();
+
+
+        const customTileProvider = new H.map.provider.ImageTileProvider({
+            getURL: (x, y, z) => {
+                const tileKey = `${z}/${x}/${y}`;
+                
+                // Tworzymy podstawowy URL
+                const params = new URLSearchParams({
+                    apikey: API_KEY,
+                    style: 'logistics.day',
+                    features: 'vehicle_restrictions:active_and_inactive,pois:disabled,congestion_zones:all',
+                    size: '512',
+                    ppi: '200',
+                    lang: currentLang,
+                    xnlp: 'CL_JSMv3.1.61.1',
+                    cache_control: 'max-age=86400' // Dodajemy cache control jako parametr zamiast nagłówka
+                });
+
+                // Zwracamy kompletny URL
+                return `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8?${params}`;
+            }
+        });
+
+        const customTileLayer = new H.map.layer.TileLayer(customTileProvider);
+
+        function clearTileCache() {
+            cacheManager.etagStore.clear();
+            if ('caches' in window) {
+                caches.delete('tile-cache').catch(console.error);
+            }
+        }
+        const map = new H.Map(
+            document.getElementById('map-container'),
+            customTileLayer,
+            {
+                zoom: 4,
+                center: { lat: 50.0, lng: 15.0 }
+            }
+        );
+
+        const ui = H.ui.UI.createDefault(map, platform.createDefaultLayers());
+        const mapEvents = new H.mapevents.MapEvents(map);
+        const behavior = new H.mapevents.Behavior(mapEvents);
+
+        // FUNCJE DO MENU KONTEKSTOWEGO (START/VIA/KONIEC)    
+        // Functions for handling waypoints from context menu
+        function addStartPoint(coordinates) {
+            const waypointsContainer = document.getElementById('waypoints-container');
+            const waypointContainers = waypointsContainer.querySelectorAll('.waypoint-container');
+            
+            // Create new waypoint
+            const newWaypoint = createWaypointInput();
+            const input = newWaypoint.querySelector('.waypoint');
+            input.value = `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`;
+
+            // Zawsze wstaw nowy punkt jako pierwszy
+            if (waypointContainers.length > 0) {
+                // Wstaw przed pierwszym istniejącym punktem
+                waypointsContainer.insertBefore(newWaypoint, waypointContainers[0]);
+            } else {
+                // Jeśli nie ma żadnych punktów, po prostu dodaj
+                waypointsContainer.appendChild(newWaypoint);
+            }
+
+            input.dispatchEvent(new Event('input'));
+            updateWaypointNumbers();
+        }
+
+        function addViaPoint(coordinates) {
+            const waypointsContainer = document.getElementById('waypoints-container');
+            const waypointContainers = waypointsContainer.querySelectorAll('.waypoint-container');
+            
+            if (waypointContainers.length === 0) {
+                alert(translations.addStartFirst);
+                return;
+            }
+
+            // Create new waypoint
+            const newWaypoint = createWaypointInput();
+            const input = newWaypoint.querySelector('.waypoint');
+            input.value = `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`;
+
+            // Znajdź wszystkie niepuste punkty
+            const nonEmptyContainers = Array.from(waypointContainers).filter(container => 
+                container.querySelector('.waypoint').value.trim() !== ''
+            );
+
+            if (nonEmptyContainers.length === 1) {
+                // Jeśli mamy tylko punkt startowy, dodaj po nim
+                const secondContainer = waypointContainers[1];
+                waypointsContainer.insertBefore(newWaypoint, secondContainer || null);
+            } else if (nonEmptyContainers.length >= 2) {
+                // Dodaj przed ostatnim niepustym punktem
+                const lastContainer = nonEmptyContainers[nonEmptyContainers.length - 1];
+                waypointsContainer.insertBefore(newWaypoint, lastContainer);
+            } else {
+                waypointsContainer.appendChild(newWaypoint);
+            }
+
+            input.dispatchEvent(new Event('input'));
+            updateWaypointNumbers();
+        }
+
+        function addEndPoint(coordinates) {
+            const waypointsContainer = document.getElementById('waypoints-container');
+            const waypointContainers = waypointsContainer.querySelectorAll('.waypoint-container');
+            
+            if (waypointContainers.length === 0) {
+                alert(translations.addStartFirst);
+                return;
+            }
+
+            // Create new waypoint
+            const newWaypoint = createWaypointInput();
+            const input = newWaypoint.querySelector('.waypoint');
+            input.value = `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`;
+
+            // Znajdź wszystkie niepuste punkty
+            const nonEmptyContainers = Array.from(waypointContainers).filter(container => 
+                container.querySelector('.waypoint').value.trim() !== ''
+            );
+
+            if (nonEmptyContainers.length > 0) {
+                // Zawsze dodaj na końcu, po wszystkich istniejących punktach
+                const lastContainer = waypointContainers[waypointContainers.length - 1];
+                waypointsContainer.insertBefore(newWaypoint, lastContainer.nextSibling);
+            } else {
+                waypointsContainer.appendChild(newWaypoint);
+            }
+
+            input.dispatchEvent(new Event('input'));
+            updateWaypointNumbers();
+        }
+
+
+        // LISTENER NA PRAWY PRZYCISK MYSZY!
+        // Add map right click handler
+        map.addEventListener('pointerdown', (evt) => {
+        // Check if it's right mouse button
+        if (evt.currentPointer.button === 2) {
+            // Prevent default browser's context menu
+            evt.originalEvent.preventDefault();
+            
+            // Remove any existing menu before creating new one
+            document.querySelectorAll('.context-menu').forEach(menu => menu.remove());
+            
+            const coordinates = map.screenToGeo(
+                evt.currentPointer.viewportX,
+                evt.currentPointer.viewportY
+            );
+            
+            // Create a temporary div for our custom context menu
+            const menuDiv = document.createElement('div');
+            menuDiv.className = 'context-menu';
+            menuDiv.style.position = 'fixed'; // Zmiana z 'absolute' na 'fixed'
+            
+            // Pobieramy pozycję kliknięcia względem strony
+            const x = evt.originalEvent.pageX;
+            const y = evt.originalEvent.pageY;
+            
+            menuDiv.style.left = x + 'px';
+            menuDiv.style.top = y + 'px';
+            menuDiv.style.backgroundColor = 'white';
+            menuDiv.style.border = '1px solid #ddd';
+            menuDiv.style.borderRadius = '4px';
+            menuDiv.style.padding = '5px';
+            menuDiv.style.zIndex = '1000';
+            menuDiv.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+
+            // Create menu items
+            const menuItems = [
+                { text: translations.addStartPoint, action: () => addStartPoint(coordinates) },
+                { text: translations.addViaPoint, action: () => addViaPoint(coordinates) },
+                { text: translations.addEndPoint, action: () => addEndPoint(coordinates) },
+                { text: `${translations.coordinates}: ${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`, action: null }
+            ];
+
+            menuItems.forEach(item => {
+                const menuItem = document.createElement('div');
+                menuItem.textContent = item.text;
+                menuItem.style.padding = '8px 12px';
+                menuItem.style.cursor = item.action ? 'pointer' : 'default';
+                menuItem.style.borderBottom = '1px solid #eee';
+                
+                if (item.action) {
+                    menuItem.addEventListener('mouseover', () => {
+                        menuItem.style.backgroundColor = '#f0f0f0';
+                    });
+                    menuItem.addEventListener('mouseout', () => {
+                        menuItem.style.backgroundColor = 'white';
+                    });
+                    menuItem.addEventListener('click', () => {
+                        item.action();
+                        menuDiv.remove();
+                    });
+                } else {
+                    menuItem.style.color = '#666';
+                    menuItem.style.fontSize = '12px';
+                }
+                
+                menuDiv.appendChild(menuItem);
+            });
+
+            document.getElementById('map-container').appendChild(menuDiv);
+            
+            // Sprawdzamy, czy menu nie wychodzi poza ekran
+            setTimeout(() => {
+                const rect = menuDiv.getBoundingClientRect();
+                const windowWidth = window.innerWidth;
+                const windowHeight = window.innerHeight;
+                
+                if (rect.right > windowWidth) {
+                    menuDiv.style.left = (windowWidth - rect.width) + 'px';
+                }
+                
+                if (rect.bottom > windowHeight) {
+                    menuDiv.style.top = (windowHeight - rect.height) + 'px';
+                }
+            }, 0);
+            
+            // Remove menu when clicking anywhere else
+            const removeMenu = () => {
+                menuDiv.remove();
+                document.removeEventListener('click', removeMenu);
+            };
+            
+            document.addEventListener('click', removeMenu);
+        }
+    });
+
+        // Disable the default draggability of the underlying map
+        // and enable it only when no marker is being dragged
+        let isDragging = false;
+
+        map.addEventListener('dragstart', function(ev) {
+            const target = ev.target;
+            if (target instanceof H.map.Marker) {
+                isDragging = true;
+                // Disable the default draggability of the underlying map
+                // when starting to drag a marker
+                behavior.disable();
+            }
+        });
+
+        map.addEventListener('drag', function(ev) {
+            const target = ev.target;
+            if (target instanceof H.map.Marker && isDragging) {
+                const pointer = ev.currentPointer;
+                target.setGeometry(map.screenToGeo(pointer.viewportX, pointer.viewportY));
+            }
+        });
+
+        map.addEventListener('dragend', function(ev) {
+            const target = ev.target;
+            if (target instanceof H.map.Marker && isDragging) {
+                isDragging = false;
+                behavior.enable();
+                
+                // Pobierz nową pozycję markera
+                const newPosition = target.getGeometry();
+                const markerId = target.getData().id;
+                
+                // Zaktualizuj koordynaty dla odpowiedniego punktu
+                const waypoints = document.querySelectorAll('.waypoint');
+                const waypointInput = waypoints[markerId - 1];
+                
+                if (waypointInput) {
+                    // Wykonaj reverse geocoding dla nowej pozycji
+                    fetch(
+                        `https://revgeocode.search.hereapi.com/v1/revgeocode` +
+                        `?at=${newPosition.lat},${newPosition.lng}` +
+                        `&limit=1` +
+                        `&lang=${currentLang}` +
+                        `&apiKey=${API_KEY}`
+                    )
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.items && data.items.length > 0) {
+                            const address = data.items[0].title;
+                            
+                            // Zaktualizuj pole adresu
+                            waypointInput.value = address;
+                            
+                            // Zaktualizuj wyświetlane koordynaty
+                            const coordsStr = `${newPosition.lat.toFixed(6)}, ${newPosition.lng.toFixed(6)}`;
+                            const box = waypointInput.parentElement;
+                            const coordsDisplay = box.querySelector('.coordinates-display');
+                            if (coordsDisplay) {
+                                coordsDisplay.textContent = coordsStr;
+                            }
+                            
+                            // Zaktualizuj geocodedPoints
+                            geocodedPoints.set(address, {
+                                lat: newPosition.lat,
+                                lng: newPosition.lng,
+                                address: address
+                            });
+                            
+                            // Przelicz trasę
+                            calculateRouteIfPossible();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Reverse geocoding error:', error);
+                    });
+                }
+            }
+        });
+
+        // Prevent the default draggability of the underlying map
+        // when starting to drag a marker
+        map.addEventListener('pointerdown', function(ev) {
+            if (ev.target instanceof H.map.Marker) {
+                behavior.disable();
+            }
+        }, false);
+
+        // Re-enable the default draggability of the underlying map
+        // after dragging is finished
+        map.addEventListener('pointerup', function(ev) {
+            if (ev.target instanceof H.map.Marker) {
+                behavior.enable();
+            }
+        }, false);
+
+        let routeLines = [];
+        let markers = [];
+        let debounceTimer;
+		
+		async function geocodeAddress(address) {
+            const gpsCoords = isGPSCoordinates(address);
+            
+            if (gpsCoords) {
+                try {
+                    const response = await fetch(
+                        `https://revgeocode.search.hereapi.com/v1/revgeocode` +
+                        `?at=${gpsCoords.lat},${gpsCoords.lng}` +
+                        `&limit=1` +
+                        `&lang=${currentLang}` +
+                        `&apiKey=${API_KEY}`
+                    );
+                    
+                    if (!response.ok) {
+                        throw new Error(translations.geocodingError);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.items && data.items.length > 0) {
+                        return {
+                            lat: gpsCoords.lat,
+                            lng: gpsCoords.lng,
+                            address: data.items[0].title
+                        };
+                    } else {
+                        throw new Error(translations.addressNotFound);
+                    }
+                } catch (error) {
+                    console.error('Reverse geocoding error:', error);
+                    return { lat: gpsCoords.lat, lng: gpsCoords.lng };
+                }
+            } else {
+                return new Promise((resolve, reject) => {
+                    const service = platform.getSearchService();
+                    service.geocode({
+                        q: address,
+                        limit: 1
+                    }, (result) => {
+                        if (result.items && result.items.length > 0) {
+                            resolve({
+                                lat: result.items[0].position.lat,
+                                lng: result.items[0].position.lng,
+                                address: result.items[0].title
+                            });
+                        } else {
+                            reject(new Error(translations.addressNotFound));
+                        }
+                    }, (error) => {
+                        console.error('Geocoding error:', error);
+                        reject(new Error(translations.geocodingError));
+                    });
+                });
+            }
+        }
+
+        function updateWaypointNumbers() {
+            const containers = document.querySelectorAll('.waypoint-container');
+            containers.forEach((container, index) => {
+                const numberDiv = container.querySelector('.waypoint-number');
+                if (numberDiv) {
+                    numberDiv.textContent = (index + 1).toString();
+                }
+            });
+        }
+
+        function addMarker(position, number) {
+            const svgMarkup = '<svg width="48" height="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+                '<path fill="#0066CC" d="M12 2.5c-3.8 0-7 3.2-7 7.1 0 5.4 7 11.9 7 11.9s7-6.5 7-11.9c0-3.9-3.2-7.1-7-7.1z" />' +
+                '<circle cx="12" cy="9" r="4" fill="#FFFFFF"/>' +
+                '<text x="12" y="11" font-size="6" font-family="Arial" font-weight="bold" text-anchor="middle" fill="#0066CC">' + 
+                number + '</text>' +
+                '</svg>';
+
+            const icon = new H.map.Icon(svgMarkup, {
+                anchor: { x: 24, y: 48 }
+            });
+            
+            const marker = new H.map.Marker(position, {
+                icon: icon,
+                volatility: true,
+                draggable: true,
+                // Dodajemy dane do markera
+                data: { id: number }
+            });
+
+            marker.draggable = true;
+            
+            markers.push(marker);
+            map.addObject(marker);
+            return marker;
+        }
+
+        function clearMap() {
+            routeLines.forEach(line => map.removeObject(line));
+            routeLines = [];
+            markers.forEach(marker => map.removeObject(marker));
+            markers = [];
+        }
+
+        // Drag & Drop handlers
+        // Zmienne globalne dla obsługi przeciągania
+        let draggedElement = null;
+        let initialY = 0;
+        let currentY = 0;
+        let offsetY = 0;
+
+        // Główne funkcje obsługi przeciągania
+        function handleDragStart(e) {
+            if (!e.target.classList.contains('waypoint-number')) {
+                return;
+            }
+            e.preventDefault();
+            
+            draggedElement = this.parentElement;
+            const rect = draggedElement.getBoundingClientRect();
+            initialY = e.clientY;
+            offsetY = e.clientY - rect.top;
+            
+            draggedElement.style.setProperty('--y', '0px');
+            draggedElement.classList.add('dragging');
+            draggedElement.style.width = `${rect.width}px`;
+            draggedElement.style.left = `${rect.left}px`;
+            draggedElement.originalIndex = Array.from(draggedElement.parentNode.children).indexOf(draggedElement);
+            
+            document.addEventListener('mousemove', handleDrag);
+            document.addEventListener('mouseup', handleDragEnd);
+        }
+
+        function handleDrag(e) {
+            if (!draggedElement) return;
+            e.preventDefault();
+            
+            currentY = e.clientY;
+            const deltaY = currentY - initialY;
+            draggedElement.style.setProperty('--y', `${deltaY}px`);
+            
+            const containers = Array.from(document.querySelectorAll('.waypoint-container:not(.dragging)'));
+            const draggedRect = draggedElement.getBoundingClientRect();
+            const draggedIndex = draggedElement.originalIndex;
+            
+            containers.forEach(container => {
+                const rect = container.getBoundingClientRect();
+                const containerIndex = Array.from(container.parentNode.children).indexOf(container);
+                
+                container.classList.remove('shift-up', 'shift-down');
+                
+                if (draggedRect.top + draggedRect.height / 2 < rect.top + rect.height / 2) {
+                    // Jeśli przeciągamy nad element, to powinien on przesunąć się w dół
+                    // Niezależnie od tego czy jest pierwszy czy nie
+                    if (containerIndex > draggedIndex) {
+                        container.classList.add('shift-down');
+                    }
+                } else {
+                    // Przy przesuwaniu w górę, tylko elementy nie będące pierwszym mogą się przesunąć wyżej
+                    if (containerIndex < draggedIndex && containerIndex !== 0) {
+                        container.classList.add('shift-up');
+                    }
+                }
+
+                // Specjalna obsługa dla pierwszego elementu
+                if (containerIndex === 0 && draggedRect.top < rect.top) {
+                    container.classList.add('shift-down');
+                }
+            });
+        }
+        function handleDragEnd(e) {
+            if (!draggedElement) return;
+            
+            document.removeEventListener('mousemove', handleDrag);
+            document.removeEventListener('mouseup', handleDragEnd);
+            
+            const containers = document.querySelectorAll('.waypoint-container');
+            containers.forEach(container => {
+                container.classList.remove('shift-up', 'shift-down');
+            });
+            
+            const draggedRect = draggedElement.getBoundingClientRect();
+            const targetContainer = Array.from(containers).find(container => {
+                if (container === draggedElement) return false;
+                const rect = container.getBoundingClientRect();
+                return draggedRect.top + draggedRect.height / 2 < rect.top + rect.height / 2;
+            });
+            
+            if (targetContainer) {
+                targetContainer.parentNode.insertBefore(draggedElement, targetContainer);
+            } else {
+                // Usuwamy warunek sprawdzający puste pole
+                const lastContainer = containers[containers.length - 1];
+                lastContainer.parentNode.insertBefore(draggedElement, lastContainer.nextSibling);
+            }
+            
+            draggedElement.classList.remove('dragging');
+            draggedElement.style.removeProperty('--y');
+            draggedElement.style.removeProperty('width');
+            draggedElement.style.removeProperty('left');
+            
+            updateWaypointNumbers();
+            calculateRouteIfPossible();
+            
+            draggedElement = null;
+        }
+
+        // Zmiana w event listenerach
+        document.addEventListener('mousemove', handleDrag);
+        document.addEventListener('mouseup', handleDragEnd);
+
+        function createWaypointInput() {
+            const container = document.createElement('div');
+            container.className = 'waypoint-container';
+            
+            const numberDiv = document.createElement('div');
+            numberDiv.className = 'waypoint-number';
+            numberDiv.addEventListener('mousedown', handleDragStart);
+            container.appendChild(numberDiv);
+            
+            const box = document.createElement('div');
+            box.className = 'waypoint-box';
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'waypoint';
+            input.placeholder = translations.inputPlaceholder;
+            
+            const suggestionsContainer = document.createElement('div');
+            suggestionsContainer.className = 'suggestions-container';
+            
+            const waypointCount = document.querySelectorAll('.waypoint').length;
+            if (waypointCount > 0) {
+                const removeButton = document.createElement('button');
+                removeButton.className = 'remove-waypoint';
+                removeButton.textContent = '×';
+                removeButton.onclick = () => {
+                    const input = container.querySelector('.waypoint');
+                    if (input && input.value) {
+                        geocodedPoints.delete(input.value.trim());
+                    }
+                    container.remove();
+                    updateWaypointNumbers();
+                    calculateRouteIfPossible();
+                };
+                container.appendChild(removeButton);
+            }
+            
+            box.appendChild(input);
+            container.appendChild(box);
+            container.appendChild(suggestionsContainer);
+            
+            initializeAutocomplete(input, suggestionsContainer);
+            updateWaypointNumbers();
+            return container;
+        }
+        function initializeAutocomplete(input, suggestionsContainer) {
+            let searchTimeout;
+            let selectedIndex = -1;
+            let suggestions = [];
+
+            input.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                const query = input.value.trim();
+                
+                const gpsCoords = isGPSCoordinates(query);
+                
+                if (gpsCoords) {
+                    suggestionsContainer.style.display = 'none';
+                    selectedIndex = -1;
+                    calculateRouteIfPossible();
+                    return;
+                }
+                
+                if (query.length >= 3) {
+                    searchTimeout = setTimeout(async () => {
+                        try {
+                            const response = await fetch(
+                                `https://autocomplete.search.hereapi.com/v1/autocomplete` +
+                                `?apiKey=${API_KEY}` +
+                                `&q=${encodeURIComponent(query)}` +
+                                `&in=countryCode:AND,ALB,AUT,BIH,BEL,BGR,BLR,CHE,CYP,CZE,DEU,DNK,EST,ESP,FIN,FRO,FRA,GBR,GIB,GRC,HRV,HUN,IRL,IMN,ISL,ITA,LIE,LTU,LUX,LVA,MCO,MDA,MNE,MKD,MLT,NLD,NOR,POL,PRT,ROU,SRB,RUS,SWE,SVN,SVK,SMR,TUR,UKR,VAT,KOS` +
+                                `&limit=5` +
+                                `&lang=${currentLang}`
+                            );
+                            
+                            const data = await response.json();
+                            suggestionsContainer.innerHTML = '';
+                            suggestions = data.items || [];
+
+                            if (suggestions.length > 0) {
+                                selectedIndex = 0;
+                                
+                                suggestions.forEach((item, index) => {
+                                    const div = document.createElement('div');
+                                    div.className = 'suggestion-item';
+                                    if (index === 0) {
+                                        div.classList.add('selected');
+                                    }
+                                    div.textContent = item.title;
+                                    
+                                    div.addEventListener('click', () => {
+                                        selectSuggestion(item, input);
+                                    });
+                                    
+                                    suggestionsContainer.appendChild(div);
+                                });
+                                suggestionsContainer.style.display = 'block';
+                            } else {
+                                suggestionsContainer.style.display = 'none';
+                                selectedIndex = -1;
+                            }
+                        } catch (error) {
+                            console.error('Autosuggest error:', error);
+                            suggestionsContainer.style.display = 'none';
+                            selectedIndex = -1;
+                        }
+                    }, 300);
+                } else {
+                    suggestionsContainer.style.display = 'none';
+                    selectedIndex = -1;
+                }
+            });
+
+            input.addEventListener('keydown', (e) => {
+                const query = input.value.trim();
+                const gpsCoords = isGPSCoordinates(query);
+                const suggestionItems = suggestionsContainer.querySelectorAll('.suggestion-item');
+                
+                switch (e.key) {
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        if (!gpsCoords && selectedIndex < suggestionItems.length - 1) {
+                            selectedIndex++;
+                            updateSelection(suggestionItems);
+                        }
+                        break;
+                        
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        if (!gpsCoords && selectedIndex > 0) {
+                            selectedIndex--;
+                            updateSelection(suggestionItems);
+                        }
+                        break;
+                        
+                    case 'Enter':
+                        e.preventDefault();
+                        if (gpsCoords) {
+                            handleGPSEntry(input);
+                        } else if (suggestionsContainer.style.display === 'block' && selectedIndex >= 0 && suggestions[selectedIndex]) {
+                            selectSuggestion(suggestions[selectedIndex], input);
+                        }
+                        break;
+                        
+                    case 'Escape':
+                        suggestionsContainer.style.display = 'none';
+                        selectedIndex = -1;
+                        break;
+                }
+            });
+
+            function updateSelection(items) {
+                items.forEach((item, index) => {
+                    item.classList.toggle('selected', index === selectedIndex);
+                });
+            }
+
+            function handleGPSEntry(input) {
+                const waypoints = document.querySelectorAll('.waypoint');
+                const currentIndex = Array.from(waypoints).indexOf(input);
+                const lastWaypoint = waypoints[waypoints.length - 1];
+                
+                if (input === lastWaypoint) {
+                    const waypointsContainer = document.getElementById('waypoints-container');
+                    waypointsContainer.appendChild(createWaypointInput());
+                }
+                
+                setTimeout(() => {
+                    const updatedWaypoints = document.querySelectorAll('.waypoint');
+                    const nextInput = updatedWaypoints[currentIndex + 1];
+                    if (nextInput) {
+                        nextInput.focus();
+                    }
+                }, 50);
+
+                calculateRouteIfPossible();
+            }
+
+            function selectSuggestion(suggestion, input) {
+                input.value = suggestion.title;
+                suggestionsContainer.style.display = 'none';
+                
+                const waypoints = document.querySelectorAll('.waypoint');
+                const currentIndex = Array.from(waypoints).indexOf(input);
+                const lastWaypoint = waypoints[waypoints.length - 1];
+                
+                if (input === lastWaypoint) {
+                    const waypointsContainer = document.getElementById('waypoints-container');
+                    waypointsContainer.appendChild(createWaypointInput());
+                }
+                
+                setTimeout(() => {
+                    const updatedWaypoints = document.querySelectorAll('.waypoint');
+                    const nextInput = updatedWaypoints[currentIndex + 1];
+                    if (nextInput) {
+                        nextInput.focus();
+                    }
+                }, 50);
+
+                calculateRouteIfPossible();
+            }
+
+            input.addEventListener('focus', () => {
+                if (input.value.trim().length >= 3) {
+                    const event = new Event('input');
+                    input.dispatchEvent(event);
+                }
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !suggestionsContainer.contains(e.target)) {
+                    suggestionsContainer.style.display = 'none';
+                    selectedIndex = -1;
+                }
+            });
+        }
+
+        async function calculateRouteIfPossible() {
+            try {
+                const waypointInputs = Array.from(document.querySelectorAll('.waypoint'))
+                    .map(input => ({
+                        element: input.parentElement,
+                        value: input.value.trim()
+                    }))
+                    .filter(wp => wp.value !== '');
+
+                clearMap();
+
+                // Handle single waypoint case
+                if (waypointInputs.length === 1) {
+                    const result = await geocodeAddress(waypointInputs[0].value);
+                    addMarker({ lat: result.lat, lng: result.lng }, 1);
+                    
+                    const box = waypointInputs[0].element;
+                    const container = box.closest('.waypoint-container');
+                    const input = box.querySelector('.waypoint');
+                    
+                    if (result.address) {
+                        input.value = result.address;
+                        geocodedPoints.set(input.value.trim(), result);
+                    }
+                    
+                    const oldCoordsDisplay = box.querySelector('.coordinates-display');
+                    if (oldCoordsDisplay) {
+                        oldCoordsDisplay.remove();
+                    }
+                    
+                    const coordsDisplay = document.createElement('div');
+                    coordsDisplay.className = 'coordinates-display';
+                    coordsDisplay.textContent = `${result.lat.toFixed(6)}, ${result.lng.toFixed(6)}`;
+                    box.appendChild(coordsDisplay);
+
+                    map.setCenter({ lat: result.lat, lng: result.lng });
+                    map.setZoom(14);
+                    return;
+                }
+
+                if (waypointInputs.length < 2) {
+                    return;
+                }
+
+                const geoResults = await Promise.all(
+                    waypointInputs.map(async wp => {
+                        if (geocodedPoints.has(wp.value)) {
+                            return geocodedPoints.get(wp.value);
+                        }
+                        const result = await geocodeAddress(wp.value);
+                        geocodedPoints.set(wp.value, result);
+                        return result;
+                    })
+                );
+
+                geoResults.forEach((result, index) => {
+                    addMarker({ lat: result.lat, lng: result.lng }, index + 1);
+                    
+                    const box = waypointInputs[index].element;
+                    const container = box.closest('.waypoint-container');
+                    const input = box.querySelector('.waypoint');
+                    
+                    if (result.address) {
+                        input.value = result.address;
+                        geocodedPoints.set(input.value.trim(), result);
+                    }
+                    
+                    const oldCoordsDisplay = box.querySelector('.coordinates-display');
+                    if (oldCoordsDisplay) {
+                        oldCoordsDisplay.remove();
+                    }
+                    
+                    const coordsDisplay = document.createElement('div');
+                    coordsDisplay.className = 'coordinates-display';
+                    coordsDisplay.textContent = `${result.lat.toFixed(6)}, ${result.lng.toFixed(6)}`;
+                    box.appendChild(coordsDisplay);
+                    
+                    const numberDiv = container.querySelector('.waypoint-number');
+                    numberDiv.textContent = (index + 1).toString();
+                });
+
+                const origin = { lat: geoResults[0].lat, lng: geoResults[0].lng };
+                const destination = { 
+                    lat: geoResults[geoResults.length - 1].lat, 
+                    lng: geoResults[geoResults.length - 1].lng 
+                };
+                const viaPoints = geoResults.slice(1, -1).map(result => ({
+                    lat: result.lat,
+                    lng: result.lng
+                }));
+
+                let routeUrl = `https://router.hereapi.com/v8/routes` +
+                    `?apiKey=${API_KEY}` +
+                    `&transportMode=car` +
+                    `&routingMode=fast` +
+                    `&return=polyline,summary,actions,instructions` +
+                    `&lang=${currentLang}` +
+                    `&origin=${origin.lat},${origin.lng}` +
+                    `&destination=${destination.lat},${destination.lng}`;
+
+                if (viaPoints.length > 0) {
+                    routeUrl += viaPoints.map(point =>
+                        `&via=${point.lat},${point.lng}`
+                    ).join('');
+                }
+
+                const response = await fetch(routeUrl);
+
+                if (!response.ok) {
+                    throw new Error(`${translations.routeError}: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.routes && result.routes[0]) {
+                    const route = result.routes[0];
+                    const sections = route.sections;
+
+                    sections.forEach(section => {
+                        const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+                        const polyline = new H.map.Polyline(lineString, {
+                            style: { strokeColor: '#0066CC', lineWidth: 5 }
+                        });
+
+                        map.addObject(polyline);
+                        routeLines.push(polyline);
+                    });
+
+                    const allCoordinates = [origin, destination, ...viaPoints];
+                    let minLat = Math.min(...allCoordinates.map(coord => coord.lat));
+                    let maxLat = Math.max(...allCoordinates.map(coord => coord.lat));
+                    let minLng = Math.min(...allCoordinates.map(coord => coord.lng));
+                    let maxLng = Math.max(...allCoordinates.map(coord => coord.lng));
+
+                    const latMargin = (maxLat - minLat) * 0.2;
+                    const lngMargin = (maxLng - minLng) * 0.2;
+
+                    minLat -= latMargin;
+                    maxLat += latMargin;
+                    minLng -= lngMargin;
+                    maxLng += lngMargin;
+
+                    const fullBoundingBox = new H.geo.Rect(maxLat, minLng, minLat, maxLng);
+                    map.getViewModel().setLookAtData({
+                        bounds: fullBoundingBox
+                    });
+
+                    const totalDistance = sections.reduce((sum, section) => sum + section.summary.length, 0);
+                    const totalTime = sections.reduce((sum, section) => sum + section.summary.duration, 0);
+
+                    document.getElementById('route-info').innerHTML = `
+                        <strong>${translations.routeInfo}</strong><br>
+                        ${translations.distance}: ${(totalDistance / 1000).toFixed(1)} km<br>
+                        ${translations.time}: ${Math.round(totalTime / 60)} ${translations.minutes}
+                    `;
+                } else {
+                    throw new Error(translations.routeError);
+                }
+
+            } catch (error) {
+                console.error('Route calculation error:', error);
+                document.getElementById('route-info').innerHTML = `
+                    <div class="error-message">
+                        ${error.message || translations.routeError}
+                    </div>
+                `;
+            }
+        }
+
+		// Initialize application
+		const waypointsContainer = document.getElementById('waypoints-container');
+		waypointsContainer.appendChild(createWaypointInput());
+
+		// Nasłuchuj zdarzeń input tylko dla dodawania nowych pól
+		waypointsContainer.addEventListener('input', (e) => {
+			if (e.target.classList.contains('waypoint')) {
+				const waypoints = document.querySelectorAll('.waypoint');
+				const lastWaypoint = waypoints[waypoints.length - 1];
+				
+				// Dodaj nowe pole tylko jeśli ostatnie nie jest puste
+				if (e.target === lastWaypoint && e.target.value.trim() !== '') {
+					waypointsContainer.appendChild(createWaypointInput());
+				}
+			}
+		});
+
+		// Automatyczny focus na pierwszym polu po załadowaniu strony
+		document.addEventListener('DOMContentLoaded', () => {
+			const firstWaypoint = document.querySelector('.waypoint');
+			if (firstWaypoint) {
+				firstWaypoint.focus();
+			}
+		});
+
+    </script>
+</body>
+</html
