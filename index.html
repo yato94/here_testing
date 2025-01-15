@@ -39,18 +39,18 @@
 
         .waypoint-number {
             position: absolute;
-            left: -18px;
+            left: -8px;
             top: 50%;
             transform: translateY(-50%);
-            width: 16px;
-            height: 16px;
+            width: 20px;
+            height: 20px;
             background: #0066CC;
             color: white;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: 12px;
             font-weight: bold;
             cursor: move;
             cursor: grab;
@@ -365,10 +365,11 @@
             document.getElementById('map-container'),
             customTileLayer,
             {
+                tileSize: 512,
+                pixelRatio: window.devicePixelRatio || 1,
                 zoom: 5.5,
                 center: { lat: 50.0, lng: 15.0 },
-		pixelRatio: window.devicePixelRatio || 1,
-        	tileSize: 512  // To powinno odpowiadać size=512 z URL
+                renderBaseBackground: true, // Dodajemy tło podczas ładowania
             }
         );
 
@@ -1121,7 +1122,7 @@
                     box.appendChild(coordsDisplay);
 
                     map.setCenter({ lat: result.lat, lng: result.lng });
-                    map.setZoom(14);
+                    map.setZoom(7);
                     return;
                 }
 
