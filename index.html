@@ -180,12 +180,163 @@
             font-size: 12px;
             margin-top: 4px;
         }
+
+        .route-settings {
+            border-top: 1px solid #ddd;
+            background-color: #f5f5f5;
+        }
+
+        .route-settings .row {
+            margin-bottom: 15px;
+        }
+
+        .route-settings p {
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .route-settings .button-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .route-settings button {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            color: #333;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            flex: 1;
+            min-width: 90px;
+            text-align: center;
+        }
+
+        .route-settings button:hover {
+            background-color: #e9ecef;
+        }
+
+        .route-settings button.active {
+            background-color: #0066CC;
+            color: white;
+            border-color: #0066CC;
+        }
+
+        #excluded-areas button.active {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+
+        .select-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        .select-container {
+            flex: 1;
+        }
+
+        .route-settings select {
+            width: 100%;
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+            font-size: 14px;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .route-settings select:hover {
+            border-color: #bbb;
+        }
+
+        .route-settings select:focus {
+            outline: none;
+            border-color: #0066CC;
+        }
     </style>
 </head>
 <body>
     <div id="sidebar">
         <div id="waypoints-container"></div>
         <div id="route-info"></div>
+        <!-- Panel ustawień trasy - dodaj przed zamknięciem diva "sidebar" -->
+        <div id="route-settings" class="route-settings" style="margin-top: auto; padding: 20px;">
+            <h3 style="margin-bottom: 15px; font-size: 16px;">Ustawienia trasy</h3>
+            
+            <!-- First Row: Default Selection -->
+            <div class="row">
+                <p>Domyślne ustawienia:</p>
+                <div class="button-group" id="default-combination">
+                    <button data-weight="42000" data-axles="5">Duży pojazd</button>
+                    <button data-weight="18000" data-axles="3">Średni pojazd</button>
+                    <button data-weight="7490" data-axles="2">Mały pojazd</button>
+                </div>
+            </div>
+
+            <!-- Second Row: Weight Selection -->
+            <div class="row">
+                <p>Waga pojazdu (t):</p>
+                <div class="button-group" id="weight-selection">
+                    <button data-value="7490">3,5 - 7,49</button>
+                    <button data-value="11490">7,5 - 11,49</button>
+                    <button data-value="18000">12 - 18</button>
+                    <button data-value="42000">18 - 42</button>
+                </div>
+            </div>
+
+            <!-- Third Row: Number of Axles -->
+            <div class="row">
+                <p>Liczba osi:</p>
+                <div class="button-group" id="axles-selection">
+                    <button data-value="2">2</button>
+                    <button data-value="3">3</button>
+                    <button data-value="4">4</button>
+                    <button data-value="5+">5+</button>
+                </div>
+            </div>
+
+            <!-- Fourth Row: EUR and CO2 Class -->
+            <div class="row">
+                <div class="select-group">
+                    <div class="select-container">
+                        <p>Klasa EUR:</p>
+                        <select id="euro-class">
+                            <option value="2">EURO 2</option>
+                            <option value="3">EURO 3</option>
+                            <option value="4">EURO 4</option>
+                            <option value="5">EURO 5</option>
+                            <option value="6">EURO 6</option>
+                        </select>
+                    </div>
+                    <div class="select-container">
+                        <p>Klasa CO2:</p>
+                        <select id="co2-class">
+                            <option value="1">CO2 I</option>
+                            <option value="2">CO2 II</option>
+                            <option value="3">CO2 III</option>
+                            <option value="4">CO2 IV</option>
+                            <option value="5">CO2 V</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fifth Row: Excluded Areas -->
+            <div class="row">
+                <p>Wyłączone obszary:</p>
+                <div class="button-group" id="excluded-areas">
+                    <button data-value="CH">CH</button>
+                    <button data-value="Fussen">Füssen</button>
+                </div>
+            </div>
+        </div>
     </div>
     <div id="map-container"></div>
 	<script>
@@ -348,17 +499,91 @@
             apikey: API_KEY
         });
 
-        const customTileProvider = new H.map.provider.ImageTileProvider({
-            getURL: (x, y, z) => {
-                return `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8?xnlp=CL_JSMv3.1.61.1` +
-                       `&apikey=${API_KEY}` +
-                       `&style=logistics.day` +
-                       `&features=vehicle_restrictions:active_and_inactive,pois:disabled,congestion_zones:all` +
-                       `&size=512` +
-                       `&lang=${currentLang}` +
-                       `&ppi=200`;
-            }
-        });
+        const customTileProvider = (() => {
+            const cache = new Map();
+            let totalRequests = 0;
+            let cacheHits = 0;
+
+            const provider = new H.map.provider.ImageTileProvider({
+                getURL: (x, y, z) => {
+                    const tileKey = `${z}/${x}/${y}`;
+                    const cachedTile = cache.get(tileKey);
+                    
+                    if (cachedTile) {
+                        const now = Date.now();
+                        if (now < cachedTile.expiry) {
+                            cacheHits++;
+                            console.log(`%cUżyto cache dla: ${tileKey} (Cache hits: ${cacheHits})`, 'color: green');
+                            return cachedTile.url;
+                        }
+                        console.log(`%cWygasł cache dla: ${tileKey}`, 'color: orange');
+                        cache.delete(tileKey);
+                    }
+
+                    totalRequests++;
+                    console.log(`%cNowe żądanie #${totalRequests} dla: ${tileKey}`, 'color: blue');
+                    
+                    const url = `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8` +
+                            `?xnlp=CL_JSMv3.1.61.1` +
+                            `&apikey=${API_KEY}` +
+                            `&style=logistics.day` +
+                            `&features=vehicle_restrictions:active_and_inactive,pois:disabled,congestion_zones:all` +
+                            `&size=512` +
+                            `&lang=${currentLang}` +
+                            `&ppi=200`;
+
+                    cache.set(tileKey, {
+                        url: url,
+                        expiry: Date.now() + (86400 * 1000) // 24 godziny
+                    });
+
+                    return url;
+                }
+            });
+
+            // Dodajemy rozszerzone statystyki
+            provider.getCacheStats = () => {
+                const stats = {
+                    cacheSize: cache.size,
+                    totalRequests: totalRequests,
+                    cacheHits: cacheHits,
+                    hitRate: totalRequests ? (cacheHits / totalRequests * 100).toFixed(2) + '%' : '0%',
+                    cachedTiles: Array.from(cache.keys())
+                };
+                
+                console.table({
+                    'Rozmiar cache': stats.cacheSize,
+                    'Całkowita liczba żądań': stats.totalRequests,
+                    'Trafienia cache': stats.cacheHits,
+                    'Skuteczność cache': stats.hitRate
+                });
+                
+                return stats;
+            };
+
+            // Dodajemy czyszczenie co 5 minut zamiast co godzinę (do testów)
+            setInterval(() => {
+                const now = Date.now();
+                let clearedCount = 0;
+                for (const [key, value] of cache.entries()) {
+                    if (now >= value.expiry) {
+                        cache.delete(key);
+                        clearedCount++;
+                    }
+                }
+                if (clearedCount > 0) {
+                    console.log(`%cWyczyszczono ${clearedCount} wygasłych kafelków z cache`, 'color: red');
+                }
+            }, 300000); // 5 minut
+
+            return provider;
+        })();
+
+        // LOGOWANIE DO CACHE _ MOŻNA POTEM USUNĄĆ!
+        const getCacheStats = () => {
+            console.log('Liczba kafelków w cache:', cache.size);
+            console.log('Klucze w cache:', Array.from(cache.keys()));
+        };
 
         const customTileLayer = new H.map.layer.TileLayer(customTileProvider);
         const map = new H.Map(
@@ -1177,18 +1402,53 @@
                     lng: result.lng
                 }));
 
+                // Pobierz parametry pojazdu z aktywnych przycisków
+                const weightBtn = document.querySelector('#weight-selection button.active');
+                const axlesBtn = document.querySelector('#axles-selection button.active');
+                const weight = weightBtn ? parseInt(weightBtn.dataset.value) : 3500;
+                const axleCount = axlesBtn ? parseInt(axlesBtn.dataset.value) : 2;
+                const euroClass = document.querySelector('#euro-class').value;
+                const co2Class = document.querySelector('#co2-class').value;
+
+
+                // Dostosuj parametry w zależności od liczby osi
+                const trailerCount = axleCount <= 2 ? 0 : 1;
+                const trailerAxleCount = axleCount <= 2 ? 0 : 2;
+                const tiresCount = axleCount <= 2 ? 4 : 10;
+
                 let routeUrl = `https://router.hereapi.com/v8/routes` +
-                    `?apiKey=${API_KEY}` +
-                    `&transportMode=car` +
-                    `&routingMode=fast` +
-                    `&return=polyline,summary,actions,instructions` +
-                    `&lang=${currentLang}` +
-                    `&origin=${origin.lat},${origin.lng}` +
-                    `&destination=${destination.lat},${destination.lng}`;
+                `?xnlp=CL_JSMv3.1.61.1` +
+                `&apiKey=${API_KEY}` +
+                `&transportMode=truck` +
+                `&routingMode=fast` +
+                `&units=metric` +
+                `&lang=${currentLang}` +
+                `&currency=EUR` +
+                `&spans=tollSystems,truckAttributes,countryCode,length,routeNumbers,notices` +
+                `&return=polyline,tolls,summary,travelSummary,passthrough,routeHandle,incidents,actions,potentialTimeDependentViolations` +
+                `&vehicle[height]=400` +
+                `&vehicle[width]=255` +
+                `&vehicle[length]=1650` +
+                `&vehicle[currentWeight]=${weight}` +
+                `&vehicle[grossWeight]=${weight}` +
+                `&vehicle[axleCount]=${axleCount}` +
+                `&vehicle[tiresCount]=${tiresCount}` +
+                `&vehicle[engineType]=internalCombustion` +
+                `&vehicle[weightPerAxle]=10000` +
+                `&vehicle[heightAboveFirstAxle]=400` +
+                `&vehicle[trailerCount]=${trailerCount}` +
+                `&vehicle[trailerAxleCount]=${trailerAxleCount}` +
+                `&departureTime=any` +
+                `&tolls[emissionType]=euro${euroClass};co2class=${co2Class}` +
+                `&tolls[summaries]=total` +
+                `&origin=${origin.lat},${origin.lng}` +
+                `&destination=${destination.lat},${destination.lng}`;
 
                 if (viaPoints.length > 0) {
                     routeUrl += viaPoints.map(point =>
-                        `&via=${point.lat},${point.lng}`
+                        `&via=${point.lat},${point.lng}` + 
+                        (point.passThrough ? '!passThrough=true' : '') +
+                        '&snapRadius=5000'
                     ).join('');
                 }
 
@@ -1236,13 +1496,32 @@
                     const totalDistance = sections.reduce((sum, section) => sum + section.summary.length, 0);
                     const totalTime = sections.reduce((sum, section) => sum + section.summary.duration, 0);
 
+                    // Pobieranie informacji o opłatach
+                    let tollInfo = '';
+                    if (route.sections) {
+                        let totalToll = 0;
+                        
+                        route.sections.forEach(section => {
+                            if (section.summary?.tolls?.total) {
+                                totalToll += section.summary.tolls.total.value;
+                            }
+                        });
+
+                        if (totalToll > 0) {
+                            tollInfo = `<br>Opłaty drogowe: ${totalToll.toFixed(2)} EUR`;
+                        } else {
+                            tollInfo = '<br>Brak opłat drogowych';
+                        }
+                    } else {
+                        tollInfo = '<br>Brak opłat drogowych';
+                    }
+
                     document.getElementById('route-info').innerHTML = `
                         <strong>${translations.routeInfo}</strong><br>
                         ${translations.distance}: ${(totalDistance / 1000).toFixed(1)} km<br>
                         ${translations.time}: ${Math.round(totalTime / 60)} ${translations.minutes}
+                        ${tollInfo}
                     `;
-                } else {
-                    throw new Error(translations.routeError);
                 }
 
             } catch (error) {
@@ -1280,6 +1559,148 @@
 			}
 		});
 
+
+
+        // Inicjalizacja lokalnego storage
+        const STORAGE_KEY = 'routeSettings';
+
+        // Funkcja do zapisywania ustawień
+        function saveSettings() {
+            const settings = {
+                weight: document.querySelector('#weight-selection button.active')?.dataset.value,
+                axles: document.querySelector('#axles-selection button.active')?.dataset.value,
+                euroClass: document.querySelector('#euro-class')?.value,
+                co2Class: document.querySelector('#co2-class')?.value,
+                excludedAreas: Array.from(document.querySelectorAll('#excluded-areas button.active'))
+                    .map(btn => btn.dataset.value),
+                defaultCombination: document.querySelector('#default-combination button.active')?.dataset.value
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        }
+
+        // Funkcja do wczytywania ustawień
+        function loadSettings() {
+            try {
+                const settings = JSON.parse(localStorage.getItem(STORAGE_KEY));
+                if (settings) {
+                    if (settings.weight) {
+                        document.querySelector(`#weight-selection button[data-value="${settings.weight}"]`)?.classList.add('active');
+                    }
+                    if (settings.axles) {
+                        document.querySelector(`#axles-selection button[data-value="${settings.axles}"]`)?.classList.add('active');
+                    }
+                    if (settings.euroClass) {
+                        document.querySelector('#euro-class').value = settings.euroClass;
+                    }
+                    if (settings.co2Class) {
+                        document.querySelector('#co2-class').value = settings.co2Class;
+                    }
+                    if (settings.excludedAreas) {
+                        settings.excludedAreas.forEach(area => {
+                            document.querySelector(`#excluded-areas button[data-value="${area}"]`)?.classList.add('active');
+                        });
+                    }
+                    // Sprawdź czy jest pasująca kombinacja domyślna
+                    checkDefaultCombination();
+                }
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+
+        // Funkcja do sprawdzania i zaznaczania domyślnej kombinacji
+        function checkDefaultCombination() {
+            const activeWeight = document.querySelector('#weight-selection button.active')?.dataset.value;
+            const activeAxles = document.querySelector('#axles-selection button.active')?.dataset.value;
+
+            const defaultButtons = document.querySelectorAll('#default-combination button');
+            defaultButtons.forEach(button => {
+                button.classList.remove('active');
+                if (button.dataset.weight === activeWeight && button.dataset.axles === activeAxles) {
+                    button.classList.add('active');
+                }
+            });
+        }
+
+        // Event listenery dla przycisków domyślnych kombinacji
+        document.querySelectorAll('#default-combination button').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('#default-combination button').forEach(btn => 
+                    btn.classList.remove('active'));
+                button.classList.add('active');
+
+                const weight = button.dataset.weight;
+                const axles = button.dataset.axles;
+
+                document.querySelectorAll('#weight-selection button').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.value === weight);
+                });
+
+                document.querySelectorAll('#axles-selection button').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.value === axles);
+                });
+
+                saveSettings();
+                if (typeof calculateRouteIfPossible === 'function') {
+                    calculateRouteIfPossible();
+                }
+            });
+        });
+
+        // Event listenery dla wagi i osi
+        ['weight-selection', 'axles-selection'].forEach(id => {
+            document.querySelectorAll(`#${id} button`).forEach(button => {
+                button.addEventListener('click', () => {
+                    document.querySelectorAll(`#${id} button`).forEach(btn => 
+                        btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    checkDefaultCombination();
+                    saveSettings();
+                    if (typeof calculateRouteIfPossible === 'function') {
+                        calculateRouteIfPossible();
+                    }
+                });
+            });
+        });
+
+        // Event listenery dla selectów
+        ['euro-class', 'co2-class'].forEach(id => {
+            document.getElementById(id).addEventListener('change', () => {
+                saveSettings();
+                if (typeof calculateRouteIfPossible === 'function') {
+                    calculateRouteIfPossible();
+                }
+            });
+        });
+
+        // Event listenery dla wyłączonych obszarów
+        document.querySelectorAll('#excluded-areas button').forEach(button => {
+            button.addEventListener('click', () => {
+                button.classList.toggle('active');
+                saveSettings();
+                if (typeof calculateRouteIfPossible === 'function') {
+                    calculateRouteIfPossible();
+                }
+            });
+        });
+
+        // Wczytaj ustawienia przy starcie
+        document.addEventListener('DOMContentLoaded', loadSettings);
+
+
+        function getVehicleParameters() {
+            const weightBtn = document.querySelector('#weight-selection button.active');
+            const axlesBtn = document.querySelector('#axles-selection button.active');
+            
+            return {
+                weight: weightBtn ? parseInt(weightBtn.dataset.value) : 3500, // wartość w kg
+                axleCount: axlesBtn ? parseInt(axlesBtn.dataset.value) : 2,
+                height: 400,  // 4m w centymetrach
+                width: 255,   // 2.55m w centymetrach
+                length: 1650  // 16.5m w centymetrach
+            };
+        }
     </script>
 </body>
 </html
