@@ -429,7 +429,7 @@
                     inputPlaceholder: 'Wpisz adres lub współrzędne GPS',
                     routeInfo: 'Informacje o trasie:',
                     distance: 'Dystans',
-                    time: 'Czas',
+                    time: 'Czas jazdy',
                     minutes: 'minut',
                     routeError: 'Wystąpił błąd podczas wyznaczania trasy',
                     addressNotFound: 'Nie znaleziono adresu',
@@ -1485,7 +1485,7 @@
                     document.getElementById('route-info').innerHTML = `
                         <strong>${translations.routeInfo}</strong><br>
                         ${translations.distance}: ${(totalDistance / 1000).toFixed(1)} km<br>
-                        ${translations.time}: ${Math.round(totalTime / 60)} ${translations.minutes}
+                        ${translations.time}: ${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min
                         ${tollInfo}
                     `;
                 }
