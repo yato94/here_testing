@@ -499,91 +499,17 @@
             apikey: API_KEY
         });
 
-        const customTileProvider = (() => {
-            const cache = new Map();
-            let totalRequests = 0;
-            let cacheHits = 0;
-
-            const provider = new H.map.provider.ImageTileProvider({
-                getURL: (x, y, z) => {
-                    const tileKey = `${z}/${x}/${y}`;
-                    const cachedTile = cache.get(tileKey);
-                    
-                    if (cachedTile) {
-                        const now = Date.now();
-                        if (now < cachedTile.expiry) {
-                            cacheHits++;
-                            console.log(`%cUżyto cache dla: ${tileKey} (Cache hits: ${cacheHits})`, 'color: green');
-                            return cachedTile.url;
-                        }
-                        console.log(`%cWygasł cache dla: ${tileKey}`, 'color: orange');
-                        cache.delete(tileKey);
-                    }
-
-                    totalRequests++;
-                    console.log(`%cNowe żądanie #${totalRequests} dla: ${tileKey}`, 'color: blue');
-                    
-                    const url = `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8` +
-                            `?xnlp=CL_JSMv3.1.61.1` +
-                            `&apikey=${API_KEY}` +
-                            `&style=logistics.day` +
-                            `&features=vehicle_restrictions:active_and_inactive,pois:disabled,congestion_zones:all` +
-                            `&size=512` +
-                            `&lang=${currentLang}` +
-                            `&ppi=200`;
-
-                    cache.set(tileKey, {
-                        url: url,
-                        expiry: Date.now() + (86400 * 1000) // 24 godziny
-                    });
-
-                    return url;
-                }
-            });
-
-            // Dodajemy rozszerzone statystyki
-            provider.getCacheStats = () => {
-                const stats = {
-                    cacheSize: cache.size,
-                    totalRequests: totalRequests,
-                    cacheHits: cacheHits,
-                    hitRate: totalRequests ? (cacheHits / totalRequests * 100).toFixed(2) + '%' : '0%',
-                    cachedTiles: Array.from(cache.keys())
-                };
-                
-                console.table({
-                    'Rozmiar cache': stats.cacheSize,
-                    'Całkowita liczba żądań': stats.totalRequests,
-                    'Trafienia cache': stats.cacheHits,
-                    'Skuteczność cache': stats.hitRate
-                });
-                
-                return stats;
-            };
-
-            // Dodajemy czyszczenie co 5 minut zamiast co godzinę (do testów)
-            setInterval(() => {
-                const now = Date.now();
-                let clearedCount = 0;
-                for (const [key, value] of cache.entries()) {
-                    if (now >= value.expiry) {
-                        cache.delete(key);
-                        clearedCount++;
-                    }
-                }
-                if (clearedCount > 0) {
-                    console.log(`%cWyczyszczono ${clearedCount} wygasłych kafelków z cache`, 'color: red');
-                }
-            }, 300000); // 5 minut
-
-            return provider;
-        })();
-
-        // LOGOWANIE DO CACHE _ MOŻNA POTEM USUNĄĆ!
-        const getCacheStats = () => {
-            console.log('Liczba kafelków w cache:', cache.size);
-            console.log('Klucze w cache:', Array.from(cache.keys()));
-        };
+        const customTileProvider = new H.map.provider.ImageTileProvider({
+            getURL: (x, y, z) => {
+                return `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8?xnlp=CL_JSMv3.1.61.1` +
+                       `&apikey=${API_KEY}` +
+                       `&style=logistics.day` +
+                       `&features=vehicle_restrictions:active_and_inactive,pois:disabled,congestion_zones:all` +
+                       `&size=512` +
+                       `&lang=${currentLang}` +
+                       `&ppi=200`;
+            }
+        });
 
         const customTileLayer = new H.map.layer.TileLayer(customTileProvider);
         const map = new H.Map(
@@ -597,6 +523,10 @@
                 renderBaseBackground: true, // Dodajemy tło podczas ładowania
             }
         );
+
+        window.addEventListener('resize', () => {
+            map.getViewPort().resize();
+        });
 
         const ui = H.ui.UI.createDefault(map, platform.createDefaultLayers());
         const mapEvents = new H.mapevents.MapEvents(map);
@@ -1402,7 +1332,7 @@
                     lng: result.lng
                 }));
 
-                // Pobierz parametry pojazdu z aktywnych przycisków
+                // Get vehicle parameters
                 const weightBtn = document.querySelector('#weight-selection button.active');
                 const axlesBtn = document.querySelector('#axles-selection button.active');
                 const weight = weightBtn ? parseInt(weightBtn.dataset.value) : 3500;
@@ -1410,50 +1340,86 @@
                 const euroClass = document.querySelector('#euro-class').value;
                 const co2Class = document.querySelector('#co2-class').value;
 
-
-                // Dostosuj parametry w zależności od liczby osi
+                // Adjusted vehicle configuration based on axle count
                 const trailerCount = axleCount <= 2 ? 0 : 1;
-                const trailerAxleCount = axleCount <= 2 ? 0 : 2;
-                const tiresCount = axleCount <= 2 ? 4 : 10;
+                const trailerAxleCount = axleCount <= 2 ? 0 : axleCount - 2; // Subtract truck axles
+                const tiresCount = axleCount <= 2 ? 4 : (axleCount * 2); // 2 tires per axle
 
+                // Check excluded areas
+                const excludedAreas = [];
+                const excludedButtons = document.querySelectorAll('#excluded-areas button.active');
+                
+                excludedButtons.forEach(button => {
+                    if (button.dataset.value === 'CH') {
+                        excludedAreas.push('CHE'); // Country code for Switzerland
+                    } else if (button.dataset.value === 'Fussen') {
+                        excludedAreas.push({
+                            type: 'bbox',
+                            west: 10.503569952001044,
+                            south: 47.40623942387259,
+                            east: 10.88272284357322,
+                            north: 47.648267570933086
+                        });
+                    }
+                });
+
+                // Construct route URL with exclusions
                 let routeUrl = `https://router.hereapi.com/v8/routes` +
-                `?xnlp=CL_JSMv3.1.61.1` +
-                `&apiKey=${API_KEY}` +
-                `&transportMode=truck` +
-                `&routingMode=fast` +
-                `&units=metric` +
-                `&lang=${currentLang}` +
-                `&currency=EUR` +
-                `&spans=tollSystems,truckAttributes,countryCode,length,routeNumbers,notices` +
-                `&return=polyline,tolls,summary,travelSummary,passthrough,routeHandle,incidents,actions,potentialTimeDependentViolations` +
-                `&vehicle[height]=400` +
-                `&vehicle[width]=255` +
-                `&vehicle[length]=1650` +
-                `&vehicle[currentWeight]=${weight}` +
-                `&vehicle[grossWeight]=${weight}` +
-                `&vehicle[axleCount]=${axleCount}` +
-                `&vehicle[tiresCount]=${tiresCount}` +
-                `&vehicle[engineType]=internalCombustion` +
-                `&vehicle[weightPerAxle]=10000` +
-                `&vehicle[heightAboveFirstAxle]=400` +
-                `&vehicle[trailerCount]=${trailerCount}` +
-                `&vehicle[trailerAxleCount]=${trailerAxleCount}` +
-                `&departureTime=any` +
-                `&tolls[emissionType]=euro${euroClass};co2class=${co2Class}` +
-                `&tolls[summaries]=total` +
-                `&origin=${origin.lat},${origin.lng}` +
-                `&destination=${destination.lat},${destination.lng}`;
+                    `?xnlp=CL_JSMv3.1.61.1` +
+                    `&apiKey=${API_KEY}` +
+                    `&transportMode=truck` +
+                    `&routingMode=fast` +
+                    `&units=metric` +
+                    `&lang=${currentLang}` +
+                    `&currency=EUR` +
+                    `&spans=tollSystems,truckAttributes,countryCode,length,routeNumbers,notices` +
+                    `&return=polyline,tolls,summary,travelSummary,passthrough,routeHandle,incidents,actions,potentialTimeDependentViolations`;
+
+                // Add vehicle parameters
+                routeUrl += `&vehicle[height]=400` +
+                    `&vehicle[width]=255` +
+                    `&vehicle[length]=1650` +
+                    `&vehicle[currentWeight]=${weight}` +
+                    `&vehicle[grossWeight]=${weight}` +
+                    `&vehicle[axleCount]=${axleCount}` +
+                    `&vehicle[tiresCount]=${tiresCount}` +
+                    `&vehicle[engineType]=internalCombustion` +
+                    `&vehicle[weightPerAxle]=10000` +
+                    `&vehicle[heightAboveFirstAxle]=400`;
+
+                // Add trailer parameters only if there is a trailer
+                if (trailerCount > 0) {
+                    routeUrl += `&vehicle[trailerCount]=${trailerCount}` +
+                            `&vehicle[trailerAxleCount]=${trailerAxleCount}`;
+                }
+
+                // Add excluded areas
+                excludedAreas.forEach(area => {
+                    if (typeof area === 'string') {
+                        routeUrl += `&exclude[countries]=${area}`;
+                    } else if (area.type === 'bbox') {
+                        routeUrl += `&avoid[areas]=bbox:${area.west},${area.south},${area.east},${area.north}`;
+                    }
+                });
+
+                // Add waypoints
+                routeUrl += `&origin=${origin.lat},${origin.lng}` +
+                    `&destination=${destination.lat},${destination.lng}`;
 
                 if (viaPoints.length > 0) {
                     routeUrl += viaPoints.map(point =>
-                        `&via=${point.lat},${point.lng}` + 
+                        `&via=${point.lat},${point.lng}` +
                         (point.passThrough ? '!passThrough=true' : '') +
                         '&snapRadius=5000'
                     ).join('');
                 }
 
-                const response = await fetch(routeUrl);
+                // Add toll parameters
+                routeUrl += `&departureTime=any` +
+                    `&tolls[emissionType]=euro${euroClass};co2class=${co2Class}` +
+                    `&tolls[summaries]=total`;
 
+                const response = await fetch(routeUrl);
                 if (!response.ok) {
                     throw new Error(`${translations.routeError}: ${response.status}`);
                 }
@@ -1533,7 +1499,6 @@
                 `;
             }
         }
-
 		// Initialize application
 		const waypointsContainer = document.getElementById('waypoints-container');
 		waypointsContainer.appendChild(createWaypointInput());
