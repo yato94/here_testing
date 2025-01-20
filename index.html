@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transport Nomad</title>
+    <title>HERE Maps Route Planner</title>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
@@ -1573,9 +1573,160 @@
                             style: { strokeColor: '#0066CC', lineWidth: 5 }
                         });
 
+                        // Dodaj marker-uchwyt (początkowo ukryty)
+                        const svgMarkup = '<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">' +
+                                        '<circle cx="6" cy="6" r="5" fill="white" stroke="#0066CC" stroke-width="2"/>' +
+                                        '</svg>';
+                        
+                        const dragHandle = new H.map.Marker({ lat: 0, lng: 0 }, {
+                            icon: new H.map.Icon(svgMarkup),
+                            visibility: false,
+                            volatility: true
+                        });
+
+                        // Ustaw właściwość draggable
+                        dragHandle.draggable = true;
+
+                        map.addObject(dragHandle);
+                        routeLines.push(dragHandle);
+
+                        // Obsługa ruchu myszy nad polyline
+                        let isDragging = false;
+
+                        polyline.addEventListener('pointermove', (evt) => {
+                            if (isDragging) return;
+                            
+                            const pointer = evt.currentPointer;
+                            const coordinates = lineString.getLatLngAltArray();
+                            let closestPoint = null;
+                            let minDistance = Infinity;
+
+                            // Znajdź najbliższy punkt na linii
+                            for(let i = 0; i < coordinates.length - 2; i += 3) {
+                                const point = map.geoToScreen({ 
+                                    lat: coordinates[i], 
+                                    lng: coordinates[i + 1] 
+                                });
+                                const distance = Math.hypot(point.x - pointer.viewportX, point.y - pointer.viewportY);
+                                
+                                if (distance < minDistance) {
+                                    minDistance = distance;
+                                    closestPoint = { lat: coordinates[i], lng: coordinates[i + 1] };
+                                }
+                            }
+
+                            // Jeśli kursor jest wystarczająco blisko linii
+                            if (minDistance < 15) { // 15 pikseli tolerancji
+                                dragHandle.setGeometry(closestPoint);
+                                dragHandle.setVisibility(true);
+                                map.getViewPort().element.style.cursor = 'grab';
+                            } else {
+                                dragHandle.setVisibility(false);
+                                map.getViewPort().element.style.cursor = 'default';
+                            }
+                        });
+
+                        // Obsługa przeciągania
+                        dragHandle.addEventListener('pointerdown', (evt) => {
+                            evt.stopPropagation();
+                            isDragging = true;
+                            currentDragHandle = evt.target;
+                            behavior.disable();
+                            map.getViewPort().element.style.cursor = 'grabbing';
+                            
+                            // Dodaj tymczasowe listenery do dokumentu
+                            const handlePointerMove = (e) => {
+                                if (!isDragging) return;
+                                const rect = map.getViewPort().element.getBoundingClientRect();
+                                const pointer = {
+                                    viewportX: e.clientX - rect.left,
+                                    viewportY: e.clientY - rect.top
+                                };
+                                currentDragHandle.setGeometry(map.screenToGeo(pointer.viewportX, pointer.viewportY));
+                            };
+
+                            const handlePointerUp = (e) => {
+                                if (!isDragging) return;
+                                
+                                const position = currentDragHandle.getGeometry();
+                                currentDragHandle.setVisibility(false);
+                                isDragging = false;
+                                behavior.enable();
+                                map.getViewPort().element.style.cursor = 'default';
+                                
+                                // Pobierz wszystkie aktualne punkty trasy
+                                const waypoints = [];
+                                document.querySelectorAll('.waypoint').forEach((input, index) => {
+                                    if (input.value.trim() !== '') {
+                                        const coords = geocodedPoints.get(input.value.trim());
+                                        if (coords) {
+                                            waypoints.push({
+                                                coords: coords,
+                                                index: index
+                                            });
+                                        }
+                                    }
+                                });
+
+                                // Znajdź najbliższy segment używając distance()
+                                let minDistance = Infinity;
+                                let insertIndex = 0;
+                                
+                                for (let i = 0; i < waypoints.length - 1; i++) {
+                                    const startPoint = waypoints[i].coords;
+                                    const endPoint = waypoints[i + 1].coords;
+                                    
+                                    // Oblicz odległość do obu punktów segmentu
+                                    const distanceToStart = position.distance(startPoint);
+                                    const distanceToEnd = position.distance(endPoint);
+                                    
+                                    // Użyj średniej odległości jako metryki dla segmentu
+                                    const avgDistance = (distanceToStart + distanceToEnd) / 2;
+                                    
+                                    if (avgDistance < minDistance) {
+                                        minDistance = avgDistance;
+                                        insertIndex = i;
+                                    }
+                                }
+                                
+                                // Wstaw nowy punkt po znalezionym indeksie
+                                const waypointContainers = document.querySelectorAll('.waypoint-container');
+                                const newWaypoint = createWaypointInput();
+                                const input = newWaypoint.querySelector('.waypoint');
+                                input.value = `${position.lat.toFixed(6)}, ${position.lng.toFixed(6)}`;
+                                
+                                // Wstaw punkt PO znalezionym indeksie
+                                const targetContainer = waypointContainers[insertIndex + 1];
+                                if (targetContainer) {
+                                    waypointContainers[0].parentNode.insertBefore(newWaypoint, targetContainer);
+                                } else {
+                                    waypointContainers[0].parentNode.appendChild(newWaypoint);
+                                }
+                                
+                                input.dispatchEvent(new Event('input'));
+                                updateWaypointNumbers();
+                                calculateRouteIfPossible();
+                                
+                                currentDragHandle = null;
+                                document.removeEventListener('pointermove', handlePointerMove);
+                                document.removeEventListener('pointerup', handlePointerUp);
+                            };
+
+                            document.addEventListener('pointermove', handlePointerMove);
+                            document.addEventListener('pointerup', handlePointerUp);
+                        });
+
+                        polyline.addEventListener('pointerleave', () => {
+                            if (!isDragging) {
+                                dragHandle.setVisibility(false);
+                                map.getViewPort().element.style.cursor = 'default';
+                            }
+                        });
+
                         map.addObject(polyline);
                         routeLines.push(polyline);
                     });
+
 
                     const allCoordinates = [origin, destination, ...viaPoints];
                     let minLat = Math.min(...allCoordinates.map(coord => coord.lat));
