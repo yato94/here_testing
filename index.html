@@ -268,32 +268,32 @@
         <div id="route-info"></div>
         <!-- Panel ustawień trasy - dodaj przed zamknięciem diva "sidebar" -->
         <div id="route-settings" class="route-settings" style="margin-top: auto; padding: 20px;">
-            <h3 style="margin-bottom: 15px; font-size: 16px;">Ustawienia trasy</h3>
+            <h3 style="margin-bottom: 15px; font-size: 16px;" id="settings-title"></h3>
             
             <!-- First Row: Default Selection -->
             <div class="row">
-                <p>Domyślne ustawienia:</p>
+                <p id="default-settings-text"></p>
                 <div class="button-group" id="default-combination">
-                    <button data-weight="42000" data-axles="5+">Duży pojazd</button>
-                    <button data-weight="18000" data-axles="3">Średni pojazd</button>
-                    <button data-weight="7490" data-axles="2">Mały pojazd</button>
+                    <button data-weight="40000" data-axles="5+" data-translation="largeVehicle"></button>
+                    <button data-weight="18000" data-axles="3" data-translation="mediumVehicle"></button>
+                    <button data-weight="7490" data-axles="2" data-translation="smallVehicle"></button>
                 </div>
             </div>
-
+        
             <!-- Second Row: Weight Selection -->
             <div class="row">
-                <p>Waga pojazdu (t):</p>
+                <p id="weight-text"></p>
                 <div class="button-group" id="weight-selection">
                     <button data-value="7490">3,5 - 7,49</button>
                     <button data-value="11490">7,5 - 11,49</button>
                     <button data-value="18000">12 - 18</button>
-                    <button data-value="42000" selected>18 - 42</button>
+                    <button data-value="40000" selected>18 - 40</button>
                 </div>
             </div>
-
+        
             <!-- Third Row: Number of Axles -->
             <div class="row">
-                <p>Liczba osi:</p>
+                <p id="axles-text"></p>
                 <div class="button-group" id="axles-selection">
                     <button data-value="2">2</button>
                     <button data-value="3">3</button>
@@ -301,12 +301,12 @@
                     <button data-value="5+" selected>5+</button>
                 </div>
             </div>
-
+        
             <!-- Fourth Row: EUR and CO2 Class -->
             <div class="row">
                 <div class="select-group">
                     <div class="select-container">
-                        <p>Klasa EUR:</p>
+                        <p id="euro-class-text"></p>
                         <select id="euro-class">
                             <option value="2">EURO 2</option>
                             <option value="3">EURO 3</option>
@@ -316,7 +316,7 @@
                         </select>
                     </div>
                     <div class="select-container">
-                        <p>Klasa CO2:</p>
+                        <p id="co2-class-text"></p>
                         <select id="co2-class">
                             <option value="1" selected>CO2 I</option>
                             <option value="2">CO2 II</option>
@@ -327,10 +327,10 @@
                     </div>
                 </div>
             </div>
-
+        
             <!-- Fifth Row: Excluded Areas -->
             <div class="row">
-                <p>Wyłączone obszary:</p>
+                <p id="excluded-areas-text"></p>
                 <div class="button-group" id="excluded-areas">
                     <button data-value="CH">CH</button>
                     <button data-value="Fussen">Füssen</button>
@@ -363,7 +363,19 @@
                     addViaPoint: 'Add via point',
                     addEndPoint: 'Add end point',
                     coordinates: 'Coordinates',
-                    addStartFirst: 'Add start point first'
+                    addStartFirst: 'Add start point first',
+                    routeSettings: 'Route Settings',
+                    defaultSettings: 'Default Settings',
+                    largeVehicle: 'Large Vehicle',
+                    mediumVehicle: 'Medium Vehicle',
+                    smallVehicle: 'Small Vehicle',
+                    vehicleWeight: 'Vehicle Weight (t)',
+                    axleCount: 'Number of Axles',
+                    euroClass: 'EUR Class',
+                    co2Class: 'CO2 Class',
+                    excludedAreas: 'Excluded Areas',
+                    roadCharges: 'Road Charges',
+                    noRoadCharges: 'No Road Charges'
                 },
                 de: {
                     inputPlaceholder: 'Adresse oder GPS-Koordinaten eingeben',
@@ -378,7 +390,19 @@
                     addViaPoint: 'Viapunkt hinzufügen',
                     addEndPoint: 'Endpunkt hinzufügen',
                     coordinates: 'Koordinaten',
-                    addStartFirst: 'Fügen Sie zuerst den Startpunkt hinzu'
+                    addStartFirst: 'Fügen Sie zuerst den Startpunkt hinzu',
+                    routeSettings: 'Routeneinstellungen',
+                    defaultSettings: 'Standardeinstellungen',
+                    largeVehicle: 'Großes Fahrzeug',
+                    mediumVehicle: 'Mittleres Fahrzeug',
+                    smallVehicle: 'Kleines Fahrzeug',
+                    vehicleWeight: 'Fahrzeuggewicht (t)',
+                    axleCount: 'Anzahl der Achsen',
+                    euroClass: 'EUR-Klasse',
+                    co2Class: 'CO2-Klasse',
+                    excludedAreas: 'Ausgeschlossene Gebiete',
+                    roadCharges: 'Straßengebühren',
+                    noRoadCharges: 'Keine Straßengebühren'
                 },
                 fr: {
                     inputPlaceholder: 'Entrez l\'adresse ou les coordonnées GPS',
@@ -393,7 +417,19 @@
                     addViaPoint: 'Ajouter un point intermédiaire',
                     addEndPoint: 'Ajouter le point d\'arrivée',
                     coordinates: 'Coordonnées',
-                    addStartFirst: 'Ajoutez d\'abord le point de départ'
+                    addStartFirst: 'Ajoutez d\'abord le point de départ',
+                    routeSettings: 'Paramètres d\'itinéraire',
+                    defaultSettings: 'Paramètres par défaut',
+                    largeVehicle: 'Grand véhicule',
+                    mediumVehicle: 'Véhicule moyen',
+                    smallVehicle: 'Petit véhicule',
+                    vehicleWeight: 'Poids du véhicule (t)',
+                    axleCount: 'Nombre d\'essieux',
+                    euroClass: 'Classe EUR',
+                    co2Class: 'Classe CO2',
+                    excludedAreas: 'Zones exclues',
+                    roadCharges: 'Péages routiers',
+                    noRoadCharges: 'Pas de péages'
                 },
                 it: {
                     inputPlaceholder: 'Inserisci indirizzo o coordinate GPS',
@@ -408,7 +444,19 @@
                     addViaPoint: 'Aggiungi punto intermedio',
                     addEndPoint: 'Aggiungi punto di arrivo',
                     coordinates: 'Coordinate',
-                    addStartFirst: 'Aggiungi prima il punto di partenza'
+                    addStartFirst: 'Aggiungi prima il punto di partenza',
+                    routeSettings: 'Impostazioni percorso',
+                    defaultSettings: 'Impostazioni predefinite',
+                    largeVehicle: 'Veicolo grande',
+                    mediumVehicle: 'Veicolo medio',
+                    smallVehicle: 'Veicolo piccolo',
+                    vehicleWeight: 'Peso del veicolo (t)',
+                    axleCount: 'Numero di assi',
+                    euroClass: 'Classe EUR',
+                    co2Class: 'Classe CO2',
+                    excludedAreas: 'Aree escluse',
+                    roadCharges: 'Pedaggi stradali',
+                    noRoadCharges: 'Nessun pedaggio'
                 },
                 es: {
                     inputPlaceholder: 'Introduce la dirección o coordenadas GPS',
@@ -423,7 +471,19 @@
                     addViaPoint: 'Añadir punto intermedio',
                     addEndPoint: 'Añadir punto final',
                     coordinates: 'Coordenadas',
-                    addStartFirst: 'Añade primero el punto de inicio'
+                    addStartFirst: 'Añade primero el punto de inicio',
+                    routeSettings: 'Configuración de ruta',
+                    defaultSettings: 'Configuración predeterminada',
+                    largeVehicle: 'Vehículo grande',
+                    mediumVehicle: 'Vehículo mediano',
+                    smallVehicle: 'Vehículo pequeño',
+                    vehicleWeight: 'Peso del vehículo (t)',
+                    axleCount: 'Número de ejes',
+                    euroClass: 'Clase EUR',
+                    co2Class: 'Clase CO2',
+                    excludedAreas: 'Áreas excluidas',
+                    roadCharges: 'Peajes',
+                    noRoadCharges: 'Sin peajes'
                 },
                 pl: {
                     inputPlaceholder: 'Wpisz adres lub współrzędne GPS',
@@ -438,7 +498,19 @@
                     addViaPoint: 'Dodaj punkt pośredni',
                     addEndPoint: 'Dodaj punkt końcowy',
                     coordinates: 'Koordynaty',
-                    addStartFirst: 'Najpierw dodaj punkt startowy'
+                    addStartFirst: 'Najpierw dodaj punkt startowy',
+                    routeSettings: 'Ustawienia trasy',
+                    defaultSettings: 'Domyślne ustawienia',
+                    largeVehicle: 'Duży pojazd',
+                    mediumVehicle: 'Średni pojazd',
+                    smallVehicle: 'Mały pojazd',
+                    vehicleWeight: 'Waga pojazdu (t)',
+                    axleCount: 'Liczba osi',
+                    euroClass: 'Klasa EUR',
+                    co2Class: 'Klasa CO2',
+                    excludedAreas: 'Wyłączone obszary',
+                    roadCharges: 'Opłaty drogowe',
+                    noRoadCharges: 'Brak opłat drogowych'
                 }
             };
             return translations[lang] || translations.en;
@@ -501,13 +573,23 @@
 
         const customTileProvider = new H.map.provider.ImageTileProvider({
             getURL: (x, y, z) => {
-                return `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8?xnlp=CL_JSMv3.1.61.1` +
-                       `&apikey=${API_KEY}` +
-                       `&style=logistics.day` +
-                       `&features=vehicle_restrictions:active_and_inactive,pois:disabled,congestion_zones:all` +
-                       `&size=512` +
-                       `&lang=${currentLang}` +
-                       `&ppi=200`;
+                // Wybierz styl w zależności od poziomu przybliżenia
+                const mapStyle = z > 8 ? 'logistics.day' : 'explore.day';
+                
+                // Bazowy URL z wybranym stylem
+                let url = `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8?xnlp=CL_JSMv3.1.61.1` +
+                        `&apikey=${API_KEY}` +
+                        `&style=${mapStyle}` +
+                        `&size=512` +
+                        `&lang=${currentLang}` +
+                        `&ppi=200`;
+                
+                // Dodaj features tylko dla logistics.day
+                if (mapStyle === 'logistics.day') {
+                    url += '&features=vehicle_restrictions:active_and_inactive,pois:disabled,congestion_zones:all';
+                }
+                
+                return url;
             }
         });
 
@@ -664,28 +746,83 @@
                 { text: translations.addEndPoint, action: () => addEndPoint(coordinates) },
                 { text: `${translations.coordinates}: ${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`, action: null }
             ];
-
             menuItems.forEach(item => {
                 const menuItem = document.createElement('div');
-                menuItem.textContent = item.text;
-                menuItem.style.padding = '8px 12px';
-                menuItem.style.cursor = item.action ? 'pointer' : 'default';
-                menuItem.style.borderBottom = '1px solid #eee';
                 
-                if (item.action) {
-                    menuItem.addEventListener('mouseover', () => {
-                        menuItem.style.backgroundColor = '#f0f0f0';
+                if (item.text.startsWith(translations.coordinates)) {
+                    // Specjalna obsługa dla elementu z koordynatami
+                    const coordsText = `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`;
+                    
+                    menuItem.innerHTML = `
+                        <div style="margin-bottom: 2px">
+                            ${translations.coordinates}: 
+                            <span class="coords-value" style="cursor: pointer; color: #0066CC;">${coordsText}</span>
+                        </div>
+                        <div class="copy-feedback" style="display: none; color: #28a745; font-size: 11px;">
+                            ✓ Skopiowano
+                        </div>
+                    `;
+                    
+                    const wholeItem = menuItem;
+                    const coordsSpan = menuItem.querySelector('.coords-value');
+                    const feedbackSpan = menuItem.querySelector('.copy-feedback');
+                    
+                    // Dodaj obsługę kliknięcia na cały element
+                    wholeItem.style.cursor = 'pointer';
+                    wholeItem.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        
+                        try {
+                            await navigator.clipboard.writeText(coordsText); // Kopiujemy tylko same koordynaty
+                            
+                            feedbackSpan.style.display = 'block';
+                            
+                            setTimeout(() => {
+                                feedbackSpan.style.display = 'none';
+                            }, 2000);
+                        } catch (err) {
+                            console.error('Failed to copy coordinates:', err);
+                            
+                            const textArea = document.createElement('textarea');
+                            textArea.value = coordsText;
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            try {
+                                document.execCommand('copy');
+                                feedbackSpan.style.display = 'block';
+                                setTimeout(() => {
+                                    feedbackSpan.style.display = 'none';
+                                }, 2000);
+                            } catch (err) {
+                                console.error('Fallback copy failed:', err);
+                            }
+                            document.body.removeChild(textArea);
+                        }
                     });
-                    menuItem.addEventListener('mouseout', () => {
-                        menuItem.style.backgroundColor = 'white';
-                    });
-                    menuItem.addEventListener('click', () => {
-                        item.action();
-                        menuDiv.remove();
-                    });
-                } else {
+                    
+                    menuItem.style.padding = '8px 12px';
                     menuItem.style.color = '#666';
                     menuItem.style.fontSize = '12px';
+                    
+                } else {
+                    // Standardowa obsługa dla pozostałych elementów menu
+                    menuItem.textContent = item.text;
+                    menuItem.style.padding = '8px 12px';
+                    menuItem.style.cursor = item.action ? 'pointer' : 'default';
+                    menuItem.style.borderBottom = '1px solid #eee';
+                    
+                    if (item.action) {
+                        menuItem.addEventListener('mouseover', () => {
+                            menuItem.style.backgroundColor = '#f0f0f0';
+                        });
+                        menuItem.addEventListener('mouseout', () => {
+                            menuItem.style.backgroundColor = 'white';
+                        });
+                        menuItem.addEventListener('click', () => {
+                            item.action();
+                            menuDiv.remove();
+                        });
+                    }
                 }
                 
                 menuDiv.appendChild(menuItem);
@@ -1460,7 +1597,10 @@
                     });
 
                     const totalDistance = sections.reduce((sum, section) => sum + section.summary.length, 0);
-                    const totalTime = sections.reduce((sum, section) => sum + section.summary.duration, 0);
+                    // Calculate time based on fixed speed of 73 km/h
+                    const distanceInKm = totalDistance / 1000;
+                    const timeInHours = distanceInKm / 73;
+                    const totalTime = timeInHours * 3600; // Convert to seconds for consistency with the display format
 
                     // Pobieranie informacji o opłatach
                     let tollInfo = '';
@@ -1503,6 +1643,24 @@
 		const waypointsContainer = document.getElementById('waypoints-container');
 		waypointsContainer.appendChild(createWaypointInput());
 
+        function initializeUITranslations() {
+            document.getElementById('settings-title').textContent = translations.routeSettings;
+            document.getElementById('default-settings-text').textContent = translations.defaultSettings;
+            document.getElementById('weight-text').textContent = translations.vehicleWeight;
+            document.getElementById('axles-text').textContent = translations.axleCount;
+            document.getElementById('euro-class-text').textContent = translations.euroClass;
+            document.getElementById('co2-class-text').textContent = translations.co2Class;
+            document.getElementById('excluded-areas-text').textContent = translations.excludedAreas;
+
+            // Set text for default combination buttons
+            document.querySelectorAll('#default-combination button').forEach(button => {
+                const translationKey = button.dataset.translation;
+                if (translationKey) {
+                    button.textContent = translations[translationKey];
+                }
+            });
+        }
+
 		// Nasłuchuj zdarzeń input tylko dla dodawania nowych pól
 		waypointsContainer.addEventListener('input', (e) => {
 			if (e.target.classList.contains('waypoint')) {
@@ -1517,12 +1675,14 @@
 		});
 
 		// Automatyczny focus na pierwszym polu po załadowaniu strony
-		document.addEventListener('DOMContentLoaded', () => {
-			const firstWaypoint = document.querySelector('.waypoint');
-			if (firstWaypoint) {
-				firstWaypoint.focus();
-			}
-		});
+        document.addEventListener('DOMContentLoaded', () => {
+            const firstWaypoint = document.querySelector('.waypoint');
+            if (firstWaypoint) {
+                firstWaypoint.focus();
+            }
+            loadSettings();
+            initializeUITranslations(); // Dodaj to wywołanie
+        });
 
 
 
@@ -1547,7 +1707,9 @@
         function loadSettings() {
             try {
                 const settings = JSON.parse(localStorage.getItem(STORAGE_KEY));
+                
                 if (settings) {
+                    // Wczytaj zapisane ustawienia
                     if (settings.weight) {
                         document.querySelector(`#weight-selection button[data-value="${settings.weight}"]`)?.classList.add('active');
                     }
@@ -1565,9 +1727,51 @@
                             document.querySelector(`#excluded-areas button[data-value="${area}"]`)?.classList.add('active');
                         });
                     }
-                    // Sprawdź czy jest pasująca kombinacja domyślna
-                    checkDefaultCombination();
+                } else {
+                    // Ustaw wartości domyślne dla nowego użytkownika
+                    const defaultSettings = {
+                        weight: '40000',  // 18-40t
+                        axles: '5+',     // 5+ osi
+                        euroClass: '6',   // EURO 6
+                        co2Class: '1',    // CO2 I
+                    };
+
+                    // Ustawienie domyślnej kombinacji (Duży pojazd)
+                    const largeVehicleBtn = document.querySelector('#default-combination button[data-weight="40000"][data-axles="5+"]');
+                    if (largeVehicleBtn) {
+                        largeVehicleBtn.classList.add('active');
+                    }
+
+                    // Ustawienie wagi
+                    const weightBtn = document.querySelector(`#weight-selection button[data-value="${defaultSettings.weight}"]`);
+                    if (weightBtn) {
+                        weightBtn.classList.add('active');
+                    }
+
+                    // Ustawienie liczby osi
+                    const axlesBtn = document.querySelector(`#axles-selection button[data-value="${defaultSettings.axles}"]`);
+                    if (axlesBtn) {
+                        axlesBtn.classList.add('active');
+                    }
+
+                    // Ustawienie klasy EURO
+                    const euroSelect = document.querySelector('#euro-class');
+                    if (euroSelect) {
+                        euroSelect.value = defaultSettings.euroClass;
+                    }
+
+                    // Ustawienie klasy CO2
+                    const co2Select = document.querySelector('#co2-class');
+                    if (co2Select) {
+                        co2Select.value = defaultSettings.co2Class;
+                    }
+
+                    // Zapisz domyślne ustawienia w localStorage
+                    saveSettings();
                 }
+
+                // Sprawdź czy jest pasująca kombinacja domyślna
+                checkDefaultCombination();
             } catch (error) {
                 console.error('Error loading settings:', error);
             }
