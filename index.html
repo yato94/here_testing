@@ -1729,28 +1729,12 @@
                     }
                 } else {
                     // Ustaw wartości domyślne dla nowego użytkownika
-			// Ustaw wartości domyślne dla nowego użytkownika
-			const defaultSettings = {
-			    weight: '40000',  // 18-40t
-			    axles: '5+',     // 5+ osi
-			    euroClass: '6',   // EURO 6
-			    co2Class: '1',    // CO2 I
-			};
-			
-			// Ustawienie domyślnej kombinacji (Duży pojazd)
-			const largeVehicleBtn = document.querySelector('#default-combination button[data-weight="40000"][data-axles="5+"]');
-			if (largeVehicleBtn) {
-			    largeVehicleBtn.classList.add('active');
-			}
-			
-			// Ustawienie wagi i osi
-			document.querySelectorAll('#weight-selection button').forEach(btn => {
-			    btn.classList.toggle('active', btn.dataset.value === defaultSettings.weight);
-			});
-			
-			document.querySelectorAll('#axles-selection button').forEach(btn => {
-			    btn.classList.toggle('active', btn.dataset.value === defaultSettings.axles);
-			});
+                    const defaultSettings = {
+                        weight: '40000',  // 18-40t
+                        axles: '5+',     // 5+ osi
+                        euroClass: '6',   // EURO 6
+                        co2Class: '1',    // CO2 I
+                    };
 
                     // Ustawienie domyślnej kombinacji (Duży pojazd)
                     const largeVehicleBtn = document.querySelector('#default-combination button[data-weight="40000"][data-axles="5+"]');
@@ -1758,6 +1742,17 @@
                         largeVehicleBtn.classList.add('active');
                     }
 
+                    // Ustawienie wagi
+                    const weightBtn = document.querySelector(`#weight-selection button[data-value="${defaultSettings.weight}"]`);
+                    if (weightBtn) {
+                        weightBtn.classList.add('active');
+                    }
+
+                    // Ustawienie liczby osi
+                    const axlesBtn = document.querySelector(`#axles-selection button[data-value="${defaultSettings.axles}"]`);
+                    if (axlesBtn) {
+                        axlesBtn.classList.add('active');
+                    }
 
                     // Ustawienie klasy EURO
                     const euroSelect = document.querySelector('#euro-class');
