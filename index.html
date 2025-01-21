@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HERE Maps Route Planner</title>
+    <title>Transport Nomad</title>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
@@ -1597,7 +1597,7 @@
 
                 if (viaPoints.length > 0) {
                     routeUrl += viaPoints.map(point =>
-                        `&via=${point.lat},${point.lng};snapRadius=5000`
+                        `&via=${point.lat},${point.lng};snapRadius=3000`
                     ).join('');
                 }
 
@@ -1624,12 +1624,15 @@
                         });
 
                         // Dodaj marker-uchwyt (początkowo ukryty)
-                        const svgMarkup = '<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">' +
-                                        '<circle cx="6" cy="6" r="5" fill="white" stroke="#0066CC" stroke-width="2"/>' +
-                                        '</svg>';
+                        const svgMarkup = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+                            '<circle cx="12" cy="12" r="11" fill="white" fill-opacity="0.8" stroke="#0066CC" stroke-width="2"/>' +
+                            '<circle cx="12" cy="12" r="6" fill="#0066CC" fill-opacity="0.3"/>' +
+                            '</svg>';
                         
                         const dragHandle = new H.map.Marker({ lat: 0, lng: 0 }, {
-                            icon: new H.map.Icon(svgMarkup),
+                            icon: new H.map.Icon(svgMarkup, {
+                                anchor: { x: 12, y: 12 } // Ustawiamy punkt zakotwiczenia na środek ikony
+                            }),
                             visibility: false,
                             volatility: true
                         });
@@ -1644,37 +1647,37 @@
                         let isDragging = false;
 
                         polyline.addEventListener('pointermove', (evt) => {
-                            if (isDragging) return;
+                        if (isDragging) return;
+                        
+                        const pointer = evt.currentPointer;
+                        const coordinates = lineString.getLatLngAltArray();
+                        let closestPoint = null;
+                        let minDistance = Infinity;
+
+                        // Znajdź najbliższy punkt na linii
+                        for(let i = 0; i < coordinates.length - 2; i += 3) {
+                            const point = map.geoToScreen({ 
+                                lat: coordinates[i], 
+                                lng: coordinates[i + 1] 
+                            });
+                            const distance = Math.hypot(point.x - pointer.viewportX, point.y - pointer.viewportY);
                             
-                            const pointer = evt.currentPointer;
-                            const coordinates = lineString.getLatLngAltArray();
-                            let closestPoint = null;
-                            let minDistance = Infinity;
-
-                            // Znajdź najbliższy punkt na linii
-                            for(let i = 0; i < coordinates.length - 2; i += 3) {
-                                const point = map.geoToScreen({ 
-                                    lat: coordinates[i], 
-                                    lng: coordinates[i + 1] 
-                                });
-                                const distance = Math.hypot(point.x - pointer.viewportX, point.y - pointer.viewportY);
-                                
-                                if (distance < minDistance) {
-                                    minDistance = distance;
-                                    closestPoint = { lat: coordinates[i], lng: coordinates[i + 1] };
-                                }
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                closestPoint = { lat: coordinates[i], lng: coordinates[i + 1] };
                             }
+                        }
 
-                            // Jeśli kursor jest wystarczająco blisko linii
-                            if (minDistance < 15) { // 15 pikseli tolerancji
-                                dragHandle.setGeometry(closestPoint);
-                                dragHandle.setVisibility(true);
-                                map.getViewPort().element.style.cursor = 'grab';
-                            } else {
-                                dragHandle.setVisibility(false);
-                                map.getViewPort().element.style.cursor = 'default';
-                            }
-                        });
+                        // Jeśli kursor jest wystarczająco blisko linii
+                        if (minDistance < 50) { // 15 pikseli tolerancji
+                            dragHandle.setGeometry(closestPoint);
+                            dragHandle.setVisibility(true);
+                            map.getViewPort().element.style.cursor = 'grab';
+                        } else {
+                            dragHandle.setVisibility(false);
+                            map.getViewPort().element.style.cursor = 'default';
+                        }
+                    });
 
                         // Obsługa przeciągania
                         dragHandle.addEventListener('pointerdown', (evt) => {
@@ -1805,23 +1808,23 @@
 
                     // Pobieranie informacji o opłatach
                     let tollInfo = '';
-                    if (route.sections) {
-                        let totalToll = 0;
-                        
-                        route.sections.forEach(section => {
-                            if (section.summary?.tolls?.total) {
-                                totalToll += section.summary.tolls.total.value;
-                            }
-                        });
+                        if (route.sections) {
+                            let totalToll = 0;
+                            
+                            route.sections.forEach(section => {
+                                if (section.summary?.tolls?.total) {
+                                    totalToll += section.summary.tolls.total.value;
+                                }
+                            });
 
-                        if (totalToll > 0) {
-                            tollInfo = `<br>Opłaty drogowe: ${totalToll.toFixed(2)} EUR`;
+                            if (totalToll > 0) {
+                                tollInfo = `<br>Opłaty drogowe: ${totalToll.toFixed(2)} EUR`;
+                            } else {
+                                tollInfo = '<br>Brak opłat drogowych';
+                            }
                         } else {
                             tollInfo = '<br>Brak opłat drogowych';
                         }
-                    } else {
-                        tollInfo = '<br>Brak opłat drogowych';
-                    }
 
                     document.getElementById('route-info').innerHTML = `
                         <strong>${translations.routeInfo}</strong><br>
