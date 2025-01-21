@@ -1048,10 +1048,37 @@
         }
 
         function clearMap() {
-            routeLines.forEach(line => map.removeObject(line));
-            routeLines = [];
-            markers.forEach(marker => map.removeObject(marker));
-            markers = [];
+            try {
+                // Usuń wszystkie linie trasy
+                routeLines.forEach(line => {
+                    if (line && typeof line.dispose === 'function') {
+                        line.dispose();
+                    }
+                    if (line && map.getObjects().includes(line)) {
+                        map.removeObject(line);
+                    }
+                });
+                routeLines = [];
+                
+                // Usuń wszystkie markery
+                markers.forEach(marker => {
+                    if (marker && typeof marker.dispose === 'function') {
+                        marker.dispose();
+                    }
+                    if (marker && map.getObjects().includes(marker)) {
+                        map.removeObject(marker);
+                    }
+                });
+                markers = [];
+                
+                // Wyczyść informacje o trasie
+                const routeInfo = document.getElementById('route-info');
+                if (routeInfo) {
+                    routeInfo.innerHTML = '';
+                }
+            } catch (error) {
+                console.error('Error clearing map:', error);
+            }
         }
 
         // Drag & Drop handlers
@@ -1191,9 +1218,20 @@
                     if (input && input.value) {
                         geocodedPoints.delete(input.value.trim());
                     }
+                    
+                    // Najpierw wyczyść mapę
+                    clearMap();
+                    
+                    // Usuń kontener punktu
                     container.remove();
+                    
+                    // Zaktualizuj numerację
                     updateWaypointNumbers();
-                    calculateRouteIfPossible();
+                    
+                    // Użyj setTimeout aby upewnić się, że DOM został zaktualizowany
+                    setTimeout(() => {
+                        calculateRouteIfPossible();
+                    }, 0);
                 };
                 container.appendChild(removeButton);
             }
@@ -1378,8 +1416,22 @@
             });
         }
 
+
+        let currentRouteCalculation = null;
+
         async function calculateRouteIfPossible() {
             try {
+
+                // Anuluj poprzednie przeliczanie trasy
+                if (currentRouteCalculation) {
+                    currentRouteCalculation.abort();
+                }
+                
+                // Utwórz nowy kontroler dla tego przeliczenia
+                currentRouteCalculation = new AbortController();
+                const signal = currentRouteCalculation.signal;    
+
+
                 const waypointInputs = Array.from(document.querySelectorAll('.waypoint'))
                     .map(input => ({
                         element: input.parentElement,
@@ -1556,7 +1608,7 @@
                     `&tolls[emissionType]=euro${euroClass};co2class=${co2Class}` +
                     `&tolls[summaries]=total`;
 
-                const response = await fetch(routeUrl);
+                const response = await fetch(routeUrl, { signal });
                 if (!response.ok) {
                     throw new Error(`${translations.routeError}: ${response.status}`);
                 }
@@ -1782,13 +1834,18 @@
                 }
 
             } catch (error) {
-                console.error('Route calculation error:', error);
-                document.getElementById('route-info').innerHTML = `
-                    <div class="error-message">
-                        ${error.message || translations.routeError}
-                    </div>
-                `;
-            }
+                    // Ignoruj cichutko błędy związane z anulowaniem żądania
+                    if (error.name === 'AbortError') {
+                        return;
+                    }
+                    
+                    console.error('Route calculation error:', error);
+                    document.getElementById('route-info').innerHTML = `
+                        <div class="error-message">
+                            ${error.message || translations.routeError}
+                        </div>
+                    `;
+                }
         }
 		// Initialize application
 		const waypointsContainer = document.getElementById('waypoints-container');
