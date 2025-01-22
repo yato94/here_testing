@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transport Nomad</title>
+    <title>HERE Maps Route Planner</title>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
@@ -1597,7 +1597,7 @@
 
                 if (viaPoints.length > 0) {
                     routeUrl += viaPoints.map(point =>
-                        `&via=${point.lat},${point.lng};snapRadius=4000`
+                        `&via=${point.lat},${point.lng};snapRadius=3000`
                     ).join('');
                 }
 
@@ -2079,6 +2079,158 @@
                 length: 1650  // 16.5m w centymetrach
             };
         }
+
+        ////////////////// FUNKCJE ODPOWIEDZIALNE ZA BUDOWE LINKU + ZMIANĘ PAGE TITLE
+        // Function to update URL with current route and settings
+        function updateURLParameters() {
+            const waypoints = document.querySelectorAll('.waypoint');
+            const params = new URLSearchParams();
+
+            // Add waypoints
+            waypoints.forEach((waypoint, index) => {
+                const value = waypoint.value.trim();
+                if (value) {
+                    if (isGPSCoordinates(value)) {
+                        const coords = geocodedPoints.get(value);
+                        if (coords) {
+                            params.append(`wp${index}`, `${coords.lat},${coords.lng}`);
+                        }
+                    } else {
+                        // For addresses, store the actual address text
+                        params.append(`wp${index}`, encodeURIComponent(value));
+                    }
+                }
+            });
+
+            // Add vehicle settings
+            const weightBtn = document.querySelector('#weight-selection button.active');
+            const axlesBtn = document.querySelector('#axles-selection button.active');
+            params.append('weight', weightBtn?.dataset.value || '40000');
+            params.append('axles', axlesBtn?.dataset.value || '5+');
+            params.append('euro', document.querySelector('#euro-class').value);
+            params.append('co2', document.querySelector('#co2-class').value);
+
+            // Add excluded areas
+            const excludedAreas = Array.from(document.querySelectorAll('#excluded-areas button.active'))
+                .map(btn => btn.dataset.value);
+            if (excludedAreas.length > 0) {
+                params.append('excluded', excludedAreas.join(','));
+            }
+
+            // Update URL without reloading the page
+            const newURL = `${window.location.pathname}?${params.toString()}`;
+            window.history.pushState({ path: newURL }, '', newURL);
+        }
+
+        function updatePageTitle() {
+            const waypoints = document.querySelectorAll('.waypoint');
+            const nonEmptyWaypoints = Array.from(waypoints)
+                .filter(wp => wp.value.trim() !== '');
+
+            if (nonEmptyWaypoints.length >= 2) {
+                const getLocationName = (value) => {
+                    const words = value.trim().split(' ');
+                    return words.slice(0, 2).join(' ');
+                };
+
+                const firstLocation = getLocationName(nonEmptyWaypoints[0].value);
+                const lastLocation = getLocationName(nonEmptyWaypoints[nonEmptyWaypoints.length - 1].value);
+                document.title = `TN: ${firstLocation} -> ${lastLocation}`;
+            } else {
+                document.title = 'Route Planner';
+            }
+        }
+
+        // Function to load route from URL parameters
+        async function loadRouteFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.toString() === '') return;
+
+            // Clear existing waypoints
+            const waypointsContainer = document.getElementById('waypoints-container');
+            waypointsContainer.innerHTML = '';
+
+            // Load waypoints
+            const waypointParams = Array.from(params.entries())
+                .filter(([key]) => key.startsWith('wp'))
+                .sort((a, b) => parseInt(a[0].slice(2)) - parseInt(b[0].slice(2)));
+
+            for (const [_, value] of waypointParams) {
+                const container = createWaypointInput();
+                const input = container.querySelector('.waypoint');
+                
+                if (value.includes(',')) {
+                    const [lat, lng] = value.split(',').map(Number);
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        input.value = `${lat}, ${lng}`;
+                    }
+                } else {
+                    input.value = decodeURIComponent(value);
+                }
+                waypointsContainer.appendChild(container);
+            }
+
+            // Load settings
+            if (params.has('weight')) {
+                const weightBtn = document.querySelector(`#weight-selection button[data-value="${params.get('weight')}"]`);
+                if (weightBtn) {
+                    document.querySelectorAll('#weight-selection button').forEach(btn => btn.classList.remove('active'));
+                    weightBtn.classList.add('active');
+                }
+            }
+
+            if (params.has('axles')) {
+                const axlesBtn = document.querySelector(`#axles-selection button[data-value="${params.get('axles')}"]`);
+                if (axlesBtn) {
+                    document.querySelectorAll('#axles-selection button').forEach(btn => btn.classList.remove('active'));
+                    axlesBtn.classList.add('active');
+                }
+            }
+
+            if (params.has('euro')) {
+                document.querySelector('#euro-class').value = params.get('euro');
+            }
+
+            if (params.has('co2')) {
+                document.querySelector('#co2-class').value = params.get('co2');
+            }
+
+            if (params.has('excluded')) {
+                const excludedAreas = params.get('excluded').split(',');
+                document.querySelectorAll('#excluded-areas button').forEach(btn => {
+                    btn.classList.toggle('active', excludedAreas.includes(btn.dataset.value));
+                });
+            }
+
+            checkDefaultCombination();
+
+            // Calculate route and update title
+            if (waypointParams.length > 0) {
+                calculateRouteIfPossible();
+            } else {
+                updatePageTitle();
+            }
+        }
+
+        // Modify calculateRouteIfPossible to update URL and title after successful route calculation
+        const originalCalculateRouteIfPossible = calculateRouteIfPossible;
+        calculateRouteIfPossible = async function() {
+            await originalCalculateRouteIfPossible();
+            updateURLParameters();
+            updatePageTitle();
+        };
+
+        // Add initial event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRouteFromURL();
+            updatePageTitle();
+        });
+
+        // Add URL update on browser navigation
+        window.addEventListener('popstate', loadRouteFromURL);
+        ////////////////// KONIEC FUNKCJE ODPOWIEDZIALNE ZA BUDOWE LINKU + ZMIANĘ PAGE TITLE
+
+        
     </script>
 </body>
 </html
