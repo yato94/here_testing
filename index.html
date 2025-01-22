@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transport Nomad</title>
+    <title>HERE Maps Route Planner</title>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
@@ -2137,7 +2137,7 @@
                 const lastLocation = getLocationName(nonEmptyWaypoints[nonEmptyWaypoints.length - 1].value);
                 document.title = `TN: ${firstLocation} -> ${lastLocation}`;
             } else {
-                document.title = 'Transport Nomad';
+                document.title = 'Route Planner';
             }
         }
 
@@ -2203,8 +2203,14 @@
             }
 
             checkDefaultCombination();
-
-            // Calculate route and update title
+            // Sprawdź czy istnieją jakieś pola i czy ostatnie nie jest puste
+            const waypoints = document.querySelectorAll('.waypoint');
+            const lastWaypoint = waypoints[waypoints.length - 1];
+            
+            if (waypoints.length < 12 && lastWaypoint && lastWaypoint.value.trim() !== '') {
+                waypointsContainer.appendChild(createWaypointInput());
+            }
+            
             if (waypointParams.length > 0) {
                 calculateRouteIfPossible();
             } else {
