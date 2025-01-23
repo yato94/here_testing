@@ -610,9 +610,27 @@
             map.getViewPort().resize();
         });
 
-        const ui = H.ui.UI.createDefault(map, platform.createDefaultLayers());
+        const ui = new H.ui.UI(map, {
+            zoom: new H.ui.ZoomControl()
+        });
+
+        // Pobierz kontrolkę zoom i ustaw jej wyrównanie
+        const zoomControl = ui.getControl('zoom');
+        if (zoomControl) {
+            zoomControl.setAlignment('bottom-right');
+        }
         const mapEvents = new H.mapevents.MapEvents(map);
         const behavior = new H.mapevents.Behavior(mapEvents);
+
+        // Dodaj style do ukrycia niechcianych opcji
+        const style = document.createElement('style');
+        style.textContent = `
+            .H_l_vertical button[aria-label="Show traffic conditions"],
+            .H_l_vertical button[aria-label="Show traffic incidents"] {
+                display: none !important;
+            }
+        `;
+        document.head.appendChild(style);
         
 
         // FUNCJE DO MENU KONTEKSTOWEGO (START/VIA/KONIEC)    
