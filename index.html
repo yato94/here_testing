@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transport Nomad</title>
+    <title>Transpot Nomad</title>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
@@ -582,7 +582,7 @@
                         `&style=${mapStyle}` +
                         `&size=512` +
                         `&lang=${currentLang}` +
-                        `&ppi=200`;
+                        `&ppi=100`;
                 
                 // Dodaj features tylko dla logistics.day
                 if (mapStyle === 'logistics.day') {
@@ -613,6 +613,7 @@
         const ui = H.ui.UI.createDefault(map, platform.createDefaultLayers());
         const mapEvents = new H.mapevents.MapEvents(map);
         const behavior = new H.mapevents.Behavior(mapEvents);
+        
 
         // FUNCJE DO MENU KONTEKSTOWEGO (START/VIA/KONIEC)    
         // Functions for handling waypoints from context menu
@@ -1179,14 +1180,56 @@
             draggedElement.style.removeProperty('left');
             
             updateWaypointNumbers();
+            updateRemoveButtons();
             calculateRouteIfPossible();
             
             draggedElement = null;
+
         }
 
         // Zmiana w event listenerach
         document.addEventListener('mousemove', handleDrag);
         document.addEventListener('mouseup', handleDragEnd);
+
+
+
+        function updateRemoveButtons() {
+            const containers = document.querySelectorAll('.waypoint-container');
+            
+            containers.forEach((container, index) => {
+                // Usuń istniejący przycisk usuwania (jeśli istnieje)
+                const existingButton = container.querySelector('.remove-waypoint');
+                if (existingButton) {
+                    existingButton.remove();
+                }
+                
+                // Nie dodawaj przycisku dla pierwszego kontenera i ostatniego pustego
+                const isFirst = index === 0;
+                const isLastEmpty = index === containers.length - 1 && 
+                                container.querySelector('.waypoint').value.trim() === '';
+                
+                if (!isFirst && !isLastEmpty) {
+                    const removeButton = document.createElement('button');
+                    removeButton.className = 'remove-waypoint';
+                    removeButton.textContent = '×';
+                    removeButton.onclick = () => {
+                        const input = container.querySelector('.waypoint');
+                        if (input && input.value) {
+                            geocodedPoints.delete(input.value.trim());
+                        }
+                        updateRemoveButtons();
+                        clearMap();
+                        container.remove();
+                        updateWaypointNumbers();
+                        updateRemoveButtons();
+                        setTimeout(() => {
+                            calculateRouteIfPossible();
+                        }, 0);
+                    };
+                    container.appendChild(removeButton);
+                }
+            });
+        }
 
         function createWaypointInput() {
             const container = document.createElement('div');
@@ -1204,12 +1247,18 @@
             input.type = 'text';
             input.className = 'waypoint';
             input.placeholder = translations.inputPlaceholder;
-            
+
             const suggestionsContainer = document.createElement('div');
             suggestionsContainer.className = 'suggestions-container';
             
-            const waypointCount = document.querySelectorAll('.waypoint').length;
-            if (waypointCount > 0) {
+            // Sprawdź aktualną liczbę kontenerów
+            const waypointsContainer = document.getElementById('waypoints-container');
+            const existingContainers = waypointsContainer.querySelectorAll('.waypoint-container');
+            const isFirstContainer = existingContainers.length === 0;
+            const willBeLastContainer = container === existingContainers[existingContainers.length - 1];
+
+            // Dodaj przycisk usuwania dla wszystkich pól oprócz pierwszego i ostatniego pustego
+            if (!isFirstContainer && !willBeLastContainer) {
                 const removeButton = document.createElement('button');
                 removeButton.className = 'remove-waypoint';
                 removeButton.textContent = '×';
@@ -1219,16 +1268,10 @@
                         geocodedPoints.delete(input.value.trim());
                     }
                     
-                    // Najpierw wyczyść mapę
                     clearMap();
-                    
-                    // Usuń kontener punktu
                     container.remove();
-                    
-                    // Zaktualizuj numerację
                     updateWaypointNumbers();
                     
-                    // Użyj setTimeout aby upewnić się, że DOM został zaktualizowany
                     setTimeout(() => {
                         calculateRouteIfPossible();
                     }, 0);
@@ -1242,6 +1285,7 @@
             
             initializeAutocomplete(input, suggestionsContainer);
             updateWaypointNumbers();
+            updateRemoveButtons();
             return container;
         }
         function initializeAutocomplete(input, suggestionsContainer) {
@@ -1361,7 +1405,8 @@
                 const currentIndex = Array.from(waypoints).indexOf(input);
                 const lastWaypoint = waypoints[waypoints.length - 1];
                 
-                if (input === lastWaypoint) {
+                // Dodaj warunek sprawdzający limit
+                if (input === lastWaypoint && waypoints.length < 15) {
                     const waypointsContainer = document.getElementById('waypoints-container');
                     waypointsContainer.appendChild(createWaypointInput());
                 }
@@ -1385,7 +1430,8 @@
                 const currentIndex = Array.from(waypoints).indexOf(input);
                 const lastWaypoint = waypoints[waypoints.length - 1];
                 
-                if (input === lastWaypoint) {
+                // Dodaj warunek sprawdzający limit
+                if (input === lastWaypoint && waypoints.length < 15) {
                     const waypointsContainer = document.getElementById('waypoints-container');
                     waypointsContainer.appendChild(createWaypointInput());
                 }
@@ -1871,17 +1917,20 @@
         }
 
 		// Nasłuchuj zdarzeń input tylko dla dodawania nowych pól
-		waypointsContainer.addEventListener('input', (e) => {
-			if (e.target.classList.contains('waypoint')) {
-				const waypoints = document.querySelectorAll('.waypoint');
-				const lastWaypoint = waypoints[waypoints.length - 1];
-				
-				// Dodaj nowe pole tylko jeśli ostatnie nie jest puste
-				if (e.target === lastWaypoint && e.target.value.trim() !== '') {
-					waypointsContainer.appendChild(createWaypointInput());
-				}
-			}
-		});
+        waypointsContainer.addEventListener('input', (e) => {
+            if (e.target.classList.contains('waypoint')) {
+                updateRemoveButtons();
+                const waypoints = document.querySelectorAll('.waypoint');
+                const lastWaypoint = waypoints[waypoints.length - 1];
+                
+                // Add new field only if last isn't empty and we're under the limit
+                if (e.target === lastWaypoint && 
+                    e.target.value.trim() !== '' && 
+                    waypoints.length < 15) {
+                    waypointsContainer.appendChild(createWaypointInput());
+                }
+            }
+        });
 
 		// Automatyczny focus na pierwszym polu po załadowaniu strony
         document.addEventListener('DOMContentLoaded', () => {
