@@ -283,6 +283,35 @@
             height: 100%;
             position: relative;  /* dodajemy, żeby przycisk był względem map-container */
         }
+        .toll-info {
+            margin-top: 10px;
+        }
+
+        .toll-summary {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toll-details-toggle {
+            background: none;
+            border: none;
+            padding: 0 4px;
+            cursor: pointer;
+            color: #0066CC;
+            font-size: 12px;
+        }
+
+        .toll-details {
+            margin-top: 8px;
+            padding-left: 12px;
+            border-left: 2px solid #eee;
+        }
+
+        .country-toll {
+            margin: 4px 0;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -1892,60 +1921,79 @@
                     // Pobieranie informacji o opłatach
                     let tollInfo = '';
                     if (route.sections) {
-                        // Map do przechowywania najniższej opłaty dla każdego systemu pass subscription
-                        const minPassSubscriptionTolls = new Map();
-                        // Set do przechowywania już przetworzonych standardowych opłat
-                        const processedFareIds = new Set();
-                        let totalToll = 0;
-                        
-                        route.sections.forEach(section => {
-                            if (section.tolls) {
-                                section.tolls.forEach(toll => {
-                                    if (toll.fares) {
-                                        toll.fares.forEach(fare => {
-                                            // Jeśli to opłata pass subscription
-                                            if (fare.paymentMethods?.includes('passSubscription')) {
-                                                const key = `${toll.countryCode}_${toll.tollSystem}`;
-                                                const value = fare.convertedPrice?.value || fare.price?.value || 0;
-                                                
-                                                // Aktualizuj tylko jeśli to nowa lub niższa opłata
-                                                if (!minPassSubscriptionTolls.has(key) || 
-                                                    minPassSubscriptionTolls.get(key) > value) {
-                                                    minPassSubscriptionTolls.set(key, value);
-                                                }
-                                            } 
-                                            // Standardowa opłata - dodaj jeśli nie było jeszcze tego ID
-                                            else if (!processedFareIds.has(fare.id)) {
-                                                processedFareIds.add(fare.id);
-                                                const value = fare.convertedPrice?.value || fare.price?.value || 0;
-                                                totalToll += value;
+                    // Mapa do przechowywania opłat według krajów
+                    const countryTolls = new Map();
+                    // Set do śledzenia przetworzonych ID opłat
+                    const processedFareIds = new Set();
+                    let totalToll = 0;
+                    
+                    route.sections.forEach(section => {
+                        if (section.tolls) {
+                            section.tolls.forEach(toll => {
+                                if (toll.fares) {
+                                    toll.fares.forEach(fare => {
+                                        // Sprawdź czy ta opłata nie została już przetworzona
+                                        if (!processedFareIds.has(fare.id)) {
+                                            processedFareIds.add(fare.id);
+                                            const value = fare.convertedPrice?.value || fare.price?.value || 0;
+                                            totalToll += value;
+                                            
+                                            // Grupowanie według kraju
+                                            if (!countryTolls.has(toll.countryCode)) {
+                                                countryTolls.set(toll.countryCode, 0);
                                             }
-                                        });
-                                    }
-                                });
-                            }
-                        });
-
-                        // Dodaj wszystkie minimalne opłaty pass subscription do sumy
-                        for (const minValue of minPassSubscriptionTolls.values()) {
-                            totalToll += minValue;
+                                            countryTolls.set(toll.countryCode, countryTolls.get(toll.countryCode) + value);
+                                        }
+                                    });
+                                }
+                            });
                         }
+                    });
 
-                        if (totalToll > 0) {
-                            tollInfo = `<br>Opłaty drogowe: ${totalToll.toFixed(2)} EUR`;
-                        } else {
-                            tollInfo = `<br>${translations.noRoadCharges}`;
-                        }
-                    } else {
-                        tollInfo = `<br>${translations.noRoadCharges}`;
+                    // Generowanie HTML z informacjami o trasie i opłatach
+                    let tollDetailsHtml = '';
+                    if (countryTolls.size > 0) {
+                        tollDetailsHtml = Array.from(countryTolls.entries())
+                            .map(([country, value]) => `
+                                <div class="country-toll">
+                                    ${country}: ${value.toFixed(2)} EUR
+                                </div>
+                            `).join('');
                     }
 
                     document.getElementById('route-info').innerHTML = `
                         <strong>${translations.routeInfo}</strong><br>
                         ${translations.distance}: ${(totalDistance / 1000).toFixed(1)} km<br>
                         ${translations.time}: ${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min
-                        ${tollInfo}
-                    `;
+                        <div class="toll-info">
+                            <div class="toll-summary">
+                                ${totalToll > 0 ? 
+                                    `<span>Opłaty drogowe: ${totalToll.toFixed(2)} EUR</span>
+                                    <button class="toll-details-toggle">▼</button>` :
+                                    `<span>${translations.noRoadCharges}</span>`
+                                }
+                            </div>
+                            ${totalToll > 0 ? 
+                                `<div class="toll-details" style="display: none;">
+                                    <div class="toll-details-content">
+                                        ${tollDetailsHtml}
+                                    </div>
+                                </div>` : 
+                                ''
+                            }
+                        </div>`;
+
+                    // Dodaj obsługę przycisku rozwijania
+                    const tollDetailsToggle = document.querySelector('.toll-details-toggle');
+                    if (tollDetailsToggle) {
+                        tollDetailsToggle.addEventListener('click', function() {
+                            const details = document.querySelector('.toll-details');
+                            const isExpanded = details.style.display !== 'none';
+                            details.style.display = isExpanded ? 'none' : 'block';
+                            this.textContent = isExpanded ? '▼' : '▲';
+                        });
+                    }
+                }
                 }
 
             } catch (error) {
