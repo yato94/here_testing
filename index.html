@@ -283,6 +283,31 @@
             height: 100%;
             position: relative;  /* dodajemy, żeby przycisk był względem map-container */
         }
+        .toll-summary {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toll-details-toggle {
+            background: none;
+            border: none;
+            padding: 0 4px;
+            cursor: pointer;
+            color: #0066CC;
+            font-size: 12px;
+        }
+
+        .toll-details {
+            margin-top: 8px;
+            padding-left: 12px;
+            border-left: 2px solid #eee;
+        }
+
+        .country-toll {
+            margin: 4px 0;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -1891,23 +1916,80 @@
 
                     // Pobieranie informacji o opłatach
                     let tollInfo = '';
-                        if (route.sections) {
-                            let totalToll = 0;
-                            
-                            route.sections.forEach(section => {
-                                if (section.summary?.tolls?.total) {
-                                    totalToll += section.summary.tolls.total.value;
-                                }
-                            });
+                    if (route.sections) {
+                        // Map do przechowywania opłat według krajów
+                        const countryTolls = new Map();
+                        // Map do przechowywania najniższej opłaty dla każdego systemu pass subscription
+                        const minPassSubscriptionTolls = new Map();
+                        // Set do przechowywania już przetworzonych standardowych opłat
+                        const processedFareIds = new Set();
+                        let totalToll = 0;
+                        
+                        route.sections.forEach(section => {
+                            if (section.tolls) {
+                                section.tolls.forEach(toll => {
+                                    const countryCode = toll.countryCode;
+                                    if (!countryTolls.has(countryCode)) {
+                                        countryTolls.set(countryCode, 0);
+                                    }
 
-                            if (totalToll > 0) {
-                                tollInfo = `<br>Opłaty drogowe: ${totalToll.toFixed(2)} EUR`;
-                            } else {
-                                tollInfo = '<br>Brak opłat drogowych';
+                                    if (toll.fares) {
+                                        // Znajdź najniższą stawkę dla danego systemu opłat pass subscription
+                                        let minFare = Infinity;
+                                        toll.fares.forEach(fare => {
+                                            const value = fare.convertedPrice?.value || fare.price?.value || 0;
+                                            
+                                            if (fare.paymentMethods?.includes('passSubscription')) {
+                                                const key = `${toll.countryCode}_${toll.tollSystem}`;
+                                                if (!minPassSubscriptionTolls.has(key) || value < minPassSubscriptionTolls.get(key)) {
+                                                    minPassSubscriptionTolls.set(key, value);
+                                                }
+                                            } else if (!processedFareIds.has(fare.id)) {
+                                                processedFareIds.add(fare.id);
+                                                minFare = Math.min(minFare, value);
+                                            }
+                                        });
+                                        
+                                        if (minFare !== Infinity) {
+                                            countryTolls.set(countryCode, countryTolls.get(countryCode) + minFare);
+                                        }
+                                    }
+                                });
                             }
-                        } else {
-                            tollInfo = '<br>Brak opłat drogowych';
+                        });
+
+                        // Dodaj opłaty pass subscription do odpowiednich krajów
+                        for (const [key, value] of minPassSubscriptionTolls.entries()) {
+                            const countryCode = key.split('_')[0];
+                            if (countryTolls.has(countryCode)) {
+                                countryTolls.set(countryCode, countryTolls.get(countryCode) + value);
+                            }
                         }
+
+                        totalToll = Array.from(countryTolls.values()).reduce((a, b) => a + b, 0);
+
+                        if (totalToll > 0) {
+                            tollInfo = `
+                                <div class="toll-summary">
+                                    <span>Opłaty drogowe: ${totalToll.toFixed(2)} EUR</span>
+                                    <button class="toll-details-toggle">▼</button>
+                                </div>
+                                <div class="toll-details" style="display: none;">
+                                    <div class="toll-details-content">
+                                        ${Array.from(countryTolls.entries())
+                                            .map(([country, value]) => `
+                                                <div class="country-toll">
+                                                    ${country}: ${value.toFixed(2)} EUR
+                                                </div>
+                                            `).join('')}
+                                    </div>
+                                </div>`;
+                        } else {
+                            tollInfo = `<br>${translations.noRoadCharges}`;
+                        }
+                    } else {
+                        tollInfo = `<br>${translations.noRoadCharges}`;
+                    }
 
                     document.getElementById('route-info').innerHTML = `
                         <strong>${translations.routeInfo}</strong><br>
@@ -1915,6 +1997,17 @@
                         ${translations.time}: ${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min
                         ${tollInfo}
                     `;
+
+                    // Dodaj obsługę przycisku rozwijania
+                    const tollDetailsToggle = document.querySelector('.toll-details-toggle');
+                    if (tollDetailsToggle) {
+                        tollDetailsToggle.addEventListener('click', function() {
+                            const details = document.querySelector('.toll-details');
+                            const isExpanded = details.style.display !== 'none';
+                            details.style.display = isExpanded ? 'none' : 'block';
+                            this.textContent = isExpanded ? '▼' : '▲';
+                        });
+                    }
                 }
 
             } catch (error) {
