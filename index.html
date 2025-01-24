@@ -1891,23 +1891,54 @@
 
                     // Pobieranie informacji o opłatach
                     let tollInfo = '';
-                        if (route.sections) {
-                            let totalToll = 0;
-                            
-                            route.sections.forEach(section => {
-                                if (section.summary?.tolls?.total) {
-                                    totalToll += section.summary.tolls.total.value;
-                                }
-                            });
-
-                            if (totalToll > 0) {
-                                tollInfo = `<br>Opłaty drogowe: ${totalToll.toFixed(2)} EUR`;
-                            } else {
-                                tollInfo = '<br>Brak opłat drogowych';
+                    if (route.sections) {
+                        // Map do przechowywania najniższej opłaty dla każdego systemu pass subscription
+                        const minPassSubscriptionTolls = new Map();
+                        // Set do przechowywania już przetworzonych standardowych opłat
+                        const processedFareIds = new Set();
+                        let totalToll = 0;
+                        
+                        route.sections.forEach(section => {
+                            if (section.tolls) {
+                                section.tolls.forEach(toll => {
+                                    if (toll.fares) {
+                                        toll.fares.forEach(fare => {
+                                            // Jeśli to opłata pass subscription
+                                            if (fare.paymentMethods?.includes('passSubscription')) {
+                                                const key = `${toll.countryCode}_${toll.tollSystem}`;
+                                                const value = fare.convertedPrice?.value || fare.price?.value || 0;
+                                                
+                                                // Aktualizuj tylko jeśli to nowa lub niższa opłata
+                                                if (!minPassSubscriptionTolls.has(key) || 
+                                                    minPassSubscriptionTolls.get(key) > value) {
+                                                    minPassSubscriptionTolls.set(key, value);
+                                                }
+                                            } 
+                                            // Standardowa opłata - dodaj jeśli nie było jeszcze tego ID
+                                            else if (!processedFareIds.has(fare.id)) {
+                                                processedFareIds.add(fare.id);
+                                                const value = fare.convertedPrice?.value || fare.price?.value || 0;
+                                                totalToll += value;
+                                            }
+                                        });
+                                    }
+                                });
                             }
-                        } else {
-                            tollInfo = '<br>Brak opłat drogowych';
+                        });
+
+                        // Dodaj wszystkie minimalne opłaty pass subscription do sumy
+                        for (const minValue of minPassSubscriptionTolls.values()) {
+                            totalToll += minValue;
                         }
+
+                        if (totalToll > 0) {
+                            tollInfo = `<br>Opłaty drogowe: ${totalToll.toFixed(2)} EUR`;
+                        } else {
+                            tollInfo = `<br>${translations.noRoadCharges}`;
+                        }
+                    } else {
+                        tollInfo = `<br>${translations.noRoadCharges}`;
+                    }
 
                     document.getElementById('route-info').innerHTML = `
                         <strong>${translations.routeInfo}</strong><br>
