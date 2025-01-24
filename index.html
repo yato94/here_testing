@@ -23,6 +23,7 @@
         }
 
         #sidebar {
+            position: relative;
             width: 300px;
             padding: 20px;
             background-color: #f5f5f5;
@@ -31,6 +32,7 @@
             flex-direction: column;
             gap: 10px;
         }
+
 
         #map-container {
             flex: 1;
@@ -260,6 +262,22 @@
             outline: none;
             border-color: #0066CC;
         }
+        #restart-button {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 4px 8px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+            z-index: 1;  /* zwiększamy z-index, żeby był nad wszystkimi elementami mapy */
+            /*display: none;  /* domyślnie ukryty */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
     </style>
 </head>
 <body>
@@ -338,7 +356,9 @@
             </div>
         </div>
     </div>
-    <div id="map-container"></div>
+    <div id="map-container">
+        <button id="restart-button">Restart [CTRL+I]</button>
+    </div>
 	<script>
         let geocodedPoints = new Map();
 
@@ -573,18 +593,22 @@
 
         const customTileProvider = new H.map.provider.ImageTileProvider({
             getURL: (x, y, z) => {
-                // Wybierz styl w zależności od poziomu przybliżenia
+                // Determine PPI based on screen resolution
+                const screenWidth = window.screen.width * window.devicePixelRatio;
+                const ppi = screenWidth >= 2560 ? 200 : 100;
+                
+                // Select map style based on zoom level
                 const mapStyle = z > 9 ? 'logistics.day' : 'explore.day';
                 
-                // Bazowy URL z wybranym stylem
+                // Base URL with dynamic PPI
                 let url = `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8?xnlp=CL_JSMv3.1.61.1` +
                         `&apikey=${API_KEY}` +
                         `&style=${mapStyle}` +
                         `&size=512` +
                         `&lang=${currentLang}` +
-                        `&ppi=100`;
+                        `&ppi=${ppi}`;
                 
-                // Dodaj features tylko dla logistics.day
+                // Add features for logistics.day style
                 if (mapStyle === 'logistics.day') {
                     url += '&features=vehicle_restrictions:active_and_inactive,pois:disabled,congestion_zones:all';
                 }
@@ -621,16 +645,6 @@
         }
         const mapEvents = new H.mapevents.MapEvents(map);
         const behavior = new H.mapevents.Behavior(mapEvents);
-
-        // Dodaj style do ukrycia niechcianych opcji
-        const style = document.createElement('style');
-        style.textContent = `
-            .H_l_vertical button[aria-label="Show traffic conditions"],
-            .H_l_vertical button[aria-label="Show traffic incidents"] {
-                display: none !important;
-            }
-        `;
-        document.head.appendChild(style);
         
 
         // FUNCJE DO MENU KONTEKSTOWEGO (START/VIA/KONIEC)    
@@ -2303,7 +2317,67 @@
         window.addEventListener('popstate', loadRouteFromURL);
         ////////////////// KONIEC FUNKCJE ODPOWIEDZIALNE ZA BUDOWE LINKU + ZMIANĘ PAGE TITLE
 
-        
+        // Funkcja do resetowania aplikacji
+        function restartApp() {
+            // Wyczyść kontener punktów trasy
+            const waypointsContainer = document.getElementById('waypoints-container');
+            waypointsContainer.innerHTML = '';
+            
+            // Wyczyść mapę
+            clearMap();
+            
+            // Wyczyść informacje o trasie
+            const routeInfo = document.getElementById('route-info');
+            if (routeInfo) {
+                routeInfo.innerHTML = '';
+            }
+            
+            // Zresetuj zapisane punkty geocoded
+            geocodedPoints.clear();
+            
+            // Dodaj pojedyncze puste pole
+            waypointsContainer.appendChild(createWaypointInput());
+            
+            // Ustaw focus na nowym polu
+            const firstWaypoint = document.querySelector('.waypoint');
+            if (firstWaypoint) {
+                firstWaypoint.focus();
+            }
+            
+            // Zresetuj tytuł strony
+            document.title = 'Transport Nomad';
+            
+            // Wyczyść parametry URL
+            window.history.pushState({}, '', window.location.pathname);
+            
+            // Zresetuj widok mapy do domyślnego
+            map.setCenter({ lat: 50.0, lng: 15.0 });
+            map.setZoom(5.5);
+        }
+
+        // Dodaj nasłuchiwanie na przycisk reset przy starcie aplikacji
+        document.addEventListener('DOMContentLoaded', () => {
+            // [poprzedni kod DOMContentLoaded]
+            
+            // Dodaj obsługę przycisku reset
+            document.getElementById('restart-button').addEventListener('click', restartApp);
+        });
+        // Add initial event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRouteFromURL();
+            updatePageTitle();
+            
+            // Dodaj obsługę przycisku reset
+            document.getElementById('restart-button').addEventListener('click', restartApp);
+        });
+
+        // Dodaj obsługę skrótu klawiszowego Ctrl+I
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key.toLowerCase() === 'i') {
+                e.preventDefault(); // Zapobiegamy domyślnej akcji przeglądarki
+                restartApp();
+            }
+        });
     </script>
 </body>
 </html
