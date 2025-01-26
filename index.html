@@ -308,6 +308,57 @@
             margin: 4px 0;
             color: #666;
         }
+        .route-bubble {
+            position: absolute;
+            background: white;
+            border: 1px solid #666;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .alternative-route {
+            cursor: pointer;
+        }
+        /* InfoBubble styles */
+        .H_ib {
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            background: white !important;
+            border: 1px solid #666 !important;
+            border-radius: 4px !important;
+            min-width: 0 !important;
+            max-width: none !important;
+        }
+
+        .H_ib_body {
+            padding: 4px 6px !important;
+            margin: 0 !important;
+            min-width: 0 !important;
+            max-width: none !important;
+        }
+
+        .H_ib_content {
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 12px !important;
+            white-space: nowrap !important;
+            color: black !important;
+            line-height: 1.5 !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            display: inline !important;
+        }
+
+        .H_ib_close {
+            display: none !important;
+        }
+        
     </style>
 </head>
 <body>
@@ -1013,6 +1064,7 @@
             }
         }, false);
 
+        let currentRouteIndex = 0; // indeks aktualnie wybranej trasy
         let routeLines = [];
         let markers = [];
         let debounceTimer;
@@ -1110,9 +1162,19 @@
             return marker;
         }
 
+
+        let routeBubbles = [];
         function clearMap() {
             try {
-                // Usuń wszystkie linie trasy
+                // Clear existing InfoBubbles
+                routeBubbles.forEach(bubble => {
+                    if (bubble && bubble.close) {
+                        bubble.close();
+                    }
+                });
+                routeBubbles = [];
+                
+                // Rest of your existing clearMap code...
                 routeLines.forEach(line => {
                     if (line && typeof line.dispose === 'function') {
                         line.dispose();
@@ -1123,7 +1185,6 @@
                 });
                 routeLines = [];
                 
-                // Usuń wszystkie markery
                 markers.forEach(marker => {
                     if (marker && typeof marker.dispose === 'function') {
                         marker.dispose();
@@ -1134,7 +1195,6 @@
                 });
                 markers = [];
                 
-                // Wyczyść informacje o trasie
                 const routeInfo = document.getElementById('route-info');
                 if (routeInfo) {
                     routeInfo.innerHTML = '';
@@ -1535,7 +1595,7 @@
             });
         }
 
-
+        let allRoutes = [];
         let currentRouteCalculation = null;
 
         async function calculateRouteIfPossible() {
@@ -1680,6 +1740,7 @@
                     `&units=metric` +
                     `&lang=${currentLang}` +
                     `&currency=EUR` +
+                    `&alternatives=1` +
                     `&spans=tollSystems,truckAttributes,countryCode,length,routeNumbers,notices` +
                     `&return=polyline,tolls,summary,travelSummary,passthrough,routeHandle,incidents,actions,potentialTimeDependentViolations`;
 
@@ -1731,349 +1792,536 @@
                 }
 
                 const result = await response.json();
-
-                if (result.routes && result.routes[0]) {
-                    const route = result.routes[0];
-                    const sections = route.sections;
-
-                    sections.forEach(section => {
+                function addRouteBubble(mainRoute, alternativeRoute) {
+                    // Zbierz punkty z trasy głównej
+                    const mainPoints = [];
+                    mainRoute.sections.forEach(section => {
                         const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
-                        const polyline = new H.map.Polyline(lineString, {
-                            style: { strokeColor: '#0066CC', lineWidth: 5 }
-                        });
+                        const latLngArray = lineString.getLatLngAltArray();
+                        for (let i = 0; i < latLngArray.length; i += 3) {
+                            mainPoints.push({
+                                lat: latLngArray[i],
+                                lng: latLngArray[i + 1]
+                            });
+                        }
+                    });
 
-                        // Dodaj marker-uchwyt (początkowo ukryty)
-                        const svgMarkup = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
-                            '<circle cx="12" cy="12" r="11" fill="white" fill-opacity="0.8" stroke="#0066CC" stroke-width="2"/>' +
-                            '<circle cx="12" cy="12" r="6" fill="#0066CC" fill-opacity="0.3"/>' +
-                            '</svg>';
-                        
-                        const dragHandle = new H.map.Marker({ lat: 0, lng: 0 }, {
-                            icon: new H.map.Icon(svgMarkup, {
-                                anchor: { x: 12, y: 12 } // Ustawiamy punkt zakotwiczenia na środek ikony
-                            }),
-                            visibility: false,
-                            volatility: true
-                        });
+                    // Zbierz punkty z trasy alternatywnej
+                    const altPoints = [];
+                    alternativeRoute.sections.forEach(section => {
+                        const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+                        const latLngArray = lineString.getLatLngAltArray();
+                        for (let i = 0; i < latLngArray.length; i += 3) {
+                            altPoints.push({
+                                lat: latLngArray[i],
+                                lng: latLngArray[i + 1]
+                            });
+                        }
+                    });
 
-                        // Ustaw właściwość draggable
-                        dragHandle.draggable = true;
+                    // Znajdź punkt największego odchylenia
+                    let maxDeviation = 0;
+                    let deviationPoint = altPoints[Math.floor(altPoints.length / 2)]; // domyślnie środek trasy alternatywnej
 
-                        map.addObject(dragHandle);
-                        routeLines.push(dragHandle);
-
-                        // Obsługa ruchu myszy nad polyline
-                        let isDragging = false;
-
-                        polyline.addEventListener('pointermove', (evt) => {
-                        if (isDragging) return;
-                        
-                        const pointer = evt.currentPointer;
-                        const coordinates = lineString.getLatLngAltArray();
-                        let closestPoint = null;
+                    // Sprawdzamy co 10-ty punkt dla optymalizacji
+                    for (let i = 0; i < altPoints.length; i += 10) {
+                        const altPoint = altPoints[i];
                         let minDistance = Infinity;
 
-                        // Znajdź najbliższy punkt na linii
-                        for(let i = 0; i < coordinates.length - 2; i += 3) {
-                            const point = map.geoToScreen({ 
-                                lat: coordinates[i], 
-                                lng: coordinates[i + 1] 
-                            });
-                            const distance = Math.hypot(point.x - pointer.viewportX, point.y - pointer.viewportY);
+                        // Sprawdzamy co 10-ty punkt trasy głównej
+                        for (let j = 0; j < mainPoints.length; j += 10) {
+                            const mainPoint = mainPoints[j];
+                            const latDiff = altPoint.lat - mainPoint.lat;
+                            const lngDiff = altPoint.lng - mainPoint.lng;
+                            const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
                             
                             if (distance < minDistance) {
                                 minDistance = distance;
-                                closestPoint = { lat: coordinates[i], lng: coordinates[i + 1] };
                             }
                         }
 
-                        // Jeśli kursor jest wystarczająco blisko linii
-                        if (minDistance < 50) { // 15 pikseli tolerancji
-                            dragHandle.setGeometry(closestPoint);
-                            dragHandle.setVisibility(true);
-                            map.getViewPort().element.style.cursor = 'grab';
-                        } else {
-                            dragHandle.setVisibility(false);
-                            map.getViewPort().element.style.cursor = 'default';
+                        if (minDistance > maxDeviation) {
+                            maxDeviation = minDistance;
+                            deviationPoint = altPoint;
+                        }
+                    }
+
+                    // Oblicz różnice
+                    const mainDistance = mainRoute.sections.reduce((sum, section) => sum + section.summary.length, 0);
+                    const altDistance = alternativeRoute.sections.reduce((sum, section) => sum + section.summary.length, 0);
+                    const mainTolls = calculateTotalTolls(mainRoute);
+                    const altTolls = calculateTotalTolls(alternativeRoute);
+                    
+                    const distanceDiff = ((altDistance - mainDistance) / 1000);
+                    const tollsDiff = (altTolls - mainTolls);
+                    
+                    // Sprawdź czy różnice przekraczają progi
+                    const DISTANCE_THRESHOLD = 0.1; // 100m
+                    const TOLL_THRESHOLD = 0.1; // 0.1 EUR
+                    
+
+                    if (Math.abs(distanceDiff) > DISTANCE_THRESHOLD || Math.abs(tollsDiff) > TOLL_THRESHOLD) {
+                        const bubbleId = 'route-switch-' + Math.random().toString(36).substr(2, 9);
+
+                        const bubbleContent = `
+                            <div id="${bubbleId}" style="cursor: pointer;">
+                                <div style="color: ${distanceDiff > 0 ? '#ff4444' : '#44aa44'}">${distanceDiff > 0 ? '+' : ''}${distanceDiff.toFixed(1)} km</div>
+                                <div style="color: ${tollsDiff > 0 ? '#ff4444' : '#44aa44'}">${tollsDiff > 0 ? '+' : ''}${tollsDiff.toFixed(2)} €</div>
+                            </div>
+                        `;
+                        
+                        const bubble = new H.ui.InfoBubble(deviationPoint, {
+                            content: bubbleContent,
+                            hideCloseButton: true,
+                            autoClose: false
+                        });
+                        
+                        bubble.open();
+                        ui.addBubble(bubble);
+                        routeBubbles.push(bubble);
+
+                        setTimeout(() => {
+                            const element = document.getElementById(bubbleId);
+                            if (element) {
+                                element.addEventListener('click', (e) => {
+                                    e.stopPropagation();
+                                    const alternativeIndex = allRoutes.findIndex(route => route === alternativeRoute);
+                                    if (alternativeIndex !== -1) {
+                                        currentRouteIndex = alternativeIndex;
+                                        displayRoutes(allRoutes, alternativeIndex);
+                                    }
+                                });
+                            }
+                        }, 100);
+                    }
+                }
+
+                function calculateTotalTolls(route) {
+                    let total = 0;
+                    if (!route.sections) return total;
+                    
+                    route.sections.forEach(section => {
+                        if (section.tolls) {
+                            section.tolls.forEach(toll => {
+                                if (toll.fares) {
+                                    const processedFareIds = new Set();
+                                    const passSubscriptionTolls = new Map();
+                                    
+                                    toll.fares.forEach(fare => {
+                                        const value = fare.convertedPrice?.value || fare.price?.value || 0;
+                                        
+                                        if (fare.paymentMethods?.includes('passSubscription')) {
+                                            const key = `${toll.countryCode}_${toll.tollSystem}`;
+                                            if (!passSubscriptionTolls.has(key) || value < passSubscriptionTolls.get(key)) {
+                                                passSubscriptionTolls.set(key, value);
+                                            }
+                                        } else if (!processedFareIds.has(fare.id)) {
+                                            processedFareIds.add(fare.id);
+                                            total += value;
+                                        }
+                                    });
+                                    
+                                    // Dodaj najniższe opłaty za pass subscription
+                                    passSubscriptionTolls.forEach(value => {
+                                        total += value;
+                                    });
+                                }
+                            });
                         }
                     });
+                    return total;
+                }
 
-                        // Obsługa przeciągania
-                        dragHandle.addEventListener('pointerdown', (evt) => {
-                            evt.stopPropagation();
-                            isDragging = true;
-                            currentDragHandle = evt.target;
-                            behavior.disable();
-                            map.getViewPort().element.style.cursor = 'grabbing';
-                            
-                            // Dodaj tymczasowe listenery do dokumentu
-                            const handlePointerMove = (e) => {
-                                if (!isDragging) return;
-                                const rect = map.getViewPort().element.getBoundingClientRect();
-                                const pointer = {
-                                    viewportX: e.clientX - rect.left,
-                                    viewportY: e.clientY - rect.top
-                                };
-                                currentDragHandle.setGeometry(map.screenToGeo(pointer.viewportX, pointer.viewportY));
-                            };
 
-                            const handlePointerUp = (e) => {
-                                if (!isDragging) return;
+
+                
+                if (result.routes && result.routes.length > 0) {
+                    allRoutes = result.routes; // Zapisujemy wszystkie trasy
+                    displayRoutes(allRoutes, currentRouteIndex);
+                }
+
+                function displayRoutes(routes, activeIndex) {
+                    clearMap();
+                    
+                    // Oblicz metryki głównej trasy do porównania
+                    const mainRoute = routes[activeIndex];
+                    const mainDistance = mainRoute.sections.reduce((sum, section) => sum + section.summary.length, 0);
+                    const mainTolls = calculateTotalTolls(mainRoute);
+
+                    // Przetwórz każdą trasę (główną i alternatywne)
+                    routes.forEach((route, routeIndex) => {
+                        const sections = route.sections;
+                        const isAlternative = routeIndex !== activeIndex;
+                        
+                        sections.forEach(section => {
+                            const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+                            // Najpierw dodaj czarny kontur
+                            const outlinePolyline = new H.map.Polyline(lineString, {
+                                style: {
+                                    strokeColor: '#386BD0',
+                                    lineWidth: isAlternative ? 6 : 7,  // Grubsza linia dla konturu
+                                    opacity: isAlternative ? 0.3 : 0.4  // Mniejsza przezroczystość dla konturu
+                                }
+                            });
+
+                            // Następnie dodaj właściwą kolorową linię
+                            const polyline = new H.map.Polyline(lineString, {
+                                style: {
+                                    strokeColor: isAlternative ? '#808080' : '#4296FF',
+                                    lineWidth: isAlternative ? 6 : 7,
+                                    opacity: isAlternative ? 0.7 : 1
+                                }
+                            });
+
+                            outlinePolyline.setZIndex(isAlternative ? 1 : 2);
+                            polyline.setZIndex(isAlternative ? 2 : 3);
+
+                            map.addObject(outlinePolyline);
+                            map.addObject(polyline);
+                            routeLines.push(outlinePolyline);
+                            routeLines.push(polyline);
+
+                            polyline.setZIndex(isAlternative ? 1 : 2);
+                            map.addObject(polyline);
+                            routeLines.push(polyline);
+
+                            if (isAlternative) {
+                                polyline.addEventListener('tap', () => {
+                                    currentRouteIndex = routeIndex;
+                                    displayRoutes(allRoutes, routeIndex);
+                                });
+                            }
+
+                            map.addObject(polyline);
+                            routeLines.push(polyline);
+
+                            // Dodanie drag handle tylko dla aktywnej trasy
+                            if (!isAlternative) {
+                                // Dodaj marker-uchwyt (początkowo ukryty)
+                                const svgMarkup = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+                                    '<circle cx="12" cy="12" r="11" fill="white" fill-opacity="0.8" stroke="#0066CC" stroke-width="2"/>' +
+                                    '<circle cx="12" cy="12" r="6" fill="#0066CC" fill-opacity="0.3"/>' +
+                                    '</svg>';
                                 
-                                const position = currentDragHandle.getGeometry();
-                                currentDragHandle.setVisibility(false);
-                                isDragging = false;
-                                behavior.enable();
-                                map.getViewPort().element.style.cursor = 'default';
+                                const dragHandle = new H.map.Marker({ lat: 0, lng: 0 }, {
+                                    icon: new H.map.Icon(svgMarkup, {
+                                        anchor: { x: 12, y: 12 }
+                                    }),
+                                    visibility: false,
+                                    volatility: true
+                                });
+
+                                dragHandle.draggable = true;
+                                map.addObject(dragHandle);
+                                routeLines.push(dragHandle);
+
+                                // Obsługa ruchu myszy nad polyline
+                                let isDragging = false;
+
+                                polyline.addEventListener('pointermove', (evt) => {
+                                    if (isDragging) return;
+                                    
+                                    const pointer = evt.currentPointer;
+                                    const coordinates = lineString.getLatLngAltArray();
+                                    let closestPoint = null;
+                                    let minDistance = Infinity;
+
+                                    // Znajdź najbliższy punkt na linii
+                                    for(let i = 0; i < coordinates.length - 2; i += 3) {
+                                        const point = map.geoToScreen({ 
+                                            lat: coordinates[i], 
+                                            lng: coordinates[i + 1] 
+                                        });
+                                        const distance = Math.hypot(point.x - pointer.viewportX, point.y - pointer.viewportY);
+                                        
+                                        if (distance < minDistance) {
+                                            minDistance = distance;
+                                            closestPoint = { lat: coordinates[i], lng: coordinates[i + 1] };
+                                        }
+                                    }
+
+                                    if (minDistance < 50) {
+                                        dragHandle.setGeometry(closestPoint);
+                                        dragHandle.setVisibility(true);
+                                        map.getViewPort().element.style.cursor = 'grab';
+                                    } else {
+                                        dragHandle.setVisibility(false);
+                                        map.getViewPort().element.style.cursor = 'default';
+                                    }
+                                });
+
+                                // Obsługa przeciągania
+                                dragHandle.addEventListener('pointerdown', (evt) => {
+                                    evt.stopPropagation();
+                                    isDragging = true;
+                                    currentDragHandle = evt.target;
+                                    behavior.disable();
+                                    map.getViewPort().element.style.cursor = 'grabbing';
+                                    
+                                    const handlePointerMove = (e) => {
+                                        if (!isDragging) return;
+                                        const rect = map.getViewPort().element.getBoundingClientRect();
+                                        const pointer = {
+                                            viewportX: e.clientX - rect.left,
+                                            viewportY: e.clientY - rect.top
+                                        };
+                                        currentDragHandle.setGeometry(map.screenToGeo(pointer.viewportX, pointer.viewportY));
+                                    };
+
+                                    const handlePointerUp = (e) => {
+                                        if (!isDragging) return;
+                                        
+                                        const position = currentDragHandle.getGeometry();
+                                        currentDragHandle.setVisibility(false);
+                                        isDragging = false;
+                                        behavior.enable();
+                                        map.getViewPort().element.style.cursor = 'default';
+                                        
+                                        const waypoints = [];
+                                        document.querySelectorAll('.waypoint').forEach((input, index) => {
+                                            if (input.value.trim() !== '') {
+                                                const coords = geocodedPoints.get(input.value.trim());
+                                                if (coords) {
+                                                    waypoints.push({
+                                                        coords: coords,
+                                                        index: index
+                                                    });
+                                                }
+                                            }
+                                        });
+
+                                        let minDistance = Infinity;
+                                        let insertIndex = 0;
+                                        
+                                        for (let i = 0; i < waypoints.length - 1; i++) {
+                                            const startPoint = waypoints[i].coords;
+                                            const endPoint = waypoints[i + 1].coords;
+                                            const distanceToStart = position.distance(startPoint);
+                                            const distanceToEnd = position.distance(endPoint);
+                                            const avgDistance = (distanceToStart + distanceToEnd) / 2;
+                                            
+                                            if (avgDistance < minDistance) {
+                                                minDistance = avgDistance;
+                                                insertIndex = i;
+                                            }
+                                        }
+                                        
+                                        const waypointContainers = document.querySelectorAll('.waypoint-container');
+                                        const newWaypoint = createWaypointInput();
+                                        const input = newWaypoint.querySelector('.waypoint');
+                                        input.value = `${position.lat.toFixed(6)}, ${position.lng.toFixed(6)}`;
+                                        
+                                        const targetContainer = waypointContainers[insertIndex + 1];
+                                        if (targetContainer) {
+                                            waypointContainers[0].parentNode.insertBefore(newWaypoint, targetContainer);
+                                        } else {
+                                            waypointContainers[0].parentNode.appendChild(newWaypoint);
+                                        }
+                                        
+                                        input.dispatchEvent(new Event('input'));
+                                        updateWaypointNumbers();
+                                        calculateRouteIfPossible();
+                                        
+                                        currentDragHandle = null;
+                                        document.removeEventListener('pointermove', handlePointerMove);
+                                        document.removeEventListener('pointerup', handlePointerUp);
+                                    };
+
+                                    document.addEventListener('pointermove', handlePointerMove);
+                                    document.addEventListener('pointerup', handlePointerUp);
+                                });
+
+                                polyline.addEventListener('pointerleave', () => {
+                                    if (!isDragging) {
+                                        dragHandle.setVisibility(false);
+                                        map.getViewPort().element.style.cursor = 'default';
+                                    }
+                                });
+                            }
+                        });
+
+                        // Dodaj markery tylko dla aktualnej trasy
+                        if (routeIndex === currentRouteIndex) {
+                            geoResults.forEach((result, index) => {
+                                addMarker({ lat: result.lat, lng: result.lng }, index + 1);
+                            });
+
+                            // Oblicz i wyświetl informacje o trasie
+                            const totalDistance = route.sections.reduce((sum, section) => sum + section.summary.length, 0);
+                            const distanceInKm = totalDistance / 1000;
+                            const timeInHours = distanceInKm / 73;
+                            const totalTime = timeInHours * 3600;
+
+                            // Pobieranie informacji o opłatach
+                            let tollInfo = '';
+                            if (route.sections) {
+                                const countryTolls = new Map();
+                                const ferries = new Map();
+                                const minPassSubscriptionTolls = new Map();
+                                const processedFareIds = new Set();
+                                let totalToll = 0;
                                 
-                                // Pobierz wszystkie aktualne punkty trasy
-                                const waypoints = [];
-                                document.querySelectorAll('.waypoint').forEach((input, index) => {
-                                    if (input.value.trim() !== '') {
-                                        const coords = geocodedPoints.get(input.value.trim());
-                                        if (coords) {
-                                            waypoints.push({
-                                                coords: coords,
-                                                index: index
+                                route.sections.forEach(section => {
+                                    if (section.transport?.mode) {
+                                        const transportMode = section.transport.mode;
+                                        const transportName = section.transport.name;
+                                        
+                                        if (transportName && (
+                                            transportMode === 'ferry' || 
+                                            transportMode.toLowerCase().includes('shuttletrain')
+                                        )) {
+                                            const icon = transportMode === 'ferry' ? '⛴️' : '🛤️';
+                                            ferries.set(transportName, {
+                                                icon: icon,
+                                                value: localStorage.getItem(`ferry_${transportName}`) || ''
                                             });
                                         }
                                     }
-                                });
 
-                                // Znajdź najbliższy segment używając distance()
-                                let minDistance = Infinity;
-                                let insertIndex = 0;
-                                
-                                for (let i = 0; i < waypoints.length - 1; i++) {
-                                    const startPoint = waypoints[i].coords;
-                                    const endPoint = waypoints[i + 1].coords;
-                                    
-                                    // Oblicz odległość do obu punktów segmentu
-                                    const distanceToStart = position.distance(startPoint);
-                                    const distanceToEnd = position.distance(endPoint);
-                                    
-                                    // Użyj średniej odległości jako metryki dla segmentu
-                                    const avgDistance = (distanceToStart + distanceToEnd) / 2;
-                                    
-                                    if (avgDistance < minDistance) {
-                                        minDistance = avgDistance;
-                                        insertIndex = i;
-                                    }
-                                }
-                                
-                                // Wstaw nowy punkt po znalezionym indeksie
-                                const waypointContainers = document.querySelectorAll('.waypoint-container');
-                                const newWaypoint = createWaypointInput();
-                                const input = newWaypoint.querySelector('.waypoint');
-                                input.value = `${position.lat.toFixed(6)}, ${position.lng.toFixed(6)}`;
-                                
-                                // Wstaw punkt PO znalezionym indeksie
-                                const targetContainer = waypointContainers[insertIndex + 1];
-                                if (targetContainer) {
-                                    waypointContainers[0].parentNode.insertBefore(newWaypoint, targetContainer);
-                                } else {
-                                    waypointContainers[0].parentNode.appendChild(newWaypoint);
-                                }
-                                
-                                input.dispatchEvent(new Event('input'));
-                                updateWaypointNumbers();
-                                calculateRouteIfPossible();
-                                
-                                currentDragHandle = null;
-                                document.removeEventListener('pointermove', handlePointerMove);
-                                document.removeEventListener('pointerup', handlePointerUp);
-                            };
+                                    if (section.tolls) {
+                                        section.tolls.forEach(toll => {
+                                            const countryCode = toll.countryCode;
+                                            if (!countryTolls.has(countryCode)) {
+                                                countryTolls.set(countryCode, 0);
+                                            }
 
-                            document.addEventListener('pointermove', handlePointerMove);
-                            document.addEventListener('pointerup', handlePointerUp);
-                        });
-
-                        polyline.addEventListener('pointerleave', () => {
-                            if (!isDragging) {
-                                dragHandle.setVisibility(false);
-                                map.getViewPort().element.style.cursor = 'default';
-                            }
-                        });
-
-                        map.addObject(polyline);
-                        routeLines.push(polyline);
-                    });
-
-
-                    const allCoordinates = [origin, destination, ...viaPoints];
-                    let minLat = Math.min(...allCoordinates.map(coord => coord.lat));
-                    let maxLat = Math.max(...allCoordinates.map(coord => coord.lat));
-                    let minLng = Math.min(...allCoordinates.map(coord => coord.lng));
-                    let maxLng = Math.max(...allCoordinates.map(coord => coord.lng));
-
-                    const latMargin = (maxLat - minLat) * 0.2;
-                    const lngMargin = (maxLng - minLng) * 0.2;
-
-                    minLat -= latMargin;
-                    maxLat += latMargin;
-                    minLng -= lngMargin;
-                    maxLng += lngMargin;
-
-                    const fullBoundingBox = new H.geo.Rect(maxLat, minLng, minLat, maxLng);
-                    map.getViewModel().setLookAtData({
-                        bounds: fullBoundingBox
-                    });
-
-                    const totalDistance = sections.reduce((sum, section) => sum + section.summary.length, 0);
-                    // Calculate time based on fixed speed of 73 km/h
-                    const distanceInKm = totalDistance / 1000;
-                    const timeInHours = distanceInKm / 73;
-                    const totalTime = timeInHours * 3600; // Convert to seconds for consistency with the display format
-
-                    // Pobieranie informacji o opłatach
-                    let tollInfo = '';
-                    if (route.sections) {
-                        // Map do przechowywania opłat według krajów
-                        const countryTolls = new Map();
-                        // Map do przechowywania informacji o promach
-                        const ferries = new Map();
-                        // Map do przechowywania najniższej opłaty dla każdego systemu pass subscription
-                        const minPassSubscriptionTolls = new Map();
-                        // Set do przechowywania już przetworzonych standardowych opłat
-                        const processedFareIds = new Set();
-                        let totalToll = 0;
-                        
-                        route.sections.forEach(section => {
-                            // Sprawdź czy sekcja zawiera prom lub pociąg
-                            if (section.transport?.mode) {
-                                const transportMode = section.transport.mode;
-                                const transportName = section.transport.name;
-                                
-                                if (transportName && (
-                                    transportMode === 'ferry' || 
-                                    transportMode.toLowerCase().includes('shuttletrain')
-                                )) {
-                                    const icon = transportMode === 'ferry' ? '⛴️' : '🛤️';
-                                    ferries.set(transportName, {
-                                        icon: icon,
-                                        value: localStorage.getItem(`ferry_${transportName}`) || ''
-                                    });
-                                }
-                            }
-
-                            if (section.tolls) {
-                                section.tolls.forEach(toll => {
-                                    const countryCode = toll.countryCode;
-                                    if (!countryTolls.has(countryCode)) {
-                                        countryTolls.set(countryCode, 0);
-                                    }
-
-                                    if (toll.fares) {
-                                        let minFare = Infinity;
-                                        toll.fares.forEach(fare => {
-                                            const value = fare.convertedPrice?.value || fare.price?.value || 0;
-                                            
-                                            if (fare.paymentMethods?.includes('passSubscription')) {
-                                                const key = `${toll.countryCode}_${toll.tollSystem}`;
-                                                if (!minPassSubscriptionTolls.has(key) || value < minPassSubscriptionTolls.get(key)) {
-                                                    minPassSubscriptionTolls.set(key, value);
+                                            if (toll.fares) {
+                                                let minFare = Infinity;
+                                                toll.fares.forEach(fare => {
+                                                    const value = fare.convertedPrice?.value || fare.price?.value || 0;
+                                                    
+                                                    if (fare.paymentMethods?.includes('passSubscription')) {
+                                                        const key = `${toll.countryCode}_${toll.tollSystem}`;
+                                                        if (!minPassSubscriptionTolls.has(key) || value < minPassSubscriptionTolls.get(key)) {
+                                                            minPassSubscriptionTolls.set(key, value);
+                                                        }
+                                                    } else if (!processedFareIds.has(fare.id)) {
+                                                        processedFareIds.add(fare.id);
+                                                        minFare = Math.min(minFare, value);
+                                                    }
+                                                });
+                                                
+                                                if (minFare !== Infinity) {
+                                                    countryTolls.set(countryCode, countryTolls.get(countryCode) + minFare);
                                                 }
-                                            } else if (!processedFareIds.has(fare.id)) {
-                                                processedFareIds.add(fare.id);
-                                                minFare = Math.min(minFare, value);
                                             }
                                         });
-                                        
-                                        if (minFare !== Infinity) {
-                                            countryTolls.set(countryCode, countryTolls.get(countryCode) + minFare);
-                                        }
                                     }
                                 });
+
+                                for (const [key, value] of minPassSubscriptionTolls.entries()) {
+                                    const countryCode = key.split('_')[0];
+                                    if (countryTolls.has(countryCode)) {
+                                        countryTolls.set(countryCode, countryTolls.get(countryCode) + value);
+                                    }
+                                }
+
+                                totalToll = Array.from(countryTolls.values()).reduce((a, b) => a + b, 0);
+
+                                let roadTollsHtml = '';
+                                if (totalToll > 0) {
+                                    roadTollsHtml = `
+                                        <div class="toll-summary">
+                                            <span>Opłaty drogowe: ${totalToll.toFixed(2)} EUR</span>
+                                            <button class="toll-details-toggle">▼</button>
+                                        </div>
+                                        <div class="toll-details" style="display: none;">
+                                            <div class="toll-details-content">
+                                                ${Array.from(countryTolls.entries())
+                                                    .map(([country, value]) => `
+                                                        <div class="country-toll">
+                                                            ${country}: ${value.toFixed(2)} EUR
+                                                        </div>
+                                                    `).join('')}
+                                            </div>
+                                        </div>`;
+                                } else {
+                                    roadTollsHtml = `<br>${translations.noRoadCharges}`;
+                                }
+
+                                let ferriesHtml = '';
+                                if (ferries.size > 0) {
+                                    ferriesHtml = Array.from(ferries.entries())
+                                        .map(([name, data]) => `
+                                            <div class="ferry-item" style="margin-top: 2px;">
+                                                ${data.icon} ${name}: 
+                                                <input type="number" 
+                                                    class="ferry-price" 
+                                                    data-ferry-name="${name}"
+                                                    value="${data.value}"
+                                                    min="0" 
+                                                    max="5000" 
+                                                    step="1" 
+                                                    style="width: 60px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;"
+                                                    placeholder="EUR">
+                                            </div>
+                                        `).join('');
+                                }
+
+                                tollInfo = roadTollsHtml + ferriesHtml;
+                            } else {
+                                tollInfo = `<br>${translations.noRoadCharges}`;
                             }
+
+                            document.getElementById('route-info').innerHTML = `
+                                <strong>${translations.routeInfo}</strong><br>
+                                ${translations.distance}: ${(totalDistance / 1000).toFixed(1)} km<br>
+                                ${translations.time}: ${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min
+                                ${tollInfo}
+                            `;
+
+                            // Dodaj event listenery dla szczegółów opłat
+                            const tollDetailsToggle = document.querySelector('.toll-details-toggle');
+                            if (tollDetailsToggle) {
+                                tollDetailsToggle.addEventListener('click', function() {
+                                    const details = document.querySelector('.toll-details');
+                                    const isExpanded = details.style.display !== 'none';
+                                    details.style.display = isExpanded ? 'none' : 'block';
+                                    this.textContent = isExpanded ? '▼' : '▲';
+                                });
+                            }
+
+                            // Dodaj event listenery dla cen promów
+                            document.querySelectorAll('.ferry-price').forEach(input => {
+                                input.addEventListener('input', (e) => {
+                                    const value = e.target.value;
+                                    const ferryName = e.target.dataset.ferryName;
+                                    if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
+                                        localStorage.setItem(`ferry_${ferryName}`, value);
+                                }
+                            });
                         });
-
-                        // Dodaj opłaty pass subscription do odpowiednich krajów
-                        for (const [key, value] of minPassSubscriptionTolls.entries()) {
-                            const countryCode = key.split('_')[0];
-                            if (countryTolls.has(countryCode)) {
-                                countryTolls.set(countryCode, countryTolls.get(countryCode) + value);
-                            }
-                        }
-
-                        totalToll = Array.from(countryTolls.values()).reduce((a, b) => a + b, 0);
-
-                        // Generuj HTML dla opłat drogowych
-                        let roadTollsHtml = '';
-                        if (totalToll > 0) {
-                            roadTollsHtml = `
-                                <div class="toll-summary">
-                                    <span>Opłaty drogowe: ${totalToll.toFixed(2)} EUR</span>
-                                    <button class="toll-details-toggle">▼</button>
-                                </div>
-                                <div class="toll-details" style="display: none;">
-                                    <div class="toll-details-content">
-                                        ${Array.from(countryTolls.entries())
-                                            .map(([country, value]) => `
-                                                <div class="country-toll">
-                                                    ${country}: ${value.toFixed(2)} EUR
-                                                </div>
-                                            `).join('')}
-                                    </div>
-                                </div>`;
-                        } else {
-                            roadTollsHtml = `<br>${translations.noRoadCharges}`;
-                        }
-
-                        // Generuj HTML dla promów i pociągów
-                        let ferriesHtml = '';
-                        if (ferries.size > 0) {
-                            ferriesHtml = Array.from(ferries.entries())
-                                .map(([name, data]) => `
-                                    <div class="ferry-item" style="margin-top: 2px;">
-                                        ${data.icon} ${name}: 
-                                        <input type="number" 
-                                            class="ferry-price" 
-                                            data-ferry-name="${name}"
-                                            value="${data.value}"
-                                            min="0" 
-                                            max="5000" 
-                                            step="1" 
-                                            style="width: 60px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;"
-                                            placeholder="EUR">
-                                    </div>
-                                `).join('');
-                        }
-
-                        tollInfo = roadTollsHtml + ferriesHtml;
-                    } else {
-                        tollInfo = `<br>${translations.noRoadCharges}`;
                     }
-
-                    document.getElementById('route-info').innerHTML = `
-                        <strong>${translations.routeInfo}</strong><br>
-                        ${translations.distance}: ${(totalDistance / 1000).toFixed(1)} km<br>
-                        ${translations.time}: ${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min
-                        ${tollInfo}
-                    `;
-
-                    // Dodaj obsługę przycisku rozwijania
-                    const tollDetailsToggle = document.querySelector('.toll-details-toggle');
-                    if (tollDetailsToggle) {
-                        tollDetailsToggle.addEventListener('click', function() {
-                            const details = document.querySelector('.toll-details');
-                            const isExpanded = details.style.display !== 'none';
-                            details.style.display = isExpanded ? 'none' : 'block';
-                            this.textContent = isExpanded ? '▼' : '▲';
-                        });
-                    }
-
-                    // Dodaj obsługę zapisywania cen promów
-                    document.querySelectorAll('.ferry-price').forEach(input => {
-                        input.addEventListener('input', (e) => {
-                            const value = e.target.value;
-                            const ferryName = e.target.dataset.ferryName;
-                            
-                            // Walidacja
-                            if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
-                                localStorage.setItem(`ferry_${ferryName}`, value);
+                    // Dodaj InfoBubbles dla tras alternatywnych
+                    if (routes.length > 1) {
+                        const mainRoute = routes[currentRouteIndex];
+                        routes.forEach((route, index) => {
+                            if (index !== currentRouteIndex) {
+                                addRouteBubble(mainRoute, route);
                             }
                         });
-                    });
+                    }
+                });
+                
+                // Dostosuj widok mapy aby pokazać wszystkie trasy
+                const allCoordinates = [origin, destination, ...viaPoints];
+                let minLat = Math.min(...allCoordinates.map(coord => coord.lat));
+                let maxLat = Math.max(...allCoordinates.map(coord => coord.lat));
+                let minLng = Math.min(...allCoordinates.map(coord => coord.lng));
+                let maxLng = Math.max(...allCoordinates.map(coord => coord.lng));
+
+                const latMargin = (maxLat - minLat) * 0.2;
+                const lngMargin = (maxLng - minLng) * 0.2;
+
+                minLat -= latMargin;
+                maxLat += latMargin;
+                minLng -= lngMargin;
+                maxLng += lngMargin;
+
+                const fullBoundingBox = new H.geo.Rect(maxLat, minLng, minLat, maxLng);
+                map.getViewModel().setLookAtData({
+                    bounds: fullBoundingBox
+                });
                 }
 
             } catch (error) {
