@@ -1140,6 +1140,7 @@
 
         function addMarker(position, number) {
             const svgMarkup = '<svg width="48" height="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+                '<circle cx="12" cy="21" r="2.5" fill="white" stroke="black" stroke-width="1"/>' + // dodana biała kropka na dole
                 '<path fill="#0066CC" d="M12 2.5c-3.8 0-7 3.2-7 7.1 0 5.4 7 11.9 7 11.9s7-6.5 7-11.9c0-3.9-3.2-7.1-7-7.1z" />' +
                 '<circle cx="12" cy="9" r="4" fill="#FFFFFF"/>' +
                 '<text x="12" y="11" font-size="6" font-family="Arial" font-weight="bold" text-anchor="middle" fill="#0066CC">' + 
@@ -1154,7 +1155,6 @@
                 icon: icon,
                 volatility: true,
                 draggable: true,
-                // Dodajemy dane do markera
                 data: { id: number }
             });
 
@@ -1958,31 +1958,16 @@
                         
                         sections.forEach(section => {
                             const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
-                            // Najpierw dodaj czarny kontur
-                            const outlinePolyline = new H.map.Polyline(lineString, {
-                                style: {
-                                    strokeColor: '#386BD0',
-                                    lineWidth: isAlternative ? 6 : 7,  // Grubsza linia dla konturu
-                                    opacity: isAlternative ? 0.3 : 0.4  // Mniejsza przezroczystość dla konturu
-                                }
-                            });
-
-                            // Następnie dodaj właściwą kolorową linię
+                            
                             const polyline = new H.map.Polyline(lineString, {
                                 style: {
                                     strokeColor: isAlternative ? '#808080' : '#1F51FF',
-                                    lineWidth: isAlternative ? 6 : 7,
-                                    opacity: isAlternative ? 0.7 : 1
+                                    lineWidth: isAlternative ? 5 : 6.5,
+                                    opacity: isAlternative ? 0.7 : 1,
+                                    lineCap: 'round',
+                                    lineJoin: 'round'
                                 }
                             });
-
-                            outlinePolyline.setZIndex(isAlternative ? 1 : 2);
-                            polyline.setZIndex(isAlternative ? 2 : 3);
-
-                            map.addObject(outlinePolyline);
-                            map.addObject(polyline);
-                            routeLines.push(outlinePolyline);
-                            routeLines.push(polyline);
 
                             polyline.setZIndex(isAlternative ? 1 : 2);
                             map.addObject(polyline);
