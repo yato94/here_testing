@@ -1997,39 +1997,54 @@
                 }
 
                 function calculateTotalTolls(route) {
-                    let total = 0;
-                    if (!route.sections) return total;
+                    if (!route.sections) return 0;
                     
+                    const countryTolls = new Map();
+                    const minPassSubscriptionTolls = new Map();
+                    const processedFareIds = new Set();
+                    let totalToll = 0;
+
                     route.sections.forEach(section => {
                         if (section.tolls) {
                             section.tolls.forEach(toll => {
+                                const countryCode = toll.countryCode;
+                                if (!countryTolls.has(countryCode)) {
+                                    countryTolls.set(countryCode, 0);
+                                }
+
                                 if (toll.fares) {
-                                    const processedFareIds = new Set();
-                                    const passSubscriptionTolls = new Map();
-                                    
+                                    let minFare = Infinity;
                                     toll.fares.forEach(fare => {
                                         const value = fare.convertedPrice?.value || fare.price?.value || 0;
                                         
                                         if (fare.paymentMethods?.includes('passSubscription')) {
                                             const key = `${toll.countryCode}_${toll.tollSystem}`;
-                                            if (!passSubscriptionTolls.has(key) || value < passSubscriptionTolls.get(key)) {
-                                                passSubscriptionTolls.set(key, value);
+                                            if (!minPassSubscriptionTolls.has(key) || value < minPassSubscriptionTolls.get(key)) {
+                                                minPassSubscriptionTolls.set(key, value);
                                             }
                                         } else if (!processedFareIds.has(fare.id)) {
                                             processedFareIds.add(fare.id);
-                                            total += value;
+                                            minFare = Math.min(minFare, value);
                                         }
                                     });
                                     
-                                    // Dodaj najniższe opłaty za pass subscription
-                                    passSubscriptionTolls.forEach(value => {
-                                        total += value;
-                                    });
+                                    if (minFare !== Infinity) {
+                                        countryTolls.set(countryCode, countryTolls.get(countryCode) + minFare);
+                                    }
                                 }
                             });
                         }
                     });
-                    return total;
+
+                    // Dodaj najniższe opłaty za pass subscription
+                    for (const [key, value] of minPassSubscriptionTolls.entries()) {
+                        const countryCode = key.split('_')[0];
+                        if (countryTolls.has(countryCode)) {
+                            countryTolls.set(countryCode, countryTolls.get(countryCode) + value);
+                        }
+                    }
+
+                    return Array.from(countryTolls.values()).reduce((a, b) => a + b, 0);
                 }
 
 
