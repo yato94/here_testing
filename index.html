@@ -1133,7 +1133,7 @@
         let markers = [];
         let debounceTimer;
 		
-		async function geocodeAddress(address) {
+        async function geocodeAddress(address) {
             const gpsCoords = isGPSCoordinates(address);
             
             if (gpsCoords) {
@@ -1153,10 +1153,28 @@
                     const data = await response.json();
                     
                     if (data.items && data.items.length > 0) {
+                        const addressInfo = data.items[0].address;
+                        
+                        // Tworzymy część adresu z ulicą i numerem
+                        let streetPart = '';
+                        if (addressInfo.street) {
+                            streetPart = addressInfo.street;
+                            if (addressInfo.houseNumber) {
+                                streetPart += ' ' + addressInfo.houseNumber;
+                            }
+                        }
+                        
+                        const formattedAddress = [
+                            addressInfo.countryCode,
+                            addressInfo.postalCode,
+                            addressInfo.city,
+                            streetPart
+                        ].filter(Boolean).join(', ');
+
                         return {
                             lat: gpsCoords.lat,
                             lng: gpsCoords.lng,
-                            address: data.items[0].title
+                            address: formattedAddress
                         };
                     } else {
                         throw new Error(translations.addressNotFound);
@@ -1173,10 +1191,28 @@
                         limit: 1
                     }, (result) => {
                         if (result.items && result.items.length > 0) {
+                            const addressInfo = result.items[0].address;
+                            
+                            // Tworzymy część adresu z ulicą i numerem
+                            let streetPart = '';
+                            if (addressInfo.street) {
+                                streetPart = addressInfo.street;
+                                if (addressInfo.houseNumber) {
+                                    streetPart += ' ' + addressInfo.houseNumber;
+                                }
+                            }
+                            
+                            const formattedAddress = [
+                                addressInfo.countryCode,
+                                addressInfo.postalCode,
+                                addressInfo.city,
+                                streetPart
+                            ].filter(Boolean).join(', ');
+
                             resolve({
                                 lat: result.items[0].position.lat,
                                 lng: result.items[0].position.lng,
-                                address: result.items[0].title
+                                address: formattedAddress
                             });
                         } else {
                             reject(new Error(translations.addressNotFound));
