@@ -33,8 +33,15 @@
             flex-direction: column;
             gap: 16px;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+            height: 100vh;
+            overflow-y: auto;
+            scroll-behavior: smooth;
         }
 
+        /* Delikatniejszy scrollbar */
+        #sidebar::-webkit-scrollbar {
+            display: none;
+        }
 
         #map-container {
             flex: 1;
