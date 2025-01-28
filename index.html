@@ -183,12 +183,31 @@
         }
 
         #route-info {
+            position: relative;
             margin-top: 16px;
             padding: 16px;
             background-color: white;
-            border-radius: 4px;
             border: 1px solid rgba(0, 0, 0, 0.1);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Dodajemy ten sam cień co mają pola adresowe */
+        }
+
+        /* Możemy też dodać hover efekt, tak jak mają pola adresowe */
+        #route-info:hover {
+            border-color: #0066CC;
+            box-shadow: 0 2px 8px rgba(0, 102, 204, 0.15);
+        }
+
+        .route-info-label {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: white;
+            padding: 0 8px;
+            font-size: 13px;
+            color: #666;
         }
 
         .remove-waypoint {
@@ -430,6 +449,52 @@
         .H_ib_tail {
             display: none !important;
         }
+
+        .route-stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .route-stat:last-child {
+            margin-bottom: 0; /* Usuwa dolny margines z ostatniego elementu */
+        }
+
+        .stat-label {
+            font-size: 13px; /* Zwiększone z 11px */
+            color: #666;
+            margin-bottom: 3px; /* Zwiększony margin */
+        }
+
+        .stat-value {
+            font-size: 16px; /* Zwiększone z 14px */
+            color: #323130;
+            font-weight: 500;
+        }
+
+        .route-stats-container {
+            display: flex;
+            gap: 20px; /* Zwiększony gap */
+            margin-bottom: 16px; /* Zwiększony margin */
+        }
+
+        /* Dostosowanie rozmiaru tekstu w szczegółach opłat */
+        .country-toll {
+            font-size: 14px; /* Zwiększone */
+            margin: 6px 0; /* Zwiększony margin */
+        }
+
+        /* Dostosowanie przycisku szczegółów */
+        .toll-details-toggle {
+            font-size: 14px; /* Zwiększone */
+            padding: 0 6px; /* Zwiększony padding */
+        }
+
+        /* Dostosowanie kontenerów dla promów */
+        .ferry-item {
+            font-size: 14px; /* Zwiększone */
+            margin-top: 4px;
+        }
+        
         
     </style>
 </head>
@@ -2349,23 +2414,30 @@
 
                                 let roadTollsHtml = '';
                                 if (totalToll > 0) {
+                                    const costPerKm = totalToll / (totalDistance / 1000);
                                     roadTollsHtml = `
-                                        <div class="toll-summary">
-                                            <span>Opłaty drogowe: ${totalToll.toFixed(2)} €</span>
-                                            <button class="toll-details-toggle">▼</button>
-                                        </div>
-                                        <div class="toll-details" style="display: none;">
-                                            <div class="toll-details-content">
-                                                ${Array.from(countryTolls.entries())
-                                                    .map(([country, value]) => `
-                                                        <div class="country-toll">
-                                                            ${country}: ${value.toFixed(2)} EUR
-                                                        </div>
-                                                    `).join('')}
+                                        <div class="route-stat">
+                                            <div class="stat-label">${translations.roadCharges}</div>
+                                            <div class="stat-value">${totalToll.toFixed(2)} € (${costPerKm.toFixed(2)} €/km)
+                                                <button class="toll-details-toggle">▼</button>
+                                            </div>
+                                            <div class="toll-details" style="display: none;">
+                                                <div class="toll-details-content">
+                                                    ${Array.from(countryTolls.entries())
+                                                        .map(([country, value]) => `
+                                                            <div class="country-toll">
+                                                                ${country}: ${value.toFixed(2)} EUR
+                                                            </div>
+                                                        `).join('')}
+                                                </div>
                                             </div>
                                         </div>`;
                                 } else {
-                                    roadTollsHtml = `<br>${translations.noRoadCharges}`;
+                                    roadTollsHtml = `
+                                        <div class="route-stat">
+                                            <div class="stat-label">${translations.roadCharges}</div>
+                                            <div class="stat-value">${translations.noRoadCharges}</div>
+                                        </div>`;
                                 }
 
                                 let ferriesHtml = '';
@@ -2393,9 +2465,17 @@
                             }
 
                             document.getElementById('route-info').innerHTML = `
-                                <strong>${translations.routeInfo}</strong><br>
-                                ${translations.distance}: ${(totalDistance / 1000).toFixed(1)} km<br>
-                                ${translations.time}: ${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min
+                                <div class="route-info-label">${translations.routeInfo}</div>
+                                <div class="route-stats-container">
+                                    <div class="route-stat">
+                                        <div class="stat-label">${translations.distance}</div>
+                                        <div class="stat-value">${(totalDistance / 1000).toFixed(1)} km</div>
+                                    </div>
+                                    <div class="route-stat">
+                                        <div class="stat-label">${translations.time}</div>
+                                        <div class="stat-value">${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min</div>
+                                    </div>
+                                </div>
                                 ${tollInfo}
                             `;
 
