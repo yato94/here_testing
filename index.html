@@ -2609,16 +2609,6 @@
             }
         });
 
-		// Automatyczny focus na pierwszym polu po załadowaniu strony
-        document.addEventListener('DOMContentLoaded', () => {
-            const firstWaypoint = document.querySelector('.waypoint');
-            if (firstWaypoint) {
-                firstWaypoint.focus();
-            }
-            loadSettings();
-            initializeUITranslations(); // Dodaj to wywołanie
-        });
-
 
 
         // Inicjalizacja lokalnego storage
@@ -2952,12 +2942,6 @@
             updatePageTitle();
         };
 
-        // Add initial event listeners
-        document.addEventListener('DOMContentLoaded', () => {
-            loadRouteFromURL();
-            updatePageTitle();
-        });
-
         // Add URL update on browser navigation
         window.addEventListener('popstate', loadRouteFromURL);
         ////////////////// KONIEC FUNKCJE ODPOWIEDZIALNE ZA BUDOWE LINKU + ZMIANĘ PAGE TITLE
@@ -2999,21 +2983,32 @@
             map.setZoom(5.5);
         }
 
-        // Dodaj nasłuchiwanie na przycisk reset przy starcie aplikacji
-        document.addEventListener('DOMContentLoaded', () => {
-            // [poprzedni kod DOMContentLoaded]
+        function initializeApplication() {
+            // Inicjalizacja pierwszego pola waypoint
+            const firstWaypoint = document.querySelector('.waypoint');
+            if (firstWaypoint) {
+                firstWaypoint.focus();
+            }
+
+            // Wczytanie ustawień
+            loadSettings();
             
-            // Dodaj obsługę przycisku reset
-            document.getElementById('restart-button').addEventListener('click', restartApp);
-        });
-        // Add initial event listeners
-        document.addEventListener('DOMContentLoaded', () => {
+            // Inicjalizacja tłumaczeń UI
+            initializeUITranslations();
+            
+            // Wczytanie trasy z URL i aktualizacja tytułu
             loadRouteFromURL();
             updatePageTitle();
             
-            // Dodaj obsługę przycisku reset
-            document.getElementById('restart-button').addEventListener('click', restartApp);
-        });
+            // Inicjalizacja przycisku reset
+            const restartButton = document.getElementById('restart-button');
+            if (restartButton) {
+                restartButton.addEventListener('click', restartApp);
+            }
+        }
+
+        // Pojedynczy listener DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', initializeApplication);
 
         // Dodaj obsługę skrótu klawiszowego Ctrl+I
         document.addEventListener('keydown', function(e) {
