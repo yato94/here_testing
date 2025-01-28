@@ -1742,7 +1742,7 @@
 
         async function calculateRouteIfPossible() {
             try {
-                apiMonitor.logRequest('routing');
+                
                 // Anuluj poprzednie przeliczanie trasy
                 if (currentRouteCalculation) {
                     currentRouteCalculation.abort();
@@ -1794,7 +1794,7 @@
                 if (waypointInputs.length < 2) {
                     return;
                 }
-
+                apiMonitor.logRequest('routing');
                 const geoResults = await Promise.all(
                     waypointInputs.map(async wp => {
                         if (geocodedPoints.has(wp.value)) {
