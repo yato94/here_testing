@@ -501,7 +501,23 @@
 <body>
     <div id="sidebar">
         <div id="waypoints-container"></div>
-        <div id="route-info"></div>
+        <div id="route-info">
+            <div class="route-info-label" data-translation="routeInfo"></div>
+            <div class="route-stats-container">
+                <div class="route-stat">
+                    <div class="stat-label" data-translation="distance"></div>
+                    <div class="stat-value">--</div>
+                </div>
+                <div class="route-stat">
+                    <div class="stat-label" data-translation="time"></div>
+                    <div class="stat-value">--</div>
+                </div>
+            </div>
+            <div class="route-stat">
+                <div class="stat-label" data-translation="roadCharges"></div>
+                <div class="stat-value">--</div>
+            </div>
+        </div>
         <!-- Panel ustawień trasy - dodaj przed zamknięciem diva "sidebar" -->
         <div id="route-settings" class="route-settings" style="margin-top: auto; padding: 20px;">
             <h3 style="margin-bottom: 15px; font-size: 16px;" id="settings-title"></h3>
@@ -1381,7 +1397,7 @@
                 });
                 routeBubbles = [];
                 
-                // Rest of your existing clearMap code...
+                // Clear routes and markers
                 routeLines.forEach(line => {
                     if (line && typeof line.dispose === 'function') {
                         line.dispose();
@@ -1402,10 +1418,11 @@
                 });
                 markers = [];
                 
-                const routeInfo = document.getElementById('route-info');
-                if (routeInfo) {
-                    routeInfo.innerHTML = '';
-                }
+                // Reset route info to default values
+                document.querySelectorAll('#route-info .stat-value').forEach(element => {
+                    element.textContent = '--';
+                });
+                
             } catch (error) {
                 console.error('Error clearing map:', error);
             }
@@ -2567,6 +2584,13 @@
                     button.textContent = translations[translationKey];
                 }
             });
+            // Dodajemy tłumaczenia dla elementów route-info
+            document.querySelectorAll('[data-translation]').forEach(element => {
+                const translationKey = element.dataset.translation;
+                if (translations[translationKey]) {
+                    element.textContent = translations[translationKey];
+                }
+            });
         }
 
 		// Nasłuchuj zdarzeń input tylko dla dodawania nowych pól
@@ -2947,11 +2971,10 @@
             // Wyczyść mapę
             clearMap();
             
-            // Wyczyść informacje o trasie
-            const routeInfo = document.getElementById('route-info');
-            if (routeInfo) {
-                routeInfo.innerHTML = '';
-            }
+            // Zresetuj wartości w route-info do '--' zamiast czyszczenia całego HTML
+            document.querySelectorAll('#route-info .stat-value').forEach(element => {
+                element.textContent = '--';
+            });
             
             // Zresetuj zapisane punkty geocoded
             geocodedPoints.clear();
