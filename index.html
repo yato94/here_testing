@@ -1794,7 +1794,6 @@
                 if (waypointInputs.length < 2) {
                     return;
                 }
-                apiMonitor.logRequest('routing');
                 const geoResults = await Promise.all(
                     waypointInputs.map(async wp => {
                         if (geocodedPoints.has(wp.value)) {
@@ -1805,7 +1804,7 @@
                         return result;
                     })
                 );
-
+                apiMonitor.logRequest('routing');    
                 geoResults.forEach((result, index) => {
                     addMarker({ lat: result.lat, lng: result.lng }, index + 1);
                     
