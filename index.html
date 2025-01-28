@@ -692,6 +692,7 @@
         const currentLang = getPreferredLanguage();
         const translations = getUITranslations(currentLang);
         const API_KEY = 'yuwY_LTItp881XAaYOHShjcBhdc0sHWuj4TQwGKwjms';
+        
 
         ///LICZNIK ZAPYTAŃ
         const apiMonitor = new class APIMonitor {
@@ -2109,7 +2110,7 @@
                         const sections = route.sections;
                         const isAlternative = routeIndex !== activeIndex;
                         
-                        sections.forEach(section => {
+                        sections.forEach((section, sectionIndex) => {
                             const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
                             
                             const polyline = new H.map.Polyline(lineString, {
@@ -2122,9 +2123,16 @@
                                 }
                             });
 
+                            // Dodaj informację o sekcji do polyline
+                            polyline.setData({
+                                sectionIndex: sectionIndex
+                            });
+
+
                             polyline.setZIndex(isAlternative ? 1 : 2);
                             map.addObject(polyline);
                             routeLines.push(polyline);
+                            
 
                             if (isAlternative) {
                                 polyline.addEventListener('tap', () => {
@@ -2158,6 +2166,8 @@
 
                                 // Obsługa ruchu myszy nad polyline
                                 let isDragging = false;
+                                let currentDragSegmentIndex = null;
+
 
                                 polyline.addEventListener('pointermove', (evt) => {
                                     if (isDragging) return;
@@ -2178,6 +2188,8 @@
                                         if (distance < minDistance) {
                                             minDistance = distance;
                                             closestPoint = { lat: coordinates[i], lng: coordinates[i + 1] };
+                                            // Zapisz indeks sekcji trasy zamiast indeksu segmentu
+                                            currentDragSegmentIndex = polyline.getData().sectionIndex;
                                         }
                                     }
 
@@ -2187,6 +2199,7 @@
                                         map.getViewPort().element.style.cursor = 'grab';
                                     } else {
                                         dragHandle.setVisibility(false);
+                                        currentDragSegmentIndex = null;
                                         map.getViewPort().element.style.cursor = 'default';
                                     }
                                 });
@@ -2211,59 +2224,34 @@
 
                                     const handlePointerUp = (e) => {
                                         if (!isDragging) return;
-                                        
+
                                         const position = currentDragHandle.getGeometry();
                                         currentDragHandle.setVisibility(false);
                                         isDragging = false;
                                         behavior.enable();
                                         map.getViewPort().element.style.cursor = 'default';
-                                        
-                                        const waypoints = [];
-                                        document.querySelectorAll('.waypoint').forEach((input, index) => {
-                                            if (input.value.trim() !== '') {
-                                                const coords = geocodedPoints.get(input.value.trim());
-                                                if (coords) {
-                                                    waypoints.push({
-                                                        coords: coords,
-                                                        index: index
-                                                    });
-                                                }
-                                            }
-                                        });
 
-                                        let minDistance = Infinity;
-                                        let insertIndex = 0;
-                                        
-                                        for (let i = 0; i < waypoints.length - 1; i++) {
-                                            const startPoint = waypoints[i].coords;
-                                            const endPoint = waypoints[i + 1].coords;
-                                            const distanceToStart = position.distance(startPoint);
-                                            const distanceToEnd = position.distance(endPoint);
-                                            const avgDistance = (distanceToStart + distanceToEnd) / 2;
-                                            
-                                            if (avgDistance < minDistance) {
-                                                minDistance = avgDistance;
-                                                insertIndex = i;
+                                        if (currentDragSegmentIndex !== null) {
+                                            const waypointContainers = document.querySelectorAll('.waypoint-container');
+                                            const newWaypoint = createWaypointInput();
+                                            const input = newWaypoint.querySelector('.waypoint');
+                                            input.value = `${position.lat.toFixed(6)}, ${position.lng.toFixed(6)}`;
+
+                                            // Wstaw punkt za waypointem odpowiadającym początku sekcji
+                                            const targetContainer = waypointContainers[currentDragSegmentIndex + 1];
+                                            if (targetContainer) {
+                                                waypointContainers[0].parentNode.insertBefore(newWaypoint, targetContainer);
+                                            } else {
+                                                waypointContainers[0].parentNode.appendChild(newWaypoint);
                                             }
+
+                                            input.dispatchEvent(new Event('input'));
+                                            updateWaypointNumbers();
+                                            calculateRouteIfPossible();
                                         }
-                                        
-                                        const waypointContainers = document.querySelectorAll('.waypoint-container');
-                                        const newWaypoint = createWaypointInput();
-                                        const input = newWaypoint.querySelector('.waypoint');
-                                        input.value = `${position.lat.toFixed(6)}, ${position.lng.toFixed(6)}`;
-                                        
-                                        const targetContainer = waypointContainers[insertIndex + 1];
-                                        if (targetContainer) {
-                                            waypointContainers[0].parentNode.insertBefore(newWaypoint, targetContainer);
-                                        } else {
-                                            waypointContainers[0].parentNode.appendChild(newWaypoint);
-                                        }
-                                        
-                                        input.dispatchEvent(new Event('input'));
-                                        updateWaypointNumbers();
-                                        calculateRouteIfPossible();
-                                        
+
                                         currentDragHandle = null;
+                                        currentDragSegmentIndex = null;
                                         document.removeEventListener('pointermove', handlePointerMove);
                                         document.removeEventListener('pointerup', handlePointerUp);
                                     };
