@@ -774,6 +774,24 @@
         const translations = getUITranslations(currentLang);
         const API_KEY = 'yuwY_LTItp881XAaYOHShjcBhdc0sHWuj4TQwGKwjms';
         
+        const MANUAL_TOLL_SYSTEMS = {
+            'TRAFORO DEL MONTE BIANCO': {
+                checkLocation: null,
+                displayName: 'Mont Bianc IT→FR'
+            },
+            'ATMB': {
+                checkLocation: 'TUNNEL DU MONT-BLANC',
+                displayName: 'Mont Bianc FR→IT'
+            },
+            'SITAF S.P.A.': {
+                checkLocation: 'Bardonecchia',
+                displayName: 'Frejus IT→FR'
+            },
+            'SFTRF': {
+                checkLocation: 'TUNNEL DU FREJUS',
+                displayName: 'Frejus FR→IT'
+            }
+        };
 
         ///LICZNIK ZAPYTAŃ
         const apiMonitor = new class APIMonitor {
@@ -2131,6 +2149,22 @@
                     route.sections.forEach(section => {
                         if (section.tolls) {
                             section.tolls.forEach(toll => {
+                                // Sprawdzamy czy to jest system manualny i czy spełnia kryteria
+                                if (MANUAL_TOLL_SYSTEMS.hasOwnProperty(toll.tollSystem)) {
+                                    const criteria = MANUAL_TOLL_SYSTEMS[toll.tollSystem];
+                                    
+                                    // Jeśli mamy dodatkowe kryteria (np. dla ATMB)
+                                    if (criteria && criteria.checkLocation) {
+                                        // Sprawdź czy punkt poboru istnieje
+                                        const hasLocation = toll.tollCollectionLocations?.some(loc => 
+                                            loc.name === criteria.checkLocation
+                                        );
+                                        if (hasLocation) return; // Pomijamy jeśli to jest potwierdzony system manualny
+                                    } else {
+                                        return; // Pomijamy jeśli to jest system manualny bez dodatkowych kryteriów
+                                    }
+                                }
+
                                 const countryCode = toll.countryCode;
                                 if (!countryTolls.has(countryCode)) {
                                     countryTolls.set(countryCode, 0);
@@ -2162,8 +2196,8 @@
 
                     // Dodaj najniższe opłaty za pass subscription
                     for (const [key, value] of minPassSubscriptionTolls.entries()) {
-                        const countryCode = key.split('_')[0];
-                        if (countryTolls.has(countryCode)) {
+                        const [countryCode, tollSystem] = key.split('_');
+                        if (!MANUAL_TOLL_SYSTEMS.hasOwnProperty(tollSystem) && countryTolls.has(countryCode)) {
                             countryTolls.set(countryCode, countryTolls.get(countryCode) + value);
                         }
                     }
@@ -2388,9 +2422,13 @@
                                             });
                                         }
                                     }
-
                                     if (section.tolls) {
                                         section.tolls.forEach(toll => {
+                                            // Pomijamy systemy z listy MANUAL_TOLL_SYSTEMS
+                                            if (toll.tollSystem in MANUAL_TOLL_SYSTEMS) {
+                                                return;
+                                            }
+
                                             const countryCode = toll.countryCode;
                                             if (!countryTolls.has(countryCode)) {
                                                 countryTolls.set(countryCode, 0);
@@ -2458,15 +2496,57 @@
                                 }
 
                                 let ferriesHtml = '';
-                                if (ferries.size > 0) {
-                                    ferriesHtml = Array.from(ferries.entries())
-                                        .map(([name, data]) => `
+                                    if (ferries.size > 0) {
+                                        ferriesHtml = Array.from(ferries.entries())
+                                            .map(([name, data]) => `
+                                                <div class="ferry-item" style="margin-top: 2px;">
+                                                    ${data.icon} ${name}: 
+                                                    <input type="number" 
+                                                        class="ferry-price" 
+                                                        data-ferry-name="${name}"
+                                                        value="${data.value}"
+                                                        min="0" 
+                                                        max="5000" 
+                                                        step="1" 
+                                                        style="width: 60px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;"
+                                                        placeholder="EUR">
+                                                </div>
+                                            `).join('');
+                                    }
+                                
+                                let manualTollsHtml = '';
+                                if (route.sections) {
+                                    const manualTollSystems = new Set();
+                                    route.sections.forEach(section => {
+                                        if (section.tolls) {
+                                            section.tolls.forEach(toll => {
+                                                // Sprawdź czy system jest na liście manualnych
+                                                if (MANUAL_TOLL_SYSTEMS.hasOwnProperty(toll.tollSystem)) {
+                                                    const criteria = MANUAL_TOLL_SYSTEMS[toll.tollSystem];
+                                                    
+                                                    // Jeśli mamy dodatkowe kryteria (np. dla ATMB)
+                                                    if (criteria && criteria.checkLocation) {
+                                                        // Sprawdź czy punkt poboru istnieje
+                                                        const hasLocation = toll.tollCollectionLocations?.some(loc => 
+                                                            loc.name === criteria.checkLocation
+                                                        );
+                                                        if (!hasLocation) return; // Jeśli nie ma wymaganej lokalizacji, pomiń
+                                                    }
+                                                    
+                                                    manualTollSystems.add(toll.tollSystem);
+                                                }
+                                            });
+                                        }
+                                    });
+                                    
+                                    if (manualTollSystems.size > 0) {
+                                        manualTollsHtml = Array.from(manualTollSystems).map(system => `
                                             <div class="ferry-item" style="margin-top: 2px;">
-                                                ${data.icon} ${name}: 
+                                                🛤️ ${MANUAL_TOLL_SYSTEMS[system].displayName}: 
                                                 <input type="number" 
-                                                    class="ferry-price" 
-                                                    data-ferry-name="${name}"
-                                                    value="${data.value}"
+                                                    class="manual-toll-price" 
+                                                    data-toll-system="${system}"
+                                                    value="${localStorage.getItem(`toll_${system}`) || ''}"
                                                     min="0" 
                                                     max="5000" 
                                                     step="1" 
@@ -2474,9 +2554,10 @@
                                                     placeholder="EUR">
                                             </div>
                                         `).join('');
+                                    }
                                 }
 
-                                tollInfo = roadTollsHtml + ferriesHtml;
+                                tollInfo = roadTollsHtml + ferriesHtml + manualTollsHtml;
                             } else {
                                 tollInfo = `<br>${translations.noRoadCharges}`;
                             }
@@ -2495,6 +2576,19 @@
                                 </div>
                                 ${tollInfo}
                             `;
+                            // TUTAJ dodajmy event listenery
+                            document.querySelectorAll('.manual-toll-price').forEach(input => {
+                                input.addEventListener('input', (e) => {
+                                    const value = e.target.value;
+                                    const tollSystem = e.target.dataset.tollSystem;
+                                    console.log('Manual toll input changed:', tollSystem, value); // debug
+                                    if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
+                                        localStorage.setItem(`toll_${tollSystem}`, value);
+                                        console.log('Saved to localStorage:', tollSystem, value); // debug
+                                    }
+                                });
+                            });    
+
 
                             // Dodaj event listenery dla szczegółów opłat
                             const tollDetailsToggle = document.querySelector('.toll-details-toggle');
@@ -2515,6 +2609,16 @@
                                     if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
                                         localStorage.setItem(`ferry_${ferryName}`, value);
                                 }
+                            });
+                            // Dodaj event listenery dla manualnych opłat drogowych
+                            document.querySelectorAll('.manual-toll-price').forEach(input => {
+                                input.addEventListener('input', (e) => {
+                                    const value = e.target.value;
+                                    const tollSystem = e.target.dataset.tollSystem;
+                                    if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
+                                        localStorage.setItem(`toll_${tollSystem}`, value);
+                                    }
+                                });
                             });
                         });
                     }
