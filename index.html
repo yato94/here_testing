@@ -776,7 +776,9 @@
         //wylistowanie systemów gdzie nie pobieramy stawki tylko uzytkownik wpisuje sam
         const specialTollSystems = {
             'SITAF S.P.A.': 'Frejus Tunnel',
-            'TRAFORO DEL MONTE BIANCO': 'Monte Bianco Tunnel'
+            'SFTRF': "Fejus Tunnel",
+            'TRAFORO DEL MONTE BIANCO': 'Monte Bianco Tunnel',
+            'ATMB': 'Monte Bianco Tunnel'
         };
 
         ///LICZNIK ZAPYTAŃ
@@ -1824,6 +1826,74 @@
             });
         }
 
+        function updateTollDisplay() {
+            const currentRoute = allRoutes[currentRouteIndex];
+            if (!currentRoute) return;
+
+            let baseToll = currentRoute.sections.reduce((total, section) => {
+                if (section.tolls) {
+                    return total + section.tolls.reduce((tollSum, toll) => {
+                        if (!Object.keys(specialTollSystems).includes(toll.tollSystem) && toll.fares) {
+                            const minFare = Math.min(...toll.fares.map(fare => 
+                                fare.convertedPrice?.value || fare.price?.value || 0
+                            ));
+                            return tollSum + minFare;
+                        }
+                        return tollSum;
+                    }, 0);
+                }
+                return total;
+            }, 0);
+
+            // Add stored ferry and toll values
+            for (const key of Object.keys(localStorage)) {
+                if (key.startsWith('ferry_') || key.startsWith('toll_')) {
+                    const value = parseFloat(localStorage.getItem(key));
+                    if (!isNaN(value)) {
+                        baseToll += value;
+                    }
+                }
+            }
+
+            // Znajdź element z wartością opłat
+            const tollStats = document.querySelectorAll('.route-stat');
+            const tollStat = Array.from(tollStats).find(stat => 
+                stat.querySelector('.stat-label')?.textContent === translations.roadCharges
+            );
+            
+            if (tollStat) {
+                const tollValue = tollStat.querySelector('.stat-value');
+                if (tollValue) {
+                    const distance = currentRoute.sections.reduce((sum, section) => sum + section.summary.length, 0) / 1000;
+                    const costPerKm = baseToll / distance;
+                    
+                    // Zachowaj stan rozwinięcia
+                    const details = tollStat.querySelector('.toll-details');
+                    const isExpanded = details ? details.style.display !== 'none' : false;
+                    
+                    // Aktualizuj wartość i przycisk
+                    tollValue.innerHTML = `${baseToll.toFixed(2)} € (${costPerKm.toFixed(2)} €/km) <button class="toll-details-toggle">${isExpanded ? '▲' : '▼'}</button>`;
+                    
+                    // Przywróć event listener dla przycisku
+                    const newToggle = tollValue.querySelector('.toll-details-toggle');
+                    if (newToggle) {
+                        newToggle.addEventListener('click', function() {
+                            const details = tollStat.querySelector('.toll-details');
+                            if (details) {
+                                const isCurrentlyExpanded = details.style.display !== 'none';
+                                details.style.display = isCurrentlyExpanded ? 'none' : 'block';
+                                this.textContent = isCurrentlyExpanded ? '▼' : '▲';
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+
+
+
+
         let allRoutes = [];
         let currentRouteCalculation = null;
 
@@ -2410,15 +2480,21 @@
                                                 // Sprawdź czy to specjalny system opłat
                                                 if (Object.keys(specialTollSystems).includes(toll.tollSystem)) {
                                                     const displayName = specialTollSystems[toll.tollSystem];
-                                                    const storedValue = localStorage.getItem(`toll_${toll.tollSystem}`);
+                                                    const storageKey = `toll_${toll.tollSystem}`;
+                                                    const storedValue = localStorage.getItem(storageKey);
+                                                    
                                                     ferries.set(toll.tollSystem, {
                                                         icon: '🛣️',
                                                         value: storedValue || '',
                                                         type: 'toll',
                                                         displayName: displayName
                                                     });
+                                                    
                                                     if (storedValue) {
-                                                        countryTolls.set(countryCode, countryTolls.get(countryCode) + parseFloat(storedValue));
+                                                        const value = parseFloat(storedValue);
+                                                        if (!isNaN(value)) {
+                                                            countryTolls.set(countryCode, (countryTolls.get(countryCode) || 0) + value);
+                                                        }
                                                     }
                                                     isSpecialSystem = true;
                                                 }
@@ -2488,24 +2564,32 @@
                                 let ferriesHtml = '';
                                     if (ferries.size > 0) {
                                         ferriesHtml = Array.from(ferries.entries())
-                                            .map(([name, data]) => `
-                                                <div class="ferry-item" style="margin-top: 2px;">
-                                                    ${data.icon} ${data.displayName || name}: 
-                                                    <input type="number" 
-                                                        class="ferry-price" 
-                                                        data-item-name="${name}"
-                                                        data-item-type="${data.type}"
-                                                        value="${data.value}"
-                                                        min="0" 
-                                                        max="5000" 
-                                                        step="1" 
-                                                        style="width: 60px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;"
-                                                        placeholder="EUR">
-                                                </div>
-                                            `).join('');
+                                            .map(([name, data]) => {
+                                                const storageKey = `${data.type === 'transport' ? 'ferry' : 'toll'}_${name}`;
+                                                const storedValue = localStorage.getItem(storageKey) || '';
+                                                return `
+                                                    <div class="ferry-item" style="margin-top: 2px;">
+                                                        ${data.icon} ${data.displayName || name}: 
+                                                        <input type="number" 
+                                                            class="ferry-price" 
+                                                            data-item-name="${name}"
+                                                            data-item-type="${data.type}"
+                                                            value="${storedValue}"
+                                                            min="0" 
+                                                            max="5000" 
+                                                            step="1" 
+                                                            style="width: 60px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;"
+                                                            placeholder="EUR">
+                                                    </div>
+                                                `;
+                                            }).join('');
                                     }
 
                                 tollInfo = roadTollsHtml + ferriesHtml;
+                                setTimeout(() => {
+                                    updateTollDisplay();
+                                }, 0);
+                                
                             } else {
                                 tollInfo = `<br>${translations.noRoadCharges}`;
                             }
@@ -2537,15 +2621,17 @@
                             }
 
                             // Dodaj event listenery dla cen promów/tuneli
+                            // Add event listeners for ferry/tunnel prices
                             document.querySelectorAll('.ferry-price').forEach(input => {
                                 input.addEventListener('input', (e) => {
                                     const value = e.target.value;
                                     const itemName = e.target.dataset.itemName;
                                     const itemType = e.target.dataset.itemType;
+                                    const storageKey = `${itemType === 'transport' ? 'ferry' : 'toll'}_${itemName}`;
+                                    
                                     if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
-                                        const storageKey = `${itemType === 'transport' ? 'ferry' : 'toll'}_${itemName}`;
                                         localStorage.setItem(storageKey, value);
-                                        calculateRouteIfPossible();
+                                        updateTollDisplay();
                                     }
                                 });
                             });
