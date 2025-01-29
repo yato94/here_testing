@@ -773,7 +773,11 @@
         const currentLang = getPreferredLanguage();
         const translations = getUITranslations(currentLang);
         const API_KEY = 'yuwY_LTItp881XAaYOHShjcBhdc0sHWuj4TQwGKwjms';
-        
+        //wylistowanie systemów gdzie nie pobieramy stawki tylko uzytkownik wpisuje sam
+        const specialTollSystems = {
+            'SITAF S.P.A.': 'Frejus Tunnel',
+            'TRAFORO DEL MONTE BIANCO': 'Monte Bianco Tunnel'
+        };
 
         ///LICZNIK ZAPYTAŃ
         const apiMonitor = new class APIMonitor {
@@ -923,7 +927,7 @@
             // Create new waypoint
             const newWaypoint = createWaypointInput();
             const input = newWaypoint.querySelector('.waypoint');
-            input.value = `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`;
+            input.value = `${coordinates.lat.toFixed(2)}, ${coordinates.lng.toFixed(2)}`;
 
             // Zawsze wstaw nowy punkt jako pierwszy
             if (waypointContainers.length > 0) {
@@ -1051,7 +1055,7 @@
                 
                 if (item.text.startsWith(translations.coordinates)) {
                     // Specjalna obsługa dla elementu z koordynatami
-                    const coordsText = `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`;
+                    const coordsText = `${coordinates.lat.toFixed(2)}, ${coordinates.lng.toFixed(2)}`;
                     
                     menuItem.innerHTML = `
                         <div style="margin-bottom: 2px">
@@ -1866,7 +1870,7 @@
                     
                     const coordsDisplay = document.createElement('div');
                     coordsDisplay.className = 'coordinates-display';
-                    coordsDisplay.textContent = `${result.lat.toFixed(6)}, ${result.lng.toFixed(6)}`;
+                    coordsDisplay.textContent = `${result.lat.toFixed(2)}, ${result.lng.toFixed(2)}`;
                     box.appendChild(coordsDisplay);
 
                     map.setCenter({ lat: result.lat, lng: result.lng });
@@ -2373,6 +2377,7 @@
                                 let totalToll = 0;
                                 
                                 route.sections.forEach(section => {
+                                    // Obsługa promów i pociągów
                                     if (section.transport?.mode) {
                                         const transportMode = section.transport.mode;
                                         const transportName = section.transport.name;
@@ -2384,11 +2389,13 @@
                                             const icon = transportMode === 'ferry' ? '⛴️' : '🛤️';
                                             ferries.set(transportName, {
                                                 icon: icon,
-                                                value: localStorage.getItem(`ferry_${transportName}`) || ''
+                                                value: localStorage.getItem(`ferry_${transportName}`) || '',
+                                                type: 'transport'
                                             });
                                         }
                                     }
 
+                                    // Obsługa opłat drogowych
                                     if (section.tolls) {
                                         section.tolls.forEach(toll => {
                                             const countryCode = toll.countryCode;
@@ -2398,28 +2405,49 @@
 
                                             if (toll.fares) {
                                                 let minFare = Infinity;
-                                                toll.fares.forEach(fare => {
-                                                    const value = fare.convertedPrice?.value || fare.price?.value || 0;
-                                                    
-                                                    if (fare.paymentMethods?.includes('passSubscription')) {
-                                                        const key = `${toll.countryCode}_${toll.tollSystem}`;
-                                                        if (!minPassSubscriptionTolls.has(key) || value < minPassSubscriptionTolls.get(key)) {
-                                                            minPassSubscriptionTolls.set(key, value);
-                                                        }
-                                                    } else if (!processedFareIds.has(fare.id)) {
-                                                        processedFareIds.add(fare.id);
-                                                        minFare = Math.min(minFare, value);
+                                                let isSpecialSystem = false;
+
+                                                // Sprawdź czy to specjalny system opłat
+                                                if (Object.keys(specialTollSystems).includes(toll.tollSystem)) {
+                                                    const displayName = specialTollSystems[toll.tollSystem];
+                                                    const storedValue = localStorage.getItem(`toll_${toll.tollSystem}`);
+                                                    ferries.set(toll.tollSystem, {
+                                                        icon: '🛣️',
+                                                        value: storedValue || '',
+                                                        type: 'toll',
+                                                        displayName: displayName
+                                                    });
+                                                    if (storedValue) {
+                                                        countryTolls.set(countryCode, countryTolls.get(countryCode) + parseFloat(storedValue));
                                                     }
-                                                });
-                                                
-                                                if (minFare !== Infinity) {
-                                                    countryTolls.set(countryCode, countryTolls.get(countryCode) + minFare);
+                                                    isSpecialSystem = true;
+                                                }
+
+                                                if (!isSpecialSystem) {
+                                                    toll.fares.forEach(fare => {
+                                                        const value = fare.convertedPrice?.value || fare.price?.value || 0;
+                                                        
+                                                        if (fare.paymentMethods?.includes('passSubscription')) {
+                                                            const key = `${toll.countryCode}_${toll.tollSystem}`;
+                                                            if (!minPassSubscriptionTolls.has(key) || value < minPassSubscriptionTolls.get(key)) {
+                                                                minPassSubscriptionTolls.set(key, value);
+                                                            }
+                                                        } else if (!processedFareIds.has(fare.id)) {
+                                                            processedFareIds.add(fare.id);
+                                                            minFare = Math.min(minFare, value);
+                                                        }
+                                                    });
+                                                    
+                                                    if (minFare !== Infinity) {
+                                                        countryTolls.set(countryCode, countryTolls.get(countryCode) + minFare);
+                                                    }
                                                 }
                                             }
                                         });
                                     }
                                 });
 
+                                // Dodaj najniższe opłaty za pass subscription
                                 for (const [key, value] of minPassSubscriptionTolls.entries()) {
                                     const countryCode = key.split('_')[0];
                                     if (countryTolls.has(countryCode)) {
@@ -2458,23 +2486,24 @@
                                 }
 
                                 let ferriesHtml = '';
-                                if (ferries.size > 0) {
-                                    ferriesHtml = Array.from(ferries.entries())
-                                        .map(([name, data]) => `
-                                            <div class="ferry-item" style="margin-top: 2px;">
-                                                ${data.icon} ${name}: 
-                                                <input type="number" 
-                                                    class="ferry-price" 
-                                                    data-ferry-name="${name}"
-                                                    value="${data.value}"
-                                                    min="0" 
-                                                    max="5000" 
-                                                    step="1" 
-                                                    style="width: 60px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;"
-                                                    placeholder="EUR">
-                                            </div>
-                                        `).join('');
-                                }
+                                    if (ferries.size > 0) {
+                                        ferriesHtml = Array.from(ferries.entries())
+                                            .map(([name, data]) => `
+                                                <div class="ferry-item" style="margin-top: 2px;">
+                                                    ${data.icon} ${data.displayName || name}: 
+                                                    <input type="number" 
+                                                        class="ferry-price" 
+                                                        data-item-name="${name}"
+                                                        data-item-type="${data.type}"
+                                                        value="${data.value}"
+                                                        min="0" 
+                                                        max="5000" 
+                                                        step="1" 
+                                                        style="width: 60px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;"
+                                                        placeholder="EUR">
+                                                </div>
+                                            `).join('');
+                                    }
 
                                 tollInfo = roadTollsHtml + ferriesHtml;
                             } else {
@@ -2507,16 +2536,19 @@
                                 });
                             }
 
-                            // Dodaj event listenery dla cen promów
+                            // Dodaj event listenery dla cen promów/tuneli
                             document.querySelectorAll('.ferry-price').forEach(input => {
                                 input.addEventListener('input', (e) => {
                                     const value = e.target.value;
-                                    const ferryName = e.target.dataset.ferryName;
+                                    const itemName = e.target.dataset.itemName;
+                                    const itemType = e.target.dataset.itemType;
                                     if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
-                                        localStorage.setItem(`ferry_${ferryName}`, value);
-                                }
+                                        const storageKey = `${itemType === 'transport' ? 'ferry' : 'toll'}_${itemName}`;
+                                        localStorage.setItem(storageKey, value);
+                                        calculateRouteIfPossible();
+                                    }
+                                });
                             });
-                        });
                     }
                     // Dodaj InfoBubbles dla tras alternatywnych
                     if (routes.length > 1) {
@@ -2955,13 +2987,34 @@
             // Wyczyść mapę
             clearMap();
             
-            // Zresetuj wartości w route-info do '--' zamiast czyszczenia całego HTML
-            document.querySelectorAll('#route-info .stat-value').forEach(element => {
-                element.textContent = '--';
-            });
+            // Wyczyść wartości w route-info
+            document.getElementById('route-info').innerHTML = `
+                <div class="route-info-label">${translations.routeInfo}</div>
+                <div class="route-stats-container">
+                    <div class="route-stat">
+                        <div class="stat-label">${translations.distance}</div>
+                        <div class="stat-value">--</div>
+                    </div>
+                    <div class="route-stat">
+                        <div class="stat-label">${translations.time}</div>
+                        <div class="stat-value">--</div>
+                    </div>
+                </div>
+                <div class="route-stat">
+                    <div class="stat-label">${translations.roadCharges}</div>
+                    <div class="stat-value">--</div>
+                </div>
+            `;
             
-            // Zresetuj zapisane punkty geocoded
+            // Wyczyść zapisane punkty geocoded
             geocodedPoints.clear();
+
+            // Wyczyść zapisane wartości dla promów i tuneli
+            for (const key of Object.keys(localStorage)) {
+                if (key.startsWith('ferry_') || key.startsWith('toll_')) {
+                    localStorage.removeItem(key);
+                }
+            }
             
             // Dodaj pojedyncze puste pole
             waypointsContainer.appendChild(createWaypointInput());
