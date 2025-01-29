@@ -629,7 +629,8 @@
                     co2Class: 'CO2 Class',
                     excludedAreas: 'Excluded Areas',
                     roadCharges: 'Road Charges',
-                    noRoadCharges: 'No Road Charges'
+                    noRoadCharges: 'No Road Charges',
+                    withoutFerryTrainKm: 'without ferry/train km'
                 },
                 de: {
                     inputPlaceholder: 'Adresse oder GPS-Koordinaten eingeben',
@@ -656,7 +657,8 @@
                     co2Class: 'CO2-Klasse',
                     excludedAreas: 'Ausgeschlossene Gebiete',
                     roadCharges: 'Straßengebühren',
-                    noRoadCharges: 'Keine Straßengebühren'
+                    noRoadCharges: 'Keine Straßengebühren',
+                    withoutFerryTrainKm: 'ohne Fähre/Zug km'
                 },
                 fr: {
                     inputPlaceholder: 'Entrez l\'adresse ou les coordonnées GPS',
@@ -683,7 +685,8 @@
                     co2Class: 'Classe CO2',
                     excludedAreas: 'Zones exclues',
                     roadCharges: 'Péages routiers',
-                    noRoadCharges: 'Pas de péages'
+                    noRoadCharges: 'Pas de péages',
+                    withoutFerryTrainKm: 'sans km ferry/train'
                 },
                 it: {
                     inputPlaceholder: 'Inserisci indirizzo o coordinate GPS',
@@ -710,7 +713,8 @@
                     co2Class: 'Classe CO2',
                     excludedAreas: 'Aree escluse',
                     roadCharges: 'Pedaggi stradali',
-                    noRoadCharges: 'Nessun pedaggio'
+                    noRoadCharges: 'Nessun pedaggio',
+                    withoutFerryTrainKm: 'senza km nave/treno'
                 },
                 es: {
                     inputPlaceholder: 'Introduce la dirección o coordenadas GPS',
@@ -737,7 +741,8 @@
                     co2Class: 'Clase CO2',
                     excludedAreas: 'Áreas excluidas',
                     roadCharges: 'Peajes',
-                    noRoadCharges: 'Sin peajes'
+                    noRoadCharges: 'Sin peajes',
+                    withoutFerryTrainKm: 'sin km de ferry/tren'
                 },
                 pl: {
                     inputPlaceholder: 'Wpisz adres lub współrzędne GPS',
@@ -764,7 +769,8 @@
                     co2Class: 'Klasa CO2',
                     excludedAreas: 'Wyłączone obszary',
                     roadCharges: 'Opłaty drogowe',
-                    noRoadCharges: 'Brak opłat drogowych'
+                    noRoadCharges: 'Brak opłat drogowych',
+                    withoutFerryTrainKm: 'bez km prom/kolej'
                 }
             };
             return translations[lang] || translations.en;
@@ -2392,7 +2398,12 @@
                             });
 
                             // Oblicz i wyświetl informacje o trasie
-                            const totalDistance = route.sections.reduce((sum, section) => sum + section.summary.length, 0);
+                            const totalDistance = route.sections.reduce((sum, section) => {
+                                if (section.transport?.mode === 'truck') {
+                                    return sum + section.summary.length;
+                                }
+                                return sum;
+                            }, 0);
                             const distanceInKm = totalDistance / 1000;
                             const timeInHours = distanceInKm / 73;
                             const totalTime = timeInHours * 3600;
@@ -2562,13 +2573,18 @@
                                 tollInfo = `<br>${translations.noRoadCharges}`;
                             }
 
-                            document.getElementById('route-info').innerHTML = `
-                                <div class="route-info-label">${translations.routeInfo}</div>
-                                <div class="route-stats-container">
-                                    <div class="route-stat">
-                                        <div class="stat-label">${translations.distance}</div>
-                                        <div class="stat-value">${(totalDistance / 1000).toFixed(1)} km</div>
-                                    </div>
+                                // Najpierw sprawdzamy czy trasa zawiera prom lub pociąg
+                                const hasferryOrTrain = route.sections.some(section => 
+                                    section.transport?.mode === 'ferry' || section.transport?.mode === 'shuttletrain'
+                                );
+
+                                document.getElementById('route-info').innerHTML = `
+                                    <div class="route-info-label">${translations.routeInfo}</div>
+                                    <div class="route-stats-container">
+                                        <div class="route-stat">
+                                            <div class="stat-label">${translations.distance}${hasferryOrTrain ? ` (${translations.withoutFerryTrainKm})` : ''}</div>
+                                            <div class="stat-value">${(totalDistance / 1000).toFixed(1)} km</div>
+                                        </div>
                                     <div class="route-stat">
                                         <div class="stat-label">${translations.time}</div>
                                         <div class="stat-value">${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min</div>
@@ -3059,10 +3075,20 @@
             // Wyczyść mapę
             clearMap();
             
-            // Zresetuj wartości w route-info do '--' zamiast czyszczenia całego HTML
-            document.querySelectorAll('#route-info .stat-value').forEach(element => {
-                element.textContent = '--';
-            });
+            // Wyczyść całkowicie informacje o trasie
+            document.getElementById('route-info').innerHTML = `
+                <div class="route-info-label">${translations.routeInfo}</div>
+                <div class="route-stats-container">
+                    <div class="route-stat">
+                        <div class="stat-label">${translations.distance}</div>
+                        <div class="stat-value">--</div>
+                    </div>
+                    <div class="route-stat">
+                        <div class="stat-label">${translations.time}</div>
+                        <div class="stat-value">--</div>
+                    </div>
+                </div>
+            `;
             
             // Zresetuj zapisane punkty geocoded
             geocodedPoints.clear();
