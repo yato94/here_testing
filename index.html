@@ -889,7 +889,7 @@
                 const ppi = screenWidth >= 2560 ? 200 : 100;
                 
                 // Select map style based on zoom level
-                const mapStyle = z > 7.5 ? 'logistics.day' : 'explore.day';
+                const mapStyle = z > 8 ? 'logistics.day' : 'explore.day';
                 
                 // Base URL with dynamic PPI
                 let url = `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8?xnlp=CL_JSMv3.1.61.1` +
