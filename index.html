@@ -886,7 +886,7 @@
             getURL: (x, y, z) => {
                 // Determine PPI based on screen resolution
                 const screenWidth = window.screen.width * window.devicePixelRatio;
-                const ppi = screenWidth >= 2560 ? 200 : 200;
+                const ppi = screenWidth >= 2560 ? 200 : 100;
                 
                 // Select map style based on zoom level
                 const mapStyle = z > 8 ? 'logistics.day' : 'explore.day';
