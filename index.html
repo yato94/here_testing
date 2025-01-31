@@ -2426,7 +2426,7 @@
                                             transportMode === 'ferry' || 
                                             transportMode.toLowerCase().includes('shuttletrain')
                                         )) {
-                                            const icon = transportMode === 'ferry' ? '⛴️' : '🛤️';
+                                            const icon = transportMode === 'ferry' ? '+⛴️' : '+🛤️';
                                             ferries.set(transportName, {
                                                 icon: icon,
                                                 value: localStorage.getItem(`ferry_${transportName}`) || ''
