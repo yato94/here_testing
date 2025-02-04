@@ -51,14 +51,15 @@
         .waypoint-number {
             position: absolute;
             left: -8px;
-            top: 50%;
+            /* Zmieniamy top i transform aby centrować względem pola adresu */
+            top: 19px; /* Połowa wysokości waypoint-box (który ma padding 8px góra i dół) */
             transform: translateY(-50%);
             width: 20px;
             height: 20px;
             background: white;
             color: #0066CC;
             border: 1.5px solid #0066CC;
-            border-radius: 4px;  /* delikatnie zaokrąglone rogi */
+            border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -98,27 +99,15 @@
             cursor: grabbing;
         }
 
-        .waypoint-container {
-            position: relative;
-            padding-left: 18px;
-            margin-bottom: 10px;
-        }
-
         .waypoint-container.dragging {
-            opacity: 1;
             position: fixed;
             z-index: 1000;
-            width: calc(100% - 40px); /* Dostosuj szerokość do kontenera */
-            pointer-events: none;
             transform: translateY(var(--y));
-        }
-
-        .waypoint-container.shift-up {
-            transform: translateY(-20px);
+            width: var(--width);
         }
 
         .waypoint-container.shift-down {
-            transform: translateY(20px);
+            transform: translateY(40px);
         }
 
 
@@ -145,13 +134,6 @@
 
         .waypoint:focus {
             outline: none;
-        }
-
-        .coordinates-display {
-            font-size: 11px;
-            color: #605E5C;
-            display: block;
-            width: 100%;
         }
 
         .suggestions-container {
@@ -495,6 +477,25 @@
             margin-top: 4px;
         }
         
+        /* odległości między punktami */
+        .distance-indicator {
+            text-align: left;
+            color: #666;
+            font-size: 11px;
+            padding: 4px 0;
+            margin: -3px 0;
+            visibility: hidden;
+        }
+
+        .distance-indicator.visible {
+            visibility: visible;
+        }
+
+        .waypoint-container {
+            position: relative;
+            padding-left: 18px;
+            margin-bottom: 0; /* Zmień z 10px na 0 */
+        }
         
     </style>
 </head>
@@ -949,12 +950,10 @@
             const input = newWaypoint.querySelector('.waypoint');
             input.value = `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`;
 
-            // Zawsze wstaw nowy punkt jako pierwszy
+            // Always insert as first point
             if (waypointContainers.length > 0) {
-                // Wstaw przed pierwszym istniejącym punktem
                 waypointsContainer.insertBefore(newWaypoint, waypointContainers[0]);
             } else {
-                // Jeśli nie ma żadnych punktów, po prostu dodaj
                 waypointsContainer.appendChild(newWaypoint);
             }
 
@@ -1011,17 +1010,19 @@
             const input = newWaypoint.querySelector('.waypoint');
             input.value = `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`;
 
-            // Znajdź wszystkie niepuste punkty
-            const nonEmptyContainers = Array.from(waypointContainers).filter(container => 
-                container.querySelector('.waypoint').value.trim() !== ''
-            );
-
-            if (nonEmptyContainers.length > 0) {
-                // Zawsze dodaj na końcu, po wszystkich istniejących punktach
-                const lastContainer = waypointContainers[waypointContainers.length - 1];
-                waypointsContainer.insertBefore(newWaypoint, lastContainer.nextSibling);
-            } else {
+            // In case of only one existing point (start point), add end point directly after it
+            if (waypointContainers.length === 1) {
                 waypointsContainer.appendChild(newWaypoint);
+            } else {
+                // For more points, add before the last empty container
+                const lastContainer = waypointContainers[waypointContainers.length - 1];
+                const lastInput = lastContainer.querySelector('.waypoint');
+                
+                if (lastInput && lastInput.value.trim() === '') {
+                    waypointsContainer.insertBefore(newWaypoint, lastContainer);
+                } else {
+                    waypointsContainer.appendChild(newWaypoint);
+                }
             }
 
             input.dispatchEvent(new Event('input'));
@@ -1207,16 +1208,13 @@
                 isDragging = false;
                 behavior.enable();
                 
-                // Pobierz nową pozycję markera
                 const newPosition = target.getGeometry();
                 const markerId = target.getData().id;
                 
-                // Zaktualizuj koordynaty dla odpowiedniego punktu
                 const waypoints = document.querySelectorAll('.waypoint');
                 const waypointInput = waypoints[markerId - 1];
                 
                 if (waypointInput) {
-                    // Wykonaj reverse geocoding dla nowej pozycji
                     fetch(
                         `https://revgeocode.search.hereapi.com/v1/revgeocode` +
                         `?at=${newPosition.lat},${newPosition.lng}` +
@@ -1228,26 +1226,12 @@
                     .then(data => {
                         if (data.items && data.items.length > 0) {
                             const address = data.items[0].title;
-                            
-                            // Zaktualizuj pole adresu
                             waypointInput.value = address;
-                            
-                            // Zaktualizuj wyświetlane koordynaty
-                            const coordsStr = `${newPosition.lat.toFixed(6)}, ${newPosition.lng.toFixed(6)}`;
-                            const box = waypointInput.parentElement;
-                            const coordsDisplay = box.querySelector('.coordinates-display');
-                            if (coordsDisplay) {
-                                coordsDisplay.textContent = coordsStr;
-                            }
-                            
-                            // Zaktualizuj geocodedPoints
                             geocodedPoints.set(address, {
                                 lat: newPosition.lat,
                                 lng: newPosition.lng,
                                 address: address
                             });
-                            
-                            // Przelicz trasę
                             calculateRouteIfPossible();
                         }
                     })
@@ -1280,10 +1264,15 @@
         let debounceTimer;
 		
         async function geocodeAddress(address) {
+            if (geocodedPoints.has(address.trim())) {
+                return geocodedPoints.get(address.trim());
+            }
+
             apiMonitor.logRequest('geocoding');
             const gpsCoords = isGPSCoordinates(address);
             
             if (gpsCoords) {
+                // Tylko dla ręcznie wpisanych współrzędnych GPS
                 try {
                     const response = await fetch(
                         `https://revgeocode.search.hereapi.com/v1/revgeocode` +
@@ -1300,31 +1289,11 @@
                     const data = await response.json();
                     
                     if (data.items && data.items.length > 0) {
-                        const addressInfo = data.items[0].address;
-                        
-                        // Tworzymy część adresu z ulicą i numerem
-                        let streetPart = '';
-                        if (addressInfo.street) {
-                            streetPart = addressInfo.street;
-                            if (addressInfo.houseNumber) {
-                                streetPart += ' ' + addressInfo.houseNumber;
-                            }
-                        }
-                        
-                        const formattedAddress = [
-                            addressInfo.postalCode,
-                            addressInfo.city,
-                            addressInfo.countryCode,
-                            streetPart
-                        ].filter(Boolean).join(', ');
-
                         return {
                             lat: gpsCoords.lat,
                             lng: gpsCoords.lng,
-                            address: formattedAddress
+                            address: data.items[0].title
                         };
-                    } else {
-                        throw new Error(translations.addressNotFound);
                     }
                 } catch (error) {
                     console.error('Reverse geocoding error:', error);
@@ -1446,6 +1415,12 @@
                 document.querySelectorAll('#route-info .stat-value').forEach(element => {
                     element.textContent = '--';
                 });
+
+                // Ukryj wskaźniki odległości
+                document.querySelectorAll('.distance-indicator').forEach(indicator => {
+                    indicator.classList.remove('visible');
+                    indicator.textContent = '↓ -- km';
+                });
                 
             } catch (error) {
                 console.error('Error clearing map:', error);
@@ -1491,32 +1466,25 @@
             
             const containers = Array.from(document.querySelectorAll('.waypoint-container:not(.dragging)'));
             const draggedRect = draggedElement.getBoundingClientRect();
-            const draggedIndex = draggedElement.originalIndex;
+            const draggedCenter = draggedRect.top + draggedRect.height / 2;
             
+            // Reset all shifts first
             containers.forEach(container => {
-                const rect = container.getBoundingClientRect();
-                const containerIndex = Array.from(container.parentNode.children).indexOf(container);
-                
-                container.classList.remove('shift-up', 'shift-down');
-                
-                if (draggedRect.top + draggedRect.height / 2 < rect.top + rect.height / 2) {
-                    // Jeśli przeciągamy nad element, to powinien on przesunąć się w dół
-                    // Niezależnie od tego czy jest pierwszy czy nie
-                    if (containerIndex > draggedIndex) {
-                        container.classList.add('shift-down');
-                    }
-                } else {
-                    // Przy przesuwaniu w górę, tylko elementy nie będące pierwszym mogą się przesunąć wyżej
-                    if (containerIndex < draggedIndex && containerIndex !== 0) {
-                        container.classList.add('shift-up');
-                    }
-                }
-
-                // Specjalna obsługa dla pierwszego elementu
-                if (containerIndex === 0 && draggedRect.top < rect.top) {
-                    container.classList.add('shift-down');
-                }
+                container.classList.remove('shift-down');
             });
+            
+            // Find the first container we're above
+            const targetIndex = containers.findIndex(container => {
+                const rect = container.getBoundingClientRect();
+                return draggedCenter < (rect.top + rect.height / 2);
+            });
+            
+            if (targetIndex !== -1) {
+                // Shift all containers from this index down
+                containers.slice(targetIndex).forEach(container => {
+                    container.classList.add('shift-down');
+                });
+            }
         }
         function handleDragEnd(e) {
             if (!draggedElement) return;
@@ -1629,6 +1597,11 @@
             input.className = 'waypoint';
             input.placeholder = translations.inputPlaceholder;
 
+            // Dodajemy nowy event listener na kliknięcie
+            input.addEventListener('click', function(e) {
+                this.select(); // To zaznaczy cały tekst w polu
+            });
+
             const suggestionsContainer = document.createElement('div');
             suggestionsContainer.className = 'suggestions-container';
             
@@ -1663,12 +1636,59 @@
             box.appendChild(input);
             container.appendChild(box);
             container.appendChild(suggestionsContainer);
-            
+
+            // Dodaj wskaźnik odległości jako część kontenera
+            const distanceIndicator = document.createElement('div');
+            distanceIndicator.className = 'distance-indicator';
+            distanceIndicator.innerHTML = '<span class="arrow">↓</span> -- km';
+            container.appendChild(distanceIndicator);
+
             initializeAutocomplete(input, suggestionsContainer);
             updateWaypointNumbers();
             updateRemoveButtons();
             return container;
         }
+
+        async function lookupPlace(hereId) {
+            try {
+                apiMonitor.logRequest('lookup');
+                const response = await fetch(
+                    `https://lookup.search.hereapi.com/v1/lookup` +
+                    `?id=${encodeURIComponent(hereId)}` +
+                    `&lang=${currentLang}` +
+                    `&apiKey=${API_KEY}`
+                );
+
+                if (!response.ok) {
+                    throw new Error(translations.geocodingError);
+                }
+
+                const data = await response.json();
+                if (data) {
+                    // Tworzymy sformatowany adres z poszczególnych części
+                    const addressInfo = data.address;
+                    const formattedAddress = [
+                        addressInfo.postalCode,
+                        addressInfo.city,
+                        addressInfo.countryCode,
+                        // Dodajemy część z ulicą jeśli istnieje
+                        addressInfo.street ? (addressInfo.street + (addressInfo.houseNumber ? ' ' + addressInfo.houseNumber : '')) : ''
+                    ].filter(Boolean).join(', ');
+
+                    return {
+                        lat: data.position.lat,
+                        lng: data.position.lng,
+                        address: formattedAddress
+                    };
+                }
+                throw new Error(translations.addressNotFound);
+            } catch (error) {
+                console.error('Lookup error:', error);
+                throw error;
+            }
+        }
+
+        
         function initializeAutocomplete(input, suggestionsContainer) {
             let searchTimeout;
             let selectedIndex = -1;
@@ -1714,6 +1734,8 @@
                                         div.classList.add('selected');
                                     }
                                     div.textContent = item.title;
+                                    // Dodajemy HERE ID jako data-atrybut
+                                    div.dataset.hereId = item.id;
                                     
                                     div.addEventListener('click', () => {
                                         selectSuggestion(item, input);
@@ -1804,36 +1826,50 @@
                 calculateRouteIfPossible();
             }
 
-            function selectSuggestion(suggestion, input) {
-                input.value = suggestion.title;
-                suggestionsContainer.style.display = 'none';
-                
-                const waypoints = document.querySelectorAll('.waypoint');
-                const currentIndex = Array.from(waypoints).indexOf(input);
-                const lastWaypoint = waypoints[waypoints.length - 1];
-                
-                // Dodaj warunek sprawdzający limit
-                if (input === lastWaypoint && waypoints.length < 15) {
-                    const waypointsContainer = document.getElementById('waypoints-container');
-                    waypointsContainer.appendChild(createWaypointInput());
-                }
-                
-                setTimeout(() => {
-                    const updatedWaypoints = document.querySelectorAll('.waypoint');
-                    const nextInput = updatedWaypoints[currentIndex + 1];
-                    if (nextInput) {
-                        nextInput.focus();
+            async function selectSuggestion(suggestion, input) {
+                try {
+                    let result;
+                    if (isGPSCoordinates(suggestion.title)) {
+                        result = await geocodeAddress(suggestion.title);
+                    } else if (suggestion.id) {
+                        result = await lookupPlace(suggestion.id);
+                    } else {
+                        result = await geocodeAddress(suggestion.title);
                     }
-                }, 50);
 
-                calculateRouteIfPossible();
+                    input.value = result.address;
+                    geocodedPoints.set(input.value.trim(), result);
+                    
+                    const suggestionsContainer = input.parentElement.nextElementSibling;
+                    suggestionsContainer.style.display = 'none';
+
+                    const waypoints = document.querySelectorAll('.waypoint');
+                    const currentIndex = Array.from(waypoints).indexOf(input);
+                    const nextInput = waypoints[currentIndex + 1];
+                    const lastWaypoint = waypoints[waypoints.length - 1];
+
+                    // Dodaj nowe pole tylko jeśli jesteśmy na ostatnim i mamy miejsce
+                    if (input === lastWaypoint && waypoints.length < 15) {
+                        const waypointsContainer = document.getElementById('waypoints-container');
+                        waypointsContainer.appendChild(createWaypointInput());
+                    }
+
+                    // Przenieś focus do następnego pola tylko jeśli jest puste
+                    setTimeout(() => {
+                        if (nextInput && nextInput.value.trim() === '') {
+                            nextInput.focus();
+                        }
+                    }, 50);
+
+                    calculateRouteIfPossible();
+                } catch (error) {
+                    console.error('Error processing suggestion:', error);
+                }
             }
 
-            input.addEventListener('focus', () => {
-                if (input.value.trim().length >= 3) {
-                    const event = new Event('input');
-                    input.dispatchEvent(event);
-                }
+            input.addEventListener('click', function(e) {
+                this.select(); // To zaznaczy cały tekst w polu
+                // Nie wywołujemy tutaj żadnych dodatkowych eventów
             });
             
             document.addEventListener('click', (e) => {
@@ -1869,29 +1905,19 @@
 
                 clearMap();
 
+                // Check if we have exactly 2 waypoints - delete this line and change alternatives to 1 to remove fature to check if only 2 points to show alternative
+                const shouldRequestAlternatives = waypointInputs.length === 2;
+
                 // Handle single waypoint case
                 if (waypointInputs.length === 1) {
                     const result = await geocodeAddress(waypointInputs[0].value);
                     addMarker({ lat: result.lat, lng: result.lng }, 1);
                     
-                    const box = waypointInputs[0].element;
-                    const container = box.closest('.waypoint-container');
-                    const input = box.querySelector('.waypoint');
-                    
+                    const input = waypointInputs[0].element.querySelector('.waypoint');
                     if (result.address) {
                         input.value = result.address;
                         geocodedPoints.set(input.value.trim(), result);
                     }
-                    
-                    const oldCoordsDisplay = box.querySelector('.coordinates-display');
-                    if (oldCoordsDisplay) {
-                        oldCoordsDisplay.remove();
-                    }
-                    
-                    const coordsDisplay = document.createElement('div');
-                    coordsDisplay.className = 'coordinates-display';
-                    coordsDisplay.textContent = `${result.lat.toFixed(6)}, ${result.lng.toFixed(6)}`;
-                    box.appendChild(coordsDisplay);
 
                     map.setCenter({ lat: result.lat, lng: result.lng });
                     map.setZoom(7);
@@ -1923,16 +1949,6 @@
                         input.value = result.address;
                         geocodedPoints.set(input.value.trim(), result);
                     }
-                    
-                    const oldCoordsDisplay = box.querySelector('.coordinates-display');
-                    if (oldCoordsDisplay) {
-                        oldCoordsDisplay.remove();
-                    }
-                    
-                    const coordsDisplay = document.createElement('div');
-                    coordsDisplay.className = 'coordinates-display';
-                    coordsDisplay.textContent = `${result.lat.toFixed(6)}, ${result.lng.toFixed(6)}`;
-                    box.appendChild(coordsDisplay);
                     
                     const numberDiv = container.querySelector('.waypoint-number');
                     numberDiv.textContent = (index + 1).toString();
@@ -1979,6 +1995,7 @@
                     }
                 });
 
+                
                 // Construct route URL with exclusions
                 let routeUrl = `https://router.hereapi.com/v8/routes` +
                     `?xnlp=CL_JSMv3.1.61.1` +
@@ -1988,7 +2005,7 @@
                     `&units=metric` +
                     `&lang=${currentLang}` +
                     `&currency=EUR` +
-                    `&alternatives=1` +
+                    `&alternatives=${shouldRequestAlternatives ? '1' : '0'}` + 
                     `&spans=tollSystems,truckAttributes,countryCode,length,routeNumbers,notices` +
                     `&return=polyline,tolls,summary,travelSummary,passthrough,routeHandle,incidents,actions,potentialTimeDependentViolations`;
 
@@ -2235,13 +2252,18 @@
                         sections.forEach((section, sectionIndex) => {
                             const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
                             
+                            // W funkcji displayRoutes, gdzie tworzymy polyline:
                             const polyline = new H.map.Polyline(lineString, {
                                 style: {
-                                    strokeColor: isAlternative ? '#808080' : '#1F51FF',
+                                    strokeColor: isAlternative ? '#808080' : '#1C39BB',
                                     lineWidth: isAlternative ? 5 : 5,
                                     opacity: isAlternative ? 0.7 : 1,
                                     lineCap: 'round',
-                                    lineJoin: 'round'
+                                    lineJoin: 'round',
+                                    lineDash: [0], // usuwa wszelkie przerywanie linii
+                                    strokeLineCap: 'round', // zaokrągla końce linii
+                                    strokeLineJoin: 'round', // zaokrągla połączenia segmentów
+                                    miterLimit: 1 // kontroluje jak ostre mogą być połączenia
                                 }
                             });
 
@@ -2390,6 +2412,35 @@
                                 });
                             }
                         });
+                        function updateDistanceIndicators(route) {
+                            const distanceIndicators = document.querySelectorAll('.distance-indicator');
+                            distanceIndicators.forEach(indicator => indicator.classList.remove('visible'));
+
+                            if (route.sections) {
+                                route.sections.forEach((section, index) => {
+                                    const indicator = distanceIndicators[index];
+                                    if (indicator && section.summary && section.summary.length) {
+                                        const distanceInKm = (section.summary.length / 1000).toFixed(1);
+                                        const timeInHours = (distanceInKm / 73).toFixed(1);
+                                        const hours = Math.floor(timeInHours);
+                                        const minutes = Math.round((timeInHours - hours) * 60);
+                                        
+                                        const timeDisplay = hours > 0 ? 
+                                            `${hours}h ${minutes}min` : 
+                                            `${minutes}min`;
+                                        
+                                        indicator.innerHTML = `<span class="arrow">↓</span> ${distanceInKm} km (${timeDisplay})`;
+                                        indicator.classList.add('visible');
+                                    }
+                                });
+                            }
+                        }
+
+                        // I wywołaj ją dla aktywnej trasy
+                        if (routeIndex === currentRouteIndex) {
+                            updateDistanceIndicators(route);
+                        }
+
 
                         // Dodaj markery tylko dla aktualnej trasy
                         if (routeIndex === currentRouteIndex) {
@@ -3071,6 +3122,9 @@
             // Wyczyść kontener punktów trasy
             const waypointsContainer = document.getElementById('waypoints-container');
             waypointsContainer.innerHTML = '';
+
+            // Ukryj wszystkie wskaźniki odległości
+            document.querySelectorAll('.distance-indicator').forEach(indicator => indicator.remove());
             
             // Wyczyść mapę
             clearMap();
