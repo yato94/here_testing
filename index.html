@@ -1262,6 +1262,8 @@
         let routeLines = [];
         let markers = [];
         let debounceTimer;
+        let isOverHandle = false;
+        let hideHandleTimeout;
 		
         async function geocodeAddress(address) {
             if (geocodedPoints.has(address.trim())) {
@@ -2304,6 +2306,24 @@
                                     volatility: true
                                 });
 
+                                dragHandle.addEventListener('pointerenter', () => {
+                                    isOverHandle = true;
+                                    clearTimeout(hideHandleTimeout);
+                                });
+
+                                dragHandle.addEventListener('pointerleave', () => {
+                                    isOverHandle = false;
+                                    if (!isDragging) {
+                                        hideHandleTimeout = setTimeout(() => {
+                                            if (!isOverHandle) {
+                                                dragHandle.setVisibility(false);
+                                                map.getViewPort().element.style.cursor = 'default';
+                                            }
+                                        }, 100);
+                                    }
+                                });
+                                
+
                                 dragHandle.draggable = true;
                                 map.addObject(dragHandle);
                                 routeLines.push(dragHandle);
@@ -2316,12 +2336,13 @@
                                 polyline.addEventListener('pointermove', (evt) => {
                                     if (isDragging) return;
                                     
+                                    clearTimeout(hideHandleTimeout);
+                                    
                                     const pointer = evt.currentPointer;
                                     const coordinates = lineString.getLatLngAltArray();
                                     let closestPoint = null;
                                     let minDistance = Infinity;
 
-                                    // Znajdź najbliższy punkt na linii
                                     for(let i = 0; i < coordinates.length - 2; i += 3) {
                                         const point = map.geoToScreen({ 
                                             lat: coordinates[i], 
@@ -2332,19 +2353,14 @@
                                         if (distance < minDistance) {
                                             minDistance = distance;
                                             closestPoint = { lat: coordinates[i], lng: coordinates[i + 1] };
-                                            // Zapisz indeks sekcji trasy zamiast indeksu segmentu
                                             currentDragSegmentIndex = polyline.getData().sectionIndex;
                                         }
                                     }
 
-                                    if (minDistance < 50) {
+                                    if (minDistance < 50 || isOverHandle) {
                                         dragHandle.setGeometry(closestPoint);
                                         dragHandle.setVisibility(true);
                                         map.getViewPort().element.style.cursor = 'grab';
-                                    } else {
-                                        dragHandle.setVisibility(false);
-                                        currentDragSegmentIndex = null;
-                                        map.getViewPort().element.style.cursor = 'default';
                                     }
                                 });
 
@@ -2405,9 +2421,13 @@
                                 });
 
                                 polyline.addEventListener('pointerleave', () => {
-                                    if (!isDragging) {
-                                        dragHandle.setVisibility(false);
-                                        map.getViewPort().element.style.cursor = 'default';
+                                    if (!isDragging && !isOverHandle) {
+                                        hideHandleTimeout = setTimeout(() => {
+                                            if (!isOverHandle) {
+                                                dragHandle.setVisibility(false);
+                                                map.getViewPort().element.style.cursor = 'default';
+                                            }
+                                        }, 100);
                                     }
                                 });
                             }
