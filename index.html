@@ -2255,7 +2255,7 @@
                             const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
                             
                             // W funkcji displayRoutes, gdzie tworzymy polyline:
-                            const polyline = new H.map.Polyline(lineString, {
+                            const polyline = new H.map.Polyline(lineString.simplify(1), { 
                                 style: {
                                     strokeColor: isAlternative ? '#808080' : '#1C39BB',
                                     lineWidth: isAlternative ? 5 : 5,
