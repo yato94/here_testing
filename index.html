@@ -1356,7 +1356,7 @@
         function addMarker(position, number) {
             const svgMarkup = '<svg width="48" height="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
                 '<circle cx="12" cy="21" r="2.5" fill="white" stroke="black" stroke-width="1"/>' + // dodana biała kropka na dole
-                '<path fill="#0066CC" d="M12 2.5c-3.8 0-7 3.2-7 7.1 0 5.4 7 11.9 7 11.9s7-6.5 7-11.9c0-3.9-3.2-7.1-7-7.1z" />' +
+                '<path fill="#0F52BA" d="M12 2.5c-3.8 0-7 3.2-7 7.1 0 5.4 7 11.9 7 11.9s7-6.5 7-11.9c0-3.9-3.2-7.1-7-7.1z" />' +
                 '<circle cx="12" cy="9" r="4" fill="#FFFFFF"/>' +
                 '<text x="12" y="11" font-size="6" font-family="Arial" font-weight="bold" text-anchor="middle" fill="#0066CC">' + 
                 number + '</text>' +
@@ -2255,18 +2255,20 @@
                             const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
                             
                             // W funkcji displayRoutes, gdzie tworzymy polyline:
-                            const polyline = new H.map.Polyline(lineString, { 
-                                style: {
-                                    strokeColor: isAlternative ? '#808080' : '#1C39BB',
-                                    lineWidth: isAlternative ? 5 : 5,
-                                    opacity: isAlternative ? 0.7 : 1,
-                                    lineCap: 'round',
-                                    lineJoin: 'round',
-                                    lineDash: [0], // usuwa wszelkie przerywanie linii
-                                    strokeLineCap: 'round', // zaokrągla końce linii
-                                    strokeLineJoin: 'round', // zaokrągla połączenia segmentów
-                                    miterLimit: 1 // kontroluje jak ostre mogą być połączenia
+                            const ROUTE_STYLES = {
+                                alternative: {
+                                    strokeColor: '#808080',
+                                    lineWidth: 5
+                                },
+                                main: {
+                                    strokeColor: '#3300cc',
+                                    lineWidth: 5
                                 }
+                            };
+
+                            // Użycie
+                            const polyline = new H.map.Polyline(lineString, {
+                                style: isAlternative ? ROUTE_STYLES.alternative : ROUTE_STYLES.main
                             });
 
                             // Dodaj informację o sekcji do polyline
