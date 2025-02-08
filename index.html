@@ -496,26 +496,88 @@
             padding-left: 18px;
             margin-bottom: 0; /* Zmień z 10px na 0 */
         }
-        
+        #vehicle-selection {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            justify-content: flex-start;
+        }
+
+        #vehicle-selection button {
+            width: 60px; /* zmniejszamy z 70px na 60px */
+            flex: 0 0 60px;
+            padding: 4px 2px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            align-items: center;
+        }
+
+        .vehicle-name {
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 1px;
+        }
+
+        .vehicle-details {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            align-items: center;
+            font-size: 9px;
+            opacity: 0.8;
+            width: 100%;
+        }
+
+        .vehicle-details span {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 1px 3px;
+            border-radius: 2px;
+            white-space: nowrap;
+            width: 90%;
+            text-align: center;
+        }
+
+        #vehicle-selection button.active {
+            background-color: #0066CC;
+            color: white;
+            border-color: #0066CC;
+            box-shadow: 0 2px 4px rgba(0, 102, 204, 0.15);
+        }
+
+        #vehicle-selection button.active .vehicle-details span {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div id="sidebar">
         <div id="waypoints-container"></div>
         <div id="route-info">
-            <div class="route-info-label" data-translation="routeInfo"></div>
+            <div class="route-info-label" data-translation="routeInfo">Route information:</div>
             <div class="route-stats-container">
                 <div class="route-stat">
-                    <div class="stat-label" data-translation="distance"></div>
+                    <div class="stat-label" data-translation="distance">Distance</div>
                     <div class="stat-value">--</div>
                 </div>
                 <div class="route-stat">
-                    <div class="stat-label" data-translation="time"></div>
+                    <div class="stat-label" data-translation="time">Time</div>
                     <div class="stat-value">--</div>
                 </div>
             </div>
             <div class="route-stat">
-                <div class="stat-label" data-translation="roadCharges"></div>
+                <div class="stat-label" data-translation="roadCharges">Road Charges</div>
+                <div class="stat-value">--</div>
+            </div>
+            <div class="route-stat">
+                <div class="stat-label" data-translation="fuelCosts">Fuel costs</div>
                 <div class="stat-value">--</div>
             </div>
         </div>
@@ -523,64 +585,13 @@
         <div id="route-settings" class="route-settings" style="margin-top: auto; padding: 20px;">
             <h3 style="margin-bottom: 15px; font-size: 16px;" id="settings-title"></h3>
             
-            <!-- First Row: Default Selection -->
             <div class="row">
-                <p id="default-settings-text"></p>
-                <div class="button-group" id="default-combination">
-                    <button data-weight="40000" data-axles="5+" data-translation="largeVehicle"></button>
-                    <button data-weight="18000" data-axles="3" data-translation="mediumVehicle"></button>
-                    <button data-weight="7490" data-axles="2" data-translation="smallVehicle"></button>
+                <p>Wybierz pojazd:</p>
+                <div class="button-group" id="vehicle-selection">
+                    <!-- Przyciski będą generowane przez JavaScript -->
                 </div>
             </div>
-        
-            <!-- Second Row: Weight Selection -->
-            <div class="row">
-                <p id="weight-text"></p>
-                <div class="button-group" id="weight-selection">
-                    <button data-value="7490">3,5 - 7,49</button>
-                    <button data-value="11490">7,5 - 11,49</button>
-                    <button data-value="18000">12 - 18</button>
-                    <button data-value="40000" selected>18 - 40</button>
-                </div>
-            </div>
-        
-            <!-- Third Row: Number of Axles -->
-            <div class="row">
-                <p id="axles-text"></p>
-                <div class="button-group" id="axles-selection">
-                    <button data-value="2">2</button>
-                    <button data-value="3">3</button>
-                    <button data-value="4">4</button>
-                    <button data-value="5+" selected>5+</button>
-                </div>
-            </div>
-        
-            <!-- Fourth Row: EUR and CO2 Class -->
-            <div class="row">
-                <div class="select-group">
-                    <div class="select-container">
-                        <p id="euro-class-text"></p>
-                        <select id="euro-class">
-                            <option value="2">EURO 2</option>
-                            <option value="3">EURO 3</option>
-                            <option value="4">EURO 4</option>
-                            <option value="5">EURO 5</option>
-                            <option value="6" selected>EURO 6</option>
-                        </select>
-                    </div>
-                    <div class="select-container">
-                        <p id="co2-class-text"></p>
-                        <select id="co2-class">
-                            <option value="1" selected>CO2 I</option>
-                            <option value="2">CO2 II</option>
-                            <option value="3">CO2 III</option>
-                            <option value="4">CO2 IV</option>
-                            <option value="5">CO2 V</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        
+
             <!-- Fifth Row: Excluded Areas -->
             <div class="row">
                 <p id="excluded-areas-text"></p>
@@ -631,7 +642,17 @@
                     excludedAreas: 'Excluded Areas',
                     roadCharges: 'Road Charges',
                     noRoadCharges: 'No Road Charges',
-                    withoutFerryTrainKm: 'without ferry/train km'
+                    withoutFerryTrainKm: 'without ferry/train km',
+                    fuelCosts: 'Fuel costs',
+                    consumption: 'Consumption',
+                    totalFuelNeeded: 'Total fuel needed',
+                    globalPrice: 'global price',
+                    costPerKm: '/km',
+                    fuelConsumption: 'Consumption',
+                    fuelInCountry: 'Fuel in country',
+                    fuel: 'Fuel',
+                    selectVehicle: 'Select vehicle',
+                    lowestPrice: 'Lowest price'
                 },
                 de: {
                     inputPlaceholder: 'Adresse oder GPS-Koordinaten eingeben',
@@ -659,7 +680,17 @@
                     excludedAreas: 'Ausgeschlossene Gebiete',
                     roadCharges: 'Straßengebühren',
                     noRoadCharges: 'Keine Straßengebühren',
-                    withoutFerryTrainKm: 'ohne Fähre/Zug km'
+                    withoutFerryTrainKm: 'ohne Fähre/Zug km',
+                    fuelCosts: 'Kraftstoffkosten',
+                    consumption: 'Verbrauch',
+                    totalFuelNeeded: 'Gesamter Kraftstoffbedarf',
+                    globalPrice: 'Globalpreis',
+                    costPerKm: '/km',
+                    fuelConsumption: 'Verbrauch',
+                    fuelInCountry: 'Kraftstoff im Land',
+                    fuel: 'Kraftstoff',
+                    selectVehicle: 'Fahrzeug auswählen',
+                    lowestPrice: 'Niedrigster Preis'
                 },
                 fr: {
                     inputPlaceholder: 'Entrez l\'adresse ou les coordonnées GPS',
@@ -687,7 +718,17 @@
                     excludedAreas: 'Zones exclues',
                     roadCharges: 'Péages routiers',
                     noRoadCharges: 'Pas de péages',
-                    withoutFerryTrainKm: 'sans km ferry/train'
+                    withoutFerryTrainKm: 'sans km ferry/train',
+                    fuelCosts: 'Coûts de carburant',
+                    consumption: 'Consommation',
+                    totalFuelNeeded: 'Carburant total nécessaire',
+                    globalPrice: 'prix global',
+                    costPerKm: '/km',
+                    fuelConsumption: 'Consommation',
+                    fuelInCountry: 'Carburant dans le pays',
+                    fuel: 'Carburant',
+                    selectVehicle: 'Sélectionner le véhicule',
+                    lowestPrice: 'Prix le plus bas'
                 },
                 it: {
                     inputPlaceholder: 'Inserisci indirizzo o coordinate GPS',
@@ -715,7 +756,17 @@
                     excludedAreas: 'Aree escluse',
                     roadCharges: 'Pedaggi stradali',
                     noRoadCharges: 'Nessun pedaggio',
-                    withoutFerryTrainKm: 'senza km nave/treno'
+                    withoutFerryTrainKm: 'senza km nave/treno',
+                    fuelCosts: 'Costi carburante',
+                    consumption: 'Consumo',
+                    totalFuelNeeded: 'Carburante totale necessario',
+                    globalPrice: 'prezzo globale',
+                    costPerKm: '/km',
+                    fuelConsumption: 'Consumo',
+                    fuelInCountry: 'Carburante nel paese',
+                    fuel: 'Carburante',
+                    selectVehicle: 'Seleziona veicolo',
+                    lowestPrice: 'Prezzo più basso'
                 },
                 es: {
                     inputPlaceholder: 'Introduce la dirección o coordenadas GPS',
@@ -743,7 +794,17 @@
                     excludedAreas: 'Áreas excluidas',
                     roadCharges: 'Peajes',
                     noRoadCharges: 'Sin peajes',
-                    withoutFerryTrainKm: 'sin km de ferry/tren'
+                    withoutFerryTrainKm: 'sin km de ferry/tren',
+                    fuelCosts: 'Costes de combustible',
+                    consumption: 'Consumo',
+                    totalFuelNeeded: 'Combustible total necesario',
+                    globalPrice: 'precio global',
+                    costPerKm: '/km',
+                    fuelConsumption: 'Consumo',
+                    fuelInCountry: 'Combustible en el país',
+                    fuel: 'Combustible',
+                    selectVehicle: 'Seleccionar vehículo',
+                    lowestPrice: 'Precio más bajo'
                 },
                 pl: {
                     inputPlaceholder: 'Wpisz adres lub współrzędne GPS',
@@ -771,11 +832,142 @@
                     excludedAreas: 'Wyłączone obszary',
                     roadCharges: 'Opłaty drogowe',
                     noRoadCharges: 'Brak opłat drogowych',
-                    withoutFerryTrainKm: 'bez km prom/kolej'
+                    withoutFerryTrainKm: 'bez km prom/kolej',
+                    fuelCosts: 'Koszty paliwa',
+                    consumption: 'Spalanie',
+                    totalFuelNeeded: 'Całkowite zużycie paliwa',
+                    globalPrice: 'cena globalna',
+                    costPerKm: '/km',
+                    fuelConsumption: 'Spalanie',
+                    fuelInCountry: 'Paliwo w kraju',
+                    fuel: 'Paliwo',
+                    selectVehicle: 'Wybierz pojazd',
+                    lowestPrice: 'Najniższa cena'
                 }
             };
             return translations[lang] || translations.en;
         }
+
+        const vehicles = [
+            {
+                id: 'mega',
+                name: 'MEGA',
+                weight: 40000,
+                truckAxles: 2,    
+                trailerAxles: 3,
+                trailerCount: 1,
+                euroClass: '6',
+                co2Class: '1',
+                fuelConsumption: 30,
+                adblueConsumption: 1.5,          
+                costPerKm: 0.20,
+                height: 400,
+                width: 255,
+                length: 1650
+            },
+            {
+                id: 'standard',
+                name: 'Standard',
+                weight: 40000,
+                truckAxles: 2,
+                trailerAxles: 3,
+                trailerCount: 1,
+                euroClass: '6',
+                co2Class: '1',
+                fuelConsumption: 30,
+                adblueConsumption: 1.5,
+                costPerKm: 0.15,
+                height: 400,
+                width: 255,
+                length: 1650
+            },
+            {
+                id: 'jumbo',
+                name: 'JUMBO',
+                weight: 30000,
+                truckAxles: 2,      
+                trailerAxles: 1,
+                trailerCount: 1,
+                euroClass: '6',
+                co2Class: '1',
+                fuelConsumption: 30,
+                adblueConsumption: 1.5,
+                costPerKm: 0.10,
+                height: 400,
+                width: 255,
+                length: 1750
+            },
+            {
+                id: 'solo',
+                name: 'Solo',
+                weight: 8000,
+                truckAxles: 2,    
+                trailerAxles: 0,
+                trailerCount: 0,
+                euroClass: '6',
+                co2Class: '1',
+                fuelConsumption: 20,
+                adblueConsumption: 1.5,
+                costPerKm: 0.10,
+                height: 350,
+                width: 255,
+                length: 850
+            }
+        ];
+
+        const defaultFuelPrices = {
+            'POL': 1.17,
+            'DEU': 1.45,
+            'LUX': 1.20,
+            'CZE': 1.18,
+            'SVK': 1.28,
+            'HUN': 1.28,
+            'AUT': 1.37,
+            'ITA': 1.48,
+            'FRA': 1.47,
+            'ESP': 1.27,
+            'PRT': 1.41,
+            'BEL': 1.49,
+            'NLD': 1.58,
+            'CHE': 1.79,
+            'DNK': 1.61,
+            'SWE': 1.29,
+            'NOR': 1.46,
+            'FIN': 1.43,
+            'EST': 1.27,
+            'LVA': 1.31,
+            'LTU': 1.36,
+            'ROU': 1.28,
+            'BGR': 1.12,
+            'GRC': 1.58,
+            'HRV': 1.15,
+            'SVN': 1.31,
+            'SRB': 1.41,
+            'MKD': 1.42,
+            'BIH': 1.29,
+            'MNE': 1.45,
+            'ALB': 1.42,
+            'adblue': 0.65,  // domyślna cena AdBlue dla wszystkich krajów
+        };
+
+        const companyCosts = {
+            fixedCostsPerHour: 50,
+            variableCostsPerKm: 0.5,
+            useLowestFuelPrice: true,
+            useCustomFuelPrices: true,
+            globalFuelPrice: 1.35,
+            globalAdBluePrice: 0.65,
+            customFuelPrices: {
+                'POL': 1.32,
+                'DEU': 1.46,
+                'CZE': 1.42,
+                'ESP': 1.35,
+                'AUT': 1.4,
+            }
+        };
+
+
+
 
         const currentLang = getPreferredLanguage();
         const translations = getUITranslations(currentLang);
@@ -1967,22 +2159,13 @@
                 }));
 
                 // Get vehicle parameters
-                const weightBtn = document.querySelector('#weight-selection button.active');
-                const axlesBtn = document.querySelector('#axles-selection button.active');
-                const weight = weightBtn ? parseInt(weightBtn.dataset.value) : 3500;
-                const axleCount = axlesBtn ? parseInt(axlesBtn.dataset.value) : 2;
-                const euroClass = document.querySelector('#euro-class').value;
-                const co2Class = document.querySelector('#co2-class').value;
-
-                // Adjusted vehicle configuration based on axle count
-                const trailerCount = axleCount <= 2 ? 0 : 1;
-                const trailerAxleCount = axleCount <= 2 ? 0 : axleCount - 2; // Subtract truck axles
-                const tiresCount = axleCount <= 2 ? 4 : (axleCount * 2); // 2 tires per axle
+                // Get vehicle parameters
+                const vehicleParams = getVehicleParameters();
 
                 // Check excluded areas
                 const excludedAreas = [];
                 const excludedButtons = document.querySelectorAll('#excluded-areas button.active');
-                
+
                 excludedButtons.forEach(button => {
                     if (button.dataset.value === 'CH') {
                         excludedAreas.push('CHE'); // Country code for Switzerland
@@ -1997,7 +2180,6 @@
                     }
                 });
 
-                
                 // Construct route URL with exclusions
                 let routeUrl = `https://router.hereapi.com/v8/routes` +
                     `?xnlp=CL_JSMv3.1.61.1` +
@@ -2012,22 +2194,27 @@
                     `&return=polyline,tolls,summary,travelSummary,passthrough,routeHandle,incidents,actions,potentialTimeDependentViolations`;
 
                 // Add vehicle parameters
-                routeUrl += `&vehicle[height]=400` +
-                    `&vehicle[width]=255` +
-                    `&vehicle[length]=1650` +
-                    `&vehicle[currentWeight]=${weight}` +
-                    `&vehicle[grossWeight]=${weight}` +
-                    `&vehicle[axleCount]=${axleCount}` +
-                    `&vehicle[tiresCount]=${tiresCount}` +
+                routeUrl += `&vehicle[height]=${vehicleParams.height}` +
+                    `&vehicle[width]=${vehicleParams.width}` +
+                    `&vehicle[length]=${vehicleParams.length}` +
+                    `&vehicle[currentWeight]=${vehicleParams.weight}` +
+                    `&vehicle[grossWeight]=${vehicleParams.weight}` +
+                    `&vehicle[axleCount]=${vehicleParams.truckAxles + vehicleParams.trailerAxles}` +
+                    `&vehicle[tiresCount]=${(vehicleParams.truckAxles + vehicleParams.trailerAxles) * 2}` +
                     `&vehicle[engineType]=internalCombustion` +
                     `&vehicle[weightPerAxle]=10000` +
-                    `&vehicle[heightAboveFirstAxle]=400`;
+                    `&vehicle[heightAboveFirstAxle]=${vehicleParams.height}`;
 
-                // Add trailer parameters only if there is a trailer
-                if (trailerCount > 0) {
-                    routeUrl += `&vehicle[trailerCount]=${trailerCount}` +
-                            `&vehicle[trailerAxleCount]=${trailerAxleCount}`;
+                // Add trailer parameters if vehicle has trailer
+                if (vehicleParams.trailerCount > 0) {
+                    routeUrl += `&vehicle[trailerCount]=${vehicleParams.trailerCount}` +
+                            `&vehicle[trailerAxleCount]=${vehicleParams.trailerAxles}`;
                 }
+
+                // Add toll parameters
+                routeUrl += `&departureTime=any` +
+                    `&tolls[emissionType]=euro${vehicleParams.euroClass};co2class=${vehicleParams.co2Class}` +
+                    `&tolls[summaries]=total`;
 
                 // Add excluded areas
                 excludedAreas.forEach(area => {
@@ -2046,12 +2233,9 @@
                     routeUrl += viaPoints.map(point =>
                         `&via=${point.lat},${point.lng};snapRadius=3000`
                     ).join('');
-                }
+}
 
-                // Add toll parameters
-                routeUrl += `&departureTime=any` +
-                    `&tolls[emissionType]=euro${euroClass};co2class=${co2Class}` +
-                    `&tolls[summaries]=total`;
+
 
                 const response = await fetch(routeUrl, { signal });
                 if (!response.ok) {
@@ -2237,6 +2421,282 @@
                     allRoutes = result.routes; // Zapisujemy wszystkie trasy
                     displayRoutes(allRoutes, currentRouteIndex);
                 }
+
+                // Funkcja znajdująca kraje na trasie i ich długości
+                function getCountriesFromRoute(route) {
+                    let countriesInfo = new Map();
+                    
+                    route.sections.forEach(section => {
+                        if (section.spans) {
+                            section.spans.forEach(span => {
+                                if (span.countryCode) {
+                                    const distance = span.length || 0;
+                                    const current = countriesInfo.get(span.countryCode) || 0;
+                                    countriesInfo.set(span.countryCode, current + distance);
+                                }
+                            });
+                        }
+                    });
+                    
+                    return countriesInfo;
+                }
+
+                // Funkcja znajdująca najniższą cenę paliwa dla krajów na trasie
+                function getLowestFuelPrice(countriesInfo) {
+                    let lowestPrice = Infinity;
+                    let lowestPriceCountry = null;
+                    
+                    for (const [countryCode] of countriesInfo) {
+                        let price;
+                        if (companyCosts.useCustomFuelPrices) {
+                            // Sprawdzamy czy kraj ma zdefiniowaną cenę niestandardową lub domyślną
+                            price = companyCosts.customFuelPrices[countryCode] || defaultFuelPrices[countryCode];
+                        } else {
+                            price = defaultFuelPrices[countryCode];
+                        }
+                        
+                        // Bierzemy pod uwagę tylko kraje z zdefiniowaną ceną
+                        if (price && !isNaN(price) && price < lowestPrice) {
+                            lowestPrice = price;
+                            lowestPriceCountry = countryCode;
+                        }
+                    }
+                    
+                    // Jeśli nie znaleziono żadnej ceny, zwracamy null
+                    if (lowestPrice === Infinity) {
+                        return {
+                            price: null,
+                            country: null
+                        };
+                    }
+                    
+                    return {
+                        price: lowestPrice,
+                        country: lowestPriceCountry
+                    };
+                }
+
+                // Funkcja obliczająca koszty paliwa
+                function calculateFuelCosts(route, vehicle, selectedCountry = null) {
+                    const totalDistance = route.sections.reduce((sum, section) => 
+                        sum + (section.summary?.length || 0), 0);
+                    
+                    const distanceInKm = totalDistance / 1000;
+                    const fuelConsumption = vehicle.fuelConsumption / 100; // L/km
+                    const adblueConsumption = vehicle.adblueConsumption / 100; // L/km
+                    
+                    const totalFuelNeeded = distanceInKm * fuelConsumption;
+                    const totalAdBlueNeeded = distanceInKm * adblueConsumption;
+                    
+                    // Logika dla AdBlue
+                    let adbluePrice;
+                    if (companyCosts.useCustomFuelPrices) {
+                        if (companyCosts.customFuelPrices.adblue !== undefined) {
+                            adbluePrice = companyCosts.customFuelPrices.adblue;
+                        } else {
+                            adbluePrice = defaultFuelPrices.adblue;
+                        }
+                    } else {
+                        adbluePrice = defaultFuelPrices.adblue;
+                    }
+                    
+                    const adblueCost = totalAdBlueNeeded * adbluePrice;
+
+                    let fuelPrice;
+                    let priceDetails = {};
+
+                    if (selectedCountry) {
+                        fuelPrice = companyCosts.useCustomFuelPrices && companyCosts.customFuelPrices[selectedCountry] ? 
+                            companyCosts.customFuelPrices[selectedCountry] : 
+                            defaultFuelPrices[selectedCountry];
+                            
+                        // Sprawdzamy czy cena została znaleziona
+                        if (fuelPrice && !isNaN(fuelPrice)) {
+                            priceDetails = {
+                                country: selectedCountry,
+                                price: fuelPrice,
+                                type: 'selected'
+                            };
+                        } else {
+                            // Jeśli nie znaleziono ceny dla wybranego kraju, szukamy najniższej dostępnej
+                            const countriesInfo = getCountriesFromRoute(route);
+                            const lowestFuelInfo = getLowestFuelPrice(countriesInfo);
+                            fuelPrice = lowestFuelInfo.price;
+                            priceDetails = {
+                                country: lowestFuelInfo.country,
+                                price: fuelPrice,
+                                type: 'lowest'
+                            };
+                        }
+                    } else {
+                        const countriesInfo = getCountriesFromRoute(route);
+                        const lowestFuelInfo = getLowestFuelPrice(countriesInfo);
+                        fuelPrice = lowestFuelInfo.price;
+                        priceDetails = {
+                            country: lowestFuelInfo.country,
+                            price: fuelPrice,
+                            type: 'lowest'
+                        };
+                    }
+
+                    // Sprawdzamy czy udało się znaleźć jakąkolwiek cenę
+                    if (!fuelPrice || isNaN(fuelPrice)) {
+                        return {
+                            fuelNeeded: totalFuelNeeded,
+                            adblueNeeded: totalAdBlueNeeded,
+                            fuelCost: 0,
+                            adblueCost: adblueCost,
+                            totalCost: adblueCost, // tylko koszt AdBlue
+                            priceDetails: {
+                                country: null,
+                                price: null,
+                                type: 'no_prices_available'
+                            },
+                            adbluePrice: adbluePrice
+                        };
+                    }
+
+                    const fuelCost = totalFuelNeeded * fuelPrice;
+                    const totalCost = fuelCost + adblueCost;
+                    
+                    return {
+                        fuelNeeded: totalFuelNeeded,
+                        adblueNeeded: totalAdBlueNeeded,
+                        fuelCost: fuelCost,
+                        adblueCost: adblueCost,
+                        totalCost: totalCost,
+                        priceDetails: priceDetails,
+                        adbluePrice: adbluePrice
+                    };
+                }
+
+                // Funkcja generująca HTML dla sekcji kosztów paliwa
+                function generateFuelCostsHTML(fuelCosts, route, selectedVehicle) {
+                    const { totalCost, fuelNeeded, adblueNeeded, fuelCost, adblueCost, priceDetails, adbluePrice } = fuelCosts;
+                    const totalDistance = route.sections.reduce((sum, section) => 
+                        sum + (section.summary?.length || 0), 0) / 1000;
+                    const costPerKm = totalCost / totalDistance;
+
+                    // Pobierz kraje z trasy
+                    const countriesFromRoute = getCountriesFromRoute(route);
+                    
+                    // Funkcja pomocnicza do pobierania aktualnej ceny dla kraju
+                    function getPriceForCountry(countryCode) {
+                        if (companyCosts.useCustomFuelPrices && companyCosts.customFuelPrices[countryCode] !== undefined) {
+                            return companyCosts.customFuelPrices[countryCode];
+                        }
+                        return defaultFuelPrices[countryCode];
+                    }
+
+                    // Przygotuj kraje z trasy (posortowane po cenie)
+                    const routeCountries = Array.from(countriesFromRoute.keys())
+                        .map(code => ({
+                            code,
+                            price: getPriceForCountry(code)
+                        }))
+                        .sort((a, b) => a.price - b.price);
+
+                    // Przygotuj pozostałe kraje
+                    const otherCountries = Object.entries(defaultFuelPrices)
+                        .filter(([code]) => code !== 'adblue' && !countriesFromRoute.has(code))
+                        .map(([code]) => ({
+                            code,
+                            price: getPriceForCountry(code)
+                        }))
+                        .sort((a, b) => a.code.localeCompare(b.code)); // sortuj alfabetycznie
+
+                    // Generuj opcje
+                    const countryOptions = `
+                        ${routeCountries.map(({ code, price }) => {
+                            // Dodajemy tylko kraje z zdefiniowaną ceną
+                            if (price && !isNaN(price)) {
+                                return `
+                                    <option value="${code}" ${priceDetails.country === code ? 'selected' : ''} style="font-weight: bold">
+                                        ${code} (${price.toFixed(2)}€/L)
+                                    </option>
+                                `;
+                            }
+                            return ''; // Pomijamy kraje bez zdefiniowanej ceny
+                        }).join('')}
+                        ${otherCountries.length > 0 ? '<option disabled>──────────</option>' : ''}
+                        ${otherCountries.map(({ code, price }) => {
+                            // Również sprawdzamy czy cena jest zdefiniowana
+                            if (price && !isNaN(price)) {
+                                return `
+                                    <option value="${code}" ${priceDetails.country === code ? 'selected' : ''}>
+                                        ${code} (${price.toFixed(2)}€/L)
+                                    </option>
+                                `;
+                            }
+                            return '';
+                        }).join('')}`;
+
+                    // Aktualizujemy tylko zawartość szczegółów, nie całą strukturę
+                    const detailsContent = `
+                        <div class="country-toll">
+                            ${translations.fuelConsumption}: ${selectedVehicle.fuelConsumption}L/100km
+                        </div>
+                        <div class="country-toll">
+                            ${translations.fuelInCountry}: 
+                            <select class="fuel-country-select" style="padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;">
+                                <option value="">${translations.lowestPrice}</option>
+                                ${countryOptions}
+                            </select>
+                        </div>
+                        <div class="fuel-costs-details">
+                            <div class="country-toll">
+                                ${translations.fuel}: ${fuelNeeded.toFixed(0)}L × ${priceDetails.price.toFixed(2)}€/L = ${fuelCost.toFixed(2)}€
+                            </div>
+                            <div class="country-toll">
+                                AdBlue: ${adblueNeeded.toFixed(1)}L × ${adbluePrice.toFixed(2)}€/L = ${adblueCost.toFixed(2)}€
+                            </div>
+                        </div>`;
+
+                    // Główna wartość
+                    const mainValue = `${totalCost.toFixed(2)} € (${costPerKm.toFixed(2)} €/km)`;
+
+                    setTimeout(() => {
+                        const countrySelect = document.querySelector('.fuel-country-select');
+                        if (countrySelect) {
+                            countrySelect.addEventListener('change', (e) => {
+                                const selectedCountry = e.target.value || null; // gdy wybrana opcja "Najniższa cena", value będzie puste
+                                
+                                // Przeliczamy tylko koszty paliwa
+                                const newFuelCosts = calculateFuelCosts(route, selectedVehicle, selectedCountry);
+                                
+                                // Aktualizujemy tylko odpowiednie elementy
+                                const mainValueElement = document.querySelector('.fuel-costs-main-value');
+                                const detailsElement = document.querySelector('.fuel-costs-details');
+                                
+                                if (mainValueElement) {
+                                    mainValueElement.textContent = `${newFuelCosts.totalCost.toFixed(2)} € (${(newFuelCosts.totalCost/totalDistance).toFixed(2)} €/km)`;
+                                }
+                                
+                                if (detailsElement) {
+                                    detailsElement.innerHTML = `
+                                        <div class="country-toll">
+                                            Paliwo: ${newFuelCosts.fuelNeeded.toFixed(0)}L × ${newFuelCosts.priceDetails.price.toFixed(2)}€/L = ${newFuelCosts.fuelCost.toFixed(2)}€
+                                        </div>
+                                        <div class="country-toll">
+                                            AdBlue: ${newFuelCosts.adblueNeeded.toFixed(1)}L × ${newFuelCosts.adbluePrice.toFixed(2)}€/L = ${newFuelCosts.adblueCost.toFixed(2)}€
+                                        </div>`;
+                                }
+                            });
+                        }
+                    }, 0);
+
+                    return `
+                        <div class="stat-value">
+                            <span class="fuel-costs-main-value">${mainValue}</span>
+                            <button class="toll-details-toggle">▼</button>
+                            <div class="toll-details" style="display: none;">
+                                <div class="toll-details-content">
+                                    ${detailsContent}
+                                </div>
+                            </div>
+                        </div>`;
+                    }
+
 
                 function displayRoutes(routes, activeIndex) {
                     clearMap();
@@ -2647,6 +3107,10 @@
                             }
 
                                 // Najpierw sprawdzamy czy trasa zawiera prom lub pociąg
+                                const selectedVehicle = vehicles.find(v => v.id === localStorage.getItem('selectedVehicleId')) || vehicles[0];
+                                const fuelCosts = calculateFuelCosts(route, selectedVehicle);
+                                const fuelCostsHTML = generateFuelCostsHTML(fuelCosts, route, selectedVehicle);
+
                                 const hasferryOrTrain = route.sections.some(section => 
                                     section.transport?.mode === 'ferry' || section.transport?.mode === 'shuttletrain'
                                 );
@@ -2658,13 +3122,27 @@
                                             <div class="stat-label">${translations.distance}${hasferryOrTrain ? ` (${translations.withoutFerryTrainKm})` : ''}</div>
                                             <div class="stat-value">${(totalDistance / 1000).toFixed(1)} km</div>
                                         </div>
-                                    <div class="route-stat">
-                                        <div class="stat-label">${translations.time}</div>
-                                        <div class="stat-value">${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min</div>
+                                        <div class="route-stat">
+                                            <div class="stat-label">${translations.time}</div>
+                                            <div class="stat-value">${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min</div>
+                                        </div>
                                     </div>
-                                </div>
-                                ${tollInfo}
-                            `;
+                                    ${tollInfo}
+                                    <div class="route-stat">
+                                        <div class="stat-label">${translations.fuelCosts}</div>
+                                        ${fuelCostsHTML}
+                                    </div>
+                                `;
+                                // Dodaj event listenery dla wszystkich przycisków rozwijania
+                                document.querySelectorAll('.toll-details-toggle').forEach(button => {
+                                    button.addEventListener('click', function() {
+                                        const details = this.closest('.stat-value').querySelector('.toll-details');
+                                        const isExpanded = details.style.display !== 'none';
+                                        details.style.display = isExpanded ? 'none' : 'block';
+                                        this.textContent = isExpanded ? '▼' : '▲';
+                                    });
+                                });
+                            
                             // TUTAJ dodajmy event listenery
                             document.querySelectorAll('.manual-toll-price').forEach(input => {
                                 input.addEventListener('input', (e) => {
@@ -2763,20 +3241,8 @@
 
         function initializeUITranslations() {
             document.getElementById('settings-title').textContent = translations.routeSettings;
-            document.getElementById('default-settings-text').textContent = translations.defaultSettings;
-            document.getElementById('weight-text').textContent = translations.vehicleWeight;
-            document.getElementById('axles-text').textContent = translations.axleCount;
-            document.getElementById('euro-class-text').textContent = translations.euroClass;
-            document.getElementById('co2-class-text').textContent = translations.co2Class;
             document.getElementById('excluded-areas-text').textContent = translations.excludedAreas;
 
-            // Set text for default combination buttons
-            document.querySelectorAll('#default-combination button').forEach(button => {
-                const translationKey = button.dataset.translation;
-                if (translationKey) {
-                    button.textContent = translations[translationKey];
-                }
-            });
             // Dodajemy tłumaczenia dla elementów route-info
             document.querySelectorAll('[data-translation]').forEach(element => {
                 const translationKey = element.dataset.translation;
@@ -2802,191 +3268,94 @@
             }
         });
 
+        // Funkcja do inicjalizacji przycisków pojazdów
+        function initializeVehicleButtons() {
+            const container = document.getElementById('vehicle-selection');
+            container.innerHTML = '';
 
+            vehicles.forEach(vehicle => {
+                const button = document.createElement('button');
+                button.innerHTML = `
+                    <div class="vehicle-name">${vehicle.name}</div>
+                    <div class="vehicle-details">
+                        <span>${vehicle.weight/1000}t</span>
+                        <span>${vehicle.truckAxles}+${vehicle.trailerAxles} axles</span>
+                        <span>EUR${vehicle.euroClass}</span>
+                        <span>CO2-${vehicle.co2Class}</span>
+                    </div>
+                `;
+                button.dataset.vehicleId = vehicle.id;
+                button.classList.add('vehicle-button');
+                button.addEventListener('click', () => selectVehicle(vehicle));
+                container.appendChild(button);
+            });
 
-        // Inicjalizacja lokalnego storage
-        const STORAGE_KEY = 'routeSettings';
-
-        // Funkcja do zapisywania ustawień
-        function saveSettings() {
-            const settings = {
-                weight: document.querySelector('#weight-selection button.active')?.dataset.value,
-                axles: document.querySelector('#axles-selection button.active')?.dataset.value,
-                euroClass: document.querySelector('#euro-class')?.value,
-                co2Class: document.querySelector('#co2-class')?.value,
-                excludedAreas: Array.from(document.querySelectorAll('#excluded-areas button.active'))
-                    .map(btn => btn.dataset.value),
-                defaultCombination: document.querySelector('#default-combination button.active')?.dataset.value
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-        }
-
-        // Funkcja do wczytywania ustawień
-        function loadSettings() {
-            try {
-                const settings = JSON.parse(localStorage.getItem(STORAGE_KEY));
-                
-                if (settings) {
-                    // Wczytaj zapisane ustawienia
-                    if (settings.weight) {
-                        document.querySelector(`#weight-selection button[data-value="${settings.weight}"]`)?.classList.add('active');
-                    }
-                    if (settings.axles) {
-                        document.querySelector(`#axles-selection button[data-value="${settings.axles}"]`)?.classList.add('active');
-                    }
-                    if (settings.euroClass) {
-                        document.querySelector('#euro-class').value = settings.euroClass;
-                    }
-                    if (settings.co2Class) {
-                        document.querySelector('#co2-class').value = settings.co2Class;
-                    }
-                    if (settings.excludedAreas) {
-                        settings.excludedAreas.forEach(area => {
-                            document.querySelector(`#excluded-areas button[data-value="${area}"]`)?.classList.add('active');
-                        });
-                    }
-                } else {
-                    // Ustaw wartości domyślne dla nowego użytkownika
-                    const defaultSettings = {
-                        weight: '40000',  // 18-40t
-                        axles: '5+',     // 5+ osi
-                        euroClass: '6',   // EURO 6
-                        co2Class: '1',    // CO2 I
-                    };
-
-                    // Ustawienie domyślnej kombinacji (Duży pojazd)
-                    const largeVehicleBtn = document.querySelector('#default-combination button[data-weight="40000"][data-axles="5+"]');
-                    if (largeVehicleBtn) {
-                        largeVehicleBtn.classList.add('active');
-                    }
-
-                    // Ustawienie wagi
-                    const weightBtn = document.querySelector(`#weight-selection button[data-value="${defaultSettings.weight}"]`);
-                    if (weightBtn) {
-                        weightBtn.classList.add('active');
-                    }
-
-                    // Ustawienie liczby osi
-                    const axlesBtn = document.querySelector(`#axles-selection button[data-value="${defaultSettings.axles}"]`);
-                    if (axlesBtn) {
-                        axlesBtn.classList.add('active');
-                    }
-
-                    // Ustawienie klasy EURO
-                    const euroSelect = document.querySelector('#euro-class');
-                    if (euroSelect) {
-                        euroSelect.value = defaultSettings.euroClass;
-                    }
-
-                    // Ustawienie klasy CO2
-                    const co2Select = document.querySelector('#co2-class');
-                    if (co2Select) {
-                        co2Select.value = defaultSettings.co2Class;
-                    }
-
-                    // Zapisz domyślne ustawienia w localStorage
-                    saveSettings();
-                }
-
-                // Sprawdź czy jest pasująca kombinacja domyślna
-                checkDefaultCombination();
-            } catch (error) {
-                console.error('Error loading settings:', error);
+            const savedVehicleId = localStorage.getItem('selectedVehicleId') || vehicles[0].id;
+            const vehicle = vehicles.find(v => v.id === savedVehicleId);
+            if (vehicle) {
+                selectVehicle(vehicle);
             }
         }
-
-        // Funkcja do sprawdzania i zaznaczania domyślnej kombinacji
-        function checkDefaultCombination() {
-            const activeWeight = document.querySelector('#weight-selection button.active')?.dataset.value;
-            const activeAxles = document.querySelector('#axles-selection button.active')?.dataset.value;
-
-            const defaultButtons = document.querySelectorAll('#default-combination button');
-            defaultButtons.forEach(button => {
-                button.classList.remove('active');
-                if (button.dataset.weight === activeWeight && button.dataset.axles === activeAxles) {
-                    button.classList.add('active');
-                }
+        // Funkcja do wyboru pojazdu
+        function selectVehicle(vehicle) {
+            // Aktualizuj wygląd przycisków
+            document.querySelectorAll('#vehicle-selection button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.vehicleId === vehicle.id);
             });
+
+            // Zapisz wybór w localStorage
+            localStorage.setItem('selectedVehicleId', vehicle.id);
+
+            // Przelicz trasę
+            calculateRouteIfPossible();
         }
 
-        // Event listenery dla przycisków domyślnych kombinacji
-        document.querySelectorAll('#default-combination button').forEach(button => {
-            button.addEventListener('click', () => {
-                document.querySelectorAll('#default-combination button').forEach(btn => 
-                    btn.classList.remove('active'));
-                button.classList.add('active');
-
-                const weight = button.dataset.weight;
-                const axles = button.dataset.axles;
-
-                document.querySelectorAll('#weight-selection button').forEach(btn => {
-                    btn.classList.toggle('active', btn.dataset.value === weight);
-                });
-
-                document.querySelectorAll('#axles-selection button').forEach(btn => {
-                    btn.classList.toggle('active', btn.dataset.value === axles);
-                });
-
-                saveSettings();
-                if (typeof calculateRouteIfPossible === 'function') {
-                    calculateRouteIfPossible();
-                }
-            });
-        });
-
-        // Event listenery dla wagi i osi
-        ['weight-selection', 'axles-selection'].forEach(id => {
-            document.querySelectorAll(`#${id} button`).forEach(button => {
-                button.addEventListener('click', () => {
-                    document.querySelectorAll(`#${id} button`).forEach(btn => 
-                        btn.classList.remove('active'));
-                    button.classList.add('active');
-                    
-                    checkDefaultCombination();
-                    saveSettings();
-                    if (typeof calculateRouteIfPossible === 'function') {
-                        calculateRouteIfPossible();
-                    }
-                });
-            });
-        });
-
-        // Event listenery dla selectów
-        ['euro-class', 'co2-class'].forEach(id => {
-            document.getElementById(id).addEventListener('change', () => {
-                saveSettings();
-                if (typeof calculateRouteIfPossible === 'function') {
-                    calculateRouteIfPossible();
-                }
-            });
-        });
+        // Funkcja do pobrania parametrów aktualnie wybranego pojazdu
+        function getVehicleParameters() {
+            const vehicleId = localStorage.getItem('selectedVehicleId') || vehicles[0].id;
+            const vehicle = vehicles.find(v => v.id === vehicleId);
+            
+            return {
+                weight: vehicle.weight,
+                truckAxles: vehicle.truckAxles,
+                trailerAxles: vehicle.trailerAxles,
+                trailerCount: vehicle.trailerCount,
+                euroClass: vehicle.euroClass,
+                co2Class: vehicle.co2Class,
+                fuelConsumption: vehicle.fuelConsumption,
+                costPerKm: vehicle.costPerKm,
+                height: vehicle.height,
+                width: vehicle.width,
+                length: vehicle.length
+            };
+        }
 
         // Event listenery dla wyłączonych obszarów
         document.querySelectorAll('#excluded-areas button').forEach(button => {
             button.addEventListener('click', () => {
                 button.classList.toggle('active');
-                saveSettings();
+                saveExcludedAreas(); // Dodajemy zapisywanie
                 if (typeof calculateRouteIfPossible === 'function') {
                     calculateRouteIfPossible();
                 }
             });
         });
+        // Funkcja zapisująca stan wyłączonych obszarów
+        function saveExcludedAreas() {
+            const excludedAreas = Array.from(document.querySelectorAll('#excluded-areas button.active'))
+                .map(button => button.dataset.value);
+            localStorage.setItem('excludedAreas', JSON.stringify(excludedAreas));
+        }
 
-        // Wczytaj ustawienia przy starcie
-        document.addEventListener('DOMContentLoaded', loadSettings);
-
-
-        function getVehicleParameters() {
-            const weightBtn = document.querySelector('#weight-selection button.active');
-            const axlesBtn = document.querySelector('#axles-selection button.active');
-            
-            return {
-                weight: weightBtn ? parseInt(weightBtn.dataset.value) : 3500, // wartość w kg
-                axleCount: axlesBtn ? parseInt(axlesBtn.dataset.value) : 2,
-                height: 400,  // 4m w centymetrach
-                width: 255,   // 2.55m w centymetrach
-                length: 1650  // 16.5m w centymetrach
-            };
+        // Funkcja wczytująca stan wyłączonych obszarów
+        function loadExcludedAreas() {
+            const savedAreas = localStorage.getItem('excludedAreas');
+            if (savedAreas) {
+                const excludedAreas = JSON.parse(savedAreas);
+                document.querySelectorAll('#excluded-areas button').forEach(button => {
+                    button.classList.toggle('active', excludedAreas.includes(button.dataset.value));
+                });
+            }
         }
 
         ////////////////// FUNKCJE ODPOWIEDZIALNE ZA BUDOWE LINKU + ZMIANĘ PAGE TITLE
@@ -2995,7 +3364,7 @@
             const waypoints = document.querySelectorAll('.waypoint');
             const params = new URLSearchParams();
 
-            // Add waypoints
+            // Add only waypoints
             waypoints.forEach((waypoint, index) => {
                 const value = waypoint.value.trim();
                 if (value) {
@@ -3005,26 +3374,10 @@
                             params.append(`wp${index}`, `${coords.lat},${coords.lng}`);
                         }
                     } else {
-                        // For addresses, store the actual address text
                         params.append(`wp${index}`, encodeURIComponent(value));
                     }
                 }
             });
-
-            // Add vehicle settings
-            const weightBtn = document.querySelector('#weight-selection button.active');
-            const axlesBtn = document.querySelector('#axles-selection button.active');
-            params.append('weight', weightBtn?.dataset.value || '40000');
-            params.append('axles', axlesBtn?.dataset.value || '5+');
-            params.append('euro', document.querySelector('#euro-class').value);
-            params.append('co2', document.querySelector('#co2-class').value);
-
-            // Add excluded areas
-            const excludedAreas = Array.from(document.querySelectorAll('#excluded-areas button.active'))
-                .map(btn => btn.dataset.value);
-            if (excludedAreas.length > 0) {
-                params.append('excluded', excludedAreas.join(','));
-            }
 
             // Update URL without reloading the page
             const newURL = `${window.location.pathname}?${params.toString()}`;
@@ -3059,7 +3412,7 @@
             const waypointsContainer = document.getElementById('waypoints-container');
             waypointsContainer.innerHTML = '';
 
-            // Load waypoints
+            // Load only waypoints
             const waypointParams = Array.from(params.entries())
                 .filter(([key]) => key.startsWith('wp'))
                 .sort((a, b) => parseInt(a[0].slice(2)) - parseInt(b[0].slice(2)));
@@ -3079,44 +3432,10 @@
                 waypointsContainer.appendChild(container);
             }
 
-            // Load settings
-            if (params.has('weight')) {
-                const weightBtn = document.querySelector(`#weight-selection button[data-value="${params.get('weight')}"]`);
-                if (weightBtn) {
-                    document.querySelectorAll('#weight-selection button').forEach(btn => btn.classList.remove('active'));
-                    weightBtn.classList.add('active');
-                }
-            }
-
-            if (params.has('axles')) {
-                const axlesBtn = document.querySelector(`#axles-selection button[data-value="${params.get('axles')}"]`);
-                if (axlesBtn) {
-                    document.querySelectorAll('#axles-selection button').forEach(btn => btn.classList.remove('active'));
-                    axlesBtn.classList.add('active');
-                }
-            }
-
-            if (params.has('euro')) {
-                document.querySelector('#euro-class').value = params.get('euro');
-            }
-
-            if (params.has('co2')) {
-                document.querySelector('#co2-class').value = params.get('co2');
-            }
-
-            if (params.has('excluded')) {
-                const excludedAreas = params.get('excluded').split(',');
-                document.querySelectorAll('#excluded-areas button').forEach(btn => {
-                    btn.classList.toggle('active', excludedAreas.includes(btn.dataset.value));
-                });
-            }
-
-            checkDefaultCombination();
-            // Sprawdź czy istnieją jakieś pola i czy ostatnie nie jest puste
+            // Add empty waypoint if needed
             const waypoints = document.querySelectorAll('.waypoint');
-            const lastWaypoint = waypoints[waypoints.length - 1];
-            
-            if (waypoints.length < 12 && lastWaypoint && lastWaypoint.value.trim() !== '') {
+            if (waypoints.length < 12 && 
+                waypoints[waypoints.length - 1]?.value.trim() !== '') {
                 waypointsContainer.appendChild(createWaypointInput());
             }
             
@@ -3164,6 +3483,14 @@
                         <div class="stat-value">--</div>
                     </div>
                 </div>
+                <div class="route-stat">
+                    <div class="stat-label">${translations.roadCharges}</div>
+                    <div class="stat-value">--</div>
+                </div>
+                <div class="route-stat">
+                    <div class="stat-label">${translations.fuelCosts}</div>
+                    <div class="stat-value">--</div>
+                </div>
             `;
             
             // Zresetuj zapisane punkty geocoded
@@ -3190,23 +3517,22 @@
         }
 
         function initializeApplication() {
-            // Inicjalizacja pierwszego pola waypoint
+            // Inicjalizacja przycisków pojazdów
+            initializeVehicleButtons();
+
+            // Wczytaj stan wyłączonych obszarów
+            loadExcludedAreas();
+
+            // Pozostała część funkcji bez zmian...
             const firstWaypoint = document.querySelector('.waypoint');
             if (firstWaypoint) {
                 firstWaypoint.focus();
             }
-
-            // Wczytanie ustawień
-            loadSettings();
             
-            // Inicjalizacja tłumaczeń UI
             initializeUITranslations();
-            
-            // Wczytanie trasy z URL i aktualizacja tytułu
             loadRouteFromURL();
             updatePageTitle();
             
-            // Inicjalizacja przycisku reset
             const restartButton = document.getElementById('restart-button');
             if (restartButton) {
                 restartButton.addEventListener('click', restartApp);
