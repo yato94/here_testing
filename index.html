@@ -858,7 +858,7 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 27,
+                fuelConsumption: 30,
                 adblueConsumption: 1.5,          
                 costPerKm: 0.20,
                 height: 400,
@@ -874,7 +874,7 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 27,
+                fuelConsumption: 30,
                 adblueConsumption: 1.5,
                 costPerKm: 0.15,
                 height: 400,
@@ -890,7 +890,7 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 24.5,
+                fuelConsumption: 30,
                 adblueConsumption: 1.5,
                 costPerKm: 0.10,
                 height: 400,
@@ -916,16 +916,16 @@
         ];
 
         const defaultFuelPrices = {
-            'POL': 1.19,
-            'DEU': 1.55,
-            'LUX': 1.28,
-            'CZE': 1.22,
+            'POL': 1.17,
+            'DEU': 1.45,
+            'LUX': 1.20,
+            'CZE': 1.18,
             'SVK': 1.28,
             'HUN': 1.28,
-            'AUT': 1.52,
+            'AUT': 1.37,
             'ITA': 1.48,
             'FRA': 1.47,
-            'ESP': 1.37,
+            'ESP': 1.27,
             'PRT': 1.41,
             'BEL': 1.49,
             'NLD': 1.58,
@@ -954,7 +954,7 @@
             fixedCostsPerHour: 50,
             variableCostsPerKm: 0.5,
             useLowestFuelPrice: true,
-            useCustomFuelPrices: false,
+            useCustomFuelPrices: true,
             globalFuelPrice: 1.35,
             globalAdBluePrice: 0.65,
             customFuelPrices: {
@@ -1107,7 +1107,7 @@
             customTileLayer,
             {
                 tileSize: 512,
-                pixelRatio: window.devicePixelRatio *1.2|| 1,
+                pixelRatio: window.devicePixelRatio|| 1,
                 zoom: 5.5,
                 center: { lat: 50.0, lng: 15.0 },
                 renderBaseBackground: true, // Dodajemy tło podczas ładowania
@@ -2718,11 +2718,21 @@
                             const ROUTE_STYLES = {
                                 alternative: {
                                     strokeColor: '#808080',
-                                    lineWidth: 5
+                                    lineWidth: 5,
+                                    lineCap: 'round',
+                                    lineJoin: 'round',
+                                    lineDash: [ ],
+                                    strokeLinecap: 'round',
+                                    strokeLinejoin: 'round'
                                 },
                                 main: {
-                                    strokeColor: 'rgba(0, 0, 139, 0.7)',
-                                    lineWidth: 5
+                                    strokeColor: 'rgba(0, 100, 255, 0.9)',
+                                    lineWidth: 5,
+                                    lineCap: 'round',
+                                    lineJoin: 'round',
+                                    lineDash: [ ],
+                                    strokeLinecap: 'round',
+                                    strokeLinejoin: 'round'
                                 }
                             };
 
