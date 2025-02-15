@@ -555,6 +555,72 @@
             background: rgba(255, 255, 255, 0.15);
             color: white;
         }
+
+        .work-time-section {
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .main-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .time-controls {
+            display: inline-flex;
+            gap: 4px;
+            margin-left: 8px;
+        }
+
+        .time-adjust {
+            padding: 2px 6px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            min-width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .time-adjust:hover {
+            background: #f3f2f1;
+            border-color: #0066CC;
+        }
+        
+        .costs-summary {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .total-costs {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .total-costs .stat-label {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 3px;
+        }
+
+        .total-costs .stat-value {
+            font-size: 16px;
+            color: #323130;
+            font-weight: 500;
+        }
+
+
+
     </style>
 </head>
 <body>
@@ -578,6 +644,10 @@
             </div>
             <div class="route-stat">
                 <div class="stat-label" data-translation="fuelCosts">Fuel costs</div>
+                <div class="stat-value">--</div>
+            </div>
+            <div class="route-stat">
+                <div class="stat-label" data-translation="otherCosts">Other costs</div>
                 <div class="stat-value">--</div>
             </div>
         </div>
@@ -652,7 +722,19 @@
                     fuelInCountry: 'Fuel in country',
                     fuel: 'Fuel',
                     selectVehicle: 'Select vehicle',
-                    lowestPrice: 'Lowest price'
+                    lowestPrice: 'Lowest price',
+                    workingTime: 'Working time',
+                    days: 'days',
+                    hours: 'hours',
+                    theoreticalTime: 'Theoretical time',
+                    actualTime: 'Actual time',
+                    additionalCosts: 'Additional costs',
+                    otherCosts: 'Other costs',
+                    fixedCosts: 'Fixed costs',
+                    costsPerKm: 'Costs per km',
+                    dailyRate: 'Daily rate',
+                    totalCosts: 'Total costs',
+                    otherCostsPerKm: 'Other costs per km',
                 },
                 de: {
                     inputPlaceholder: 'Adresse oder GPS-Koordinaten eingeben',
@@ -690,7 +772,10 @@
                     fuelInCountry: 'Kraftstoff im Land',
                     fuel: 'Kraftstoff',
                     selectVehicle: 'Fahrzeug auswählen',
-                    lowestPrice: 'Niedrigster Preis'
+                    lowestPrice: 'Niedrigster Preis',
+                    totalCosts: 'Gesamtkosten',
+                    otherCostsPerKm: 'Andere Kosten pro km',
+
                 },
                 fr: {
                     inputPlaceholder: 'Entrez l\'adresse ou les coordonnées GPS',
@@ -728,7 +813,10 @@
                     fuelInCountry: 'Carburant dans le pays',
                     fuel: 'Carburant',
                     selectVehicle: 'Sélectionner le véhicule',
-                    lowestPrice: 'Prix le plus bas'
+                    lowestPrice: 'Prix le plus bas',
+                    totalCosts: 'Coûts totaux',
+                    otherCostsPerKm: 'Autres coûts par km',
+
                 },
                 it: {
                     inputPlaceholder: 'Inserisci indirizzo o coordinate GPS',
@@ -766,7 +854,10 @@
                     fuelInCountry: 'Carburante nel paese',
                     fuel: 'Carburante',
                     selectVehicle: 'Seleziona veicolo',
-                    lowestPrice: 'Prezzo più basso'
+                    lowestPrice: 'Prezzo più basso',
+                    totalCosts: 'Costi totali',
+                    otherCostsPerKm: 'Altri costi per km',
+
                 },
                 es: {
                     inputPlaceholder: 'Introduce la dirección o coordenadas GPS',
@@ -804,7 +895,10 @@
                     fuelInCountry: 'Combustible en el país',
                     fuel: 'Combustible',
                     selectVehicle: 'Seleccionar vehículo',
-                    lowestPrice: 'Precio más bajo'
+                    lowestPrice: 'Precio más bajo',
+                    totalCosts: 'Costes totales',
+                    otherCostsPerKm: 'Otros costes por km',
+
                 },
                 pl: {
                     inputPlaceholder: 'Wpisz adres lub współrzędne GPS',
@@ -842,7 +936,20 @@
                     fuelInCountry: 'Paliwo w kraju',
                     fuel: 'Paliwo',
                     selectVehicle: 'Wybierz pojazd',
-                    lowestPrice: 'Najniższa cena'
+                    lowestPrice: 'Najniższa cena',
+                    workingTime: 'Czas podróży',
+                    days: 'dni',
+                    hours: 'godz',
+                    theoreticalTime: 'Czas teoretyczny',
+                    actualTime: 'Czas rzeczywisty',
+                    additionalCosts: 'Koszty dodatkowe',
+                    otherCosts: 'Pozostałe koszty',
+                    fixedCosts: 'Koszty stałe',
+                    costsPerKm: 'Koszty za kilometr',
+                    dailyRate: 'Stawka dzienna',
+                    totalCosts: 'Suma kosztów',
+                    otherCostsPerKm: 'Inne koszty za km',
+
                 }
             };
             return translations[lang] || translations.en;
@@ -858,12 +965,16 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 30,
+                fuelConsumption: 27,
                 adblueConsumption: 1.5,          
                 costPerKm: 0.20,
                 height: 400,
                 width: 255,
-                length: 1650
+                length: 1650, 
+                workingDays: 240,
+                avgKm: 11000,
+                advFixedPerMonth: 7000,
+                advVariablePerKM: 0.00
             },
             {
                 id: 'standard',
@@ -874,12 +985,16 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 30,
+                fuelConsumption: 27,
                 adblueConsumption: 1.5,
                 costPerKm: 0.15,
                 height: 400,
                 width: 255,
-                length: 1650
+                length: 1650,
+                workingDays: 240,
+                avgKm: 11000,
+                advFixedPerMonth: 6500,
+                advVariablePerKM: 0.00
             },
             {
                 id: 'jumbo',
@@ -890,12 +1005,16 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 30,
+                fuelConsumption: 24,
                 adblueConsumption: 1.5,
                 costPerKm: 0.10,
                 height: 400,
                 width: 255,
-                length: 1750
+                length: 1750,
+                workingDays: 250,
+                avgKm: 12000,
+                advFixedPerMonth: 6300,
+                advVariablePerKM: 0.00
             },
             {
                 id: 'solo',
@@ -911,7 +1030,11 @@
                 costPerKm: 0.10,
                 height: 350,
                 width: 255,
-                length: 850
+                length: 850,
+                workingDays: 250,
+                avgKm: 12000,
+                advFixedPerMonth: 4500,
+                advVariablePerKM: 0.00
             }
         ];
 
@@ -1947,7 +2070,7 @@
                             suggestionsContainer.style.display = 'none';
                             selectedIndex = -1;
                         }
-                    }, 230);
+                    }, 300);
                 } else {
                     suggestionsContainer.style.display = 'none';
                     selectedIndex = -1;
@@ -2697,6 +2820,98 @@
                         </div>`;
                     }
 
+                    function calculateWorkingTime(routeDistance, vehicle) {
+                        const kmPerDay = (vehicle.avgKm * 12) / vehicle.workingDays;
+                        const theoreticalDays = routeDistance / kmPerDay;
+                        
+                        return {
+                            days: Math.floor(theoreticalDays),
+                            hours: Math.round((theoreticalDays - Math.floor(theoreticalDays)) * 24),
+                            kmPerDay: kmPerDay
+                        };
+                    }
+
+                    function calculateOtherCosts(route, vehicle, actualTime = null) {
+                        const routeDistance = route.sections.reduce((sum, section) => 
+                            sum + section.summary.length, 0) / 1000; // w km
+
+                        // Obliczenie km na dzień roboczy (24h)
+                        const kmPerDay = (vehicle.avgKm * 12) / vehicle.workingDays;
+                        
+                        // Obliczenie kosztu stałego na dzień roboczy (24h)
+                        const fixedCostPerDay = vehicle.advFixedPerMonth / (vehicle.workingDays / 12);
+                        
+                        // Obliczenie teoretycznego czasu
+                        const theoreticalDays = routeDistance / kmPerDay;
+                        const theoreticalTime = {
+                            days: Math.floor(theoreticalDays),
+                            hours: Math.round((theoreticalDays - Math.floor(theoreticalDays)) * 24)
+                        };
+                        
+                        // Jeśli nie ma aktualnego czasu, użyj teoretycznego
+                        if (!actualTime) {
+                            actualTime = {...theoreticalTime};
+                        }
+
+                        const theoreticalHours = theoreticalTime.days * 24 + theoreticalTime.hours;
+                        const actualHours = actualTime.days * 24 + actualTime.hours;
+
+                        // Obliczenie kosztów stałych z uwzględnieniem proporcji czasu
+                        const timeRatio = actualHours / theoreticalHours;
+                        const fixedCosts = ((routeDistance / kmPerDay) * fixedCostPerDay) * timeRatio;
+
+                        // Obliczenie kosztów zmiennych (zawsze stałe na km)
+                        const variableCosts = routeDistance * vehicle.advVariablePerKM;
+
+                        const totalCosts = fixedCosts + variableCosts;
+
+                        return {
+                            total: totalCosts,
+                            costPerKm: totalCosts / routeDistance,
+                            fixedCosts: fixedCosts,
+                            variableCosts: variableCosts,
+                            theoreticalTime: theoreticalTime,
+                            actualTime: actualTime,
+                            routeDistance: routeDistance
+                        };
+                    }
+
+
+                    function generateOtherCostsHTML(costs, vehicle) {
+                        return `
+                            <div class="stat-value">
+                                <div style="display: flex; align-items: center; gap: 8px">
+                                    <span>${costs.total.toFixed(2)} € (${costs.costPerKm.toFixed(2)} €/km)</span>
+                                    <button class="toll-details-toggle">▼</button>
+                                </div>
+                                <div class="toll-details" style="display: none;">
+                                    <div class="toll-details-content">
+                                        <div class="country-toll">
+                                            ${translations.fixedCosts}: ${costs.fixedCosts.toFixed(2)} €
+                                        </div>
+                                        <div class="country-toll">
+                                            ${translations.otherCostsPerKm} (${vehicle.advVariablePerKM.toFixed(2)} €/km): ${costs.variableCosts.toFixed(2)} €
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="route-stat">
+                                <div class="stat-label">${translations.workingTime}</div>
+                                <div class="stat-value">
+                                    <div style="display: flex; align-items: center; gap: 8px">
+                                        <span>${costs.actualTime.days} ${translations.days} ${costs.actualTime.hours} ${translations.hours}</span>
+                                        <div class="time-controls">
+                                            <button class="time-adjust plus">+</button>
+                                            <button class="time-adjust minus">-</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+
+
 
                 function displayRoutes(routes, activeIndex) {
                     clearMap();
@@ -3120,11 +3335,15 @@
                                 const selectedVehicle = vehicles.find(v => v.id === localStorage.getItem('selectedVehicleId')) || vehicles[0];
                                 const fuelCosts = calculateFuelCosts(route, selectedVehicle);
                                 const fuelCostsHTML = generateFuelCostsHTML(fuelCosts, route, selectedVehicle);
+                                const otherCosts = calculateOtherCosts(route, selectedVehicle);
+                                const otherCostsHTML = generateOtherCostsHTML(otherCosts, selectedVehicle);
+                                
 
                                 const hasferryOrTrain = route.sections.some(section => 
                                     section.transport?.mode === 'ferry' || section.transport?.mode === 'shuttletrain'
                                 );
 
+                                const totalToll = calculateTotalTolls(route);
                                 document.getElementById('route-info').innerHTML = `
                                     <div class="route-info-label">${translations.routeInfo}</div>
                                     <div class="route-stats-container">
@@ -3142,16 +3361,99 @@
                                         <div class="stat-label">${translations.fuelCosts}</div>
                                         ${fuelCostsHTML}
                                     </div>
+                                    <div class="route-stat">
+                                        <div class="stat-label">${translations.otherCosts}</div>
+                                        ${otherCostsHTML}
+                                    </div>
+                                    <div class="costs-summary">
+                                        <div class="route-stat">
+                                            <div class="stat-label">${translations.totalCosts}</div>
+                                            <div class="stat-value">
+                                                <strong>${(totalToll + fuelCosts.totalCost + otherCosts.total).toFixed(2)} €</strong>  
+                                                <span style="color: #666; margin-left: 12px"> <strong>${((totalToll + fuelCosts.totalCost + otherCosts.total) / (totalDistance / 1000)).toFixed(2)} €/km</strong></span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 `;
-                                // Dodaj event listenery dla wszystkich przycisków rozwijania
-                                document.querySelectorAll('.toll-details-toggle').forEach(button => {
-                                    button.addEventListener('click', function() {
-                                        const details = this.closest('.stat-value').querySelector('.toll-details');
-                                        const isExpanded = details.style.display !== 'none';
-                                        details.style.display = isExpanded ? 'none' : 'block';
-                                        this.textContent = isExpanded ? '▼' : '▲';
+                                    // Event listenery dla przycisków rozwijania i czasu (dodaj zaraz po document.getElementById('route-info').innerHTML = ...)
+                                    function addEventListeners() {
+                                        document.querySelectorAll('.toll-details-toggle').forEach(button => {
+                                            button.addEventListener('click', function() {
+                                                const details = this.closest('.stat-value').querySelector('.toll-details');
+                                                const isExpanded = details.style.display !== 'none';
+                                                details.style.display = isExpanded ? 'none' : 'block';
+                                                this.textContent = isExpanded ? '▼' : '▲';
+                                            });
+                                        });
+
+                                    // NA TEN KOD:
+                                    document.querySelectorAll('.time-adjust').forEach(button => {
+                                        button.addEventListener('click', function() {
+                                            const routeStat = this.closest('.route-stat');
+                                            const timeText = routeStat.querySelector('.stat-value span').textContent;
+                                            const [days, hours] = timeText.match(/(\d+)/g).map(Number);
+                                            let totalHours = days * 24 + hours;
+
+                                            if (this.classList.contains('plus')) {
+                                                totalHours += 1;
+                                            } else if (this.classList.contains('minus')) {
+                                                totalHours = Math.max(0, totalHours - 1);
+                                            }
+
+                                            const newDays = Math.floor(totalHours / 24);
+                                            const newHours = totalHours % 24;
+
+                                            const selectedVehicle = vehicles.find(v => v.id === localStorage.getItem('selectedVehicleId')) || vehicles[0];
+                                            const otherCosts = calculateOtherCosts(route, selectedVehicle, { days: newDays, hours: newHours });
+
+                                            // Aktualizacja czasu
+                                            const timeSpan = routeStat.querySelector('.stat-value span');
+                                            if (timeSpan) {
+                                                timeSpan.textContent = `${newDays} ${translations.days} ${newHours} ${translations.hours}`;
+                                            }
+
+                                            // Aktualizacja głównej kwoty kosztów
+                                            const otherCostsValue = routeStat.previousElementSibling.querySelector('span');
+                                            if (otherCostsValue) {
+                                                otherCostsValue.textContent = `${otherCosts.total.toFixed(2)} € (${otherCosts.costPerKm.toFixed(2)} €/km)`;
+                                            }
+
+                                            // Aktualizacja szczegółów kosztów
+                                            const detailsContent = routeStat.previousElementSibling.querySelector('.toll-details-content');
+                                            if (detailsContent) {
+                                                detailsContent.innerHTML = `
+                                                    <div class="country-toll">
+                                                        ${translations.fixedCosts}: ${otherCosts.fixedCosts.toFixed(2)} €
+                                                    </div>
+                                                    <div class="country-toll">
+                                                        ${translations.otherCostsPerKm} (${selectedVehicle.advVariablePerKM.toFixed(2)} €/km): ${otherCosts.variableCosts.toFixed(2)} €
+                                                    </div>
+                                                `;
+                                            }
+
+                                            // Aktualizacja sumy kosztów
+                                            const totalToll = calculateTotalTolls(route);
+                                            const fuelCostsElement = document.querySelector('.fuel-costs-main-value');
+                                            const fuelCostsMatch = fuelCostsElement.textContent.match(/([\d.]+)/);
+                                            const fuelCostsValue = fuelCostsMatch ? parseFloat(fuelCostsMatch[0]) : 0;
+                                            const totalDistance = route.sections.reduce((sum, section) => sum + section.summary.length, 0) / 1000;
+
+                                            const costsSummary = document.querySelector('.costs-summary');
+                                            costsSummary.innerHTML = `
+                                                <div class="route-stat">
+                                                    <div class="stat-label">${translations.totalCosts}</div>
+                                                    <div class="stat-value">
+                                                        <strong>${(totalToll + fuelCostsValue + otherCosts.total).toFixed(2)} €</strong>
+                                                        <span style="color: #666; margin-left: 12px"> <strong>${((totalToll + fuelCostsValue + otherCosts.total) / totalDistance).toFixed(2)} €/km</strong></span>
+                                                    </div>
+                                                </div>
+                                            `;
+                                        });
                                     });
-                                });
+                                    }
+
+                                    // Wywołaj funkcję po wygenerowaniu HTML
+                                    addEventListeners();
                             
                             // TUTAJ dodajmy event listenery
                             document.querySelectorAll('.manual-toll-price').forEach(input => {
