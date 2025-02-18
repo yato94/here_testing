@@ -456,7 +456,7 @@
         .route-stats-container {
             display: flex;
             gap: 20px; /* Zwiększony gap */
-            margin-bottom: 16px; /* Zwiększony margin */
+            margin-bottom: 8px; /* Zwiększony margin */
         }
 
         /* Dostosowanie rozmiaru tekstu w szczegółach opłat */
@@ -597,8 +597,8 @@
         }
         
         .costs-summary {
-            margin-top: 16px;
-            padding-top: 16px;
+            margin-top: 8px;
+            padding-top: 8px;
             border-top: 1px solid rgba(0, 0, 0, 0.1);
         }
 
@@ -618,7 +618,42 @@
             color: #323130;
             font-weight: 500;
         }
+        .smaller-stat {
+            font-size: 14px;
+        }
 
+        .smaller-stat .stat-label {
+            font-size: 12px;
+            margin-bottom: 1px;
+        }
+
+        .smaller-stat .stat-value {
+            font-size: 14px;
+        }
+
+        .smaller-stat .country-toll {
+            font-size: 12px;
+            margin: 2px 0;
+        }
+
+        .smaller-stat .toll-details-content {
+            font-size: 12px;
+        }
+
+        .smaller-stat .toll-details {
+            margin-top: 4px;
+            padding-left: 8px;
+        }
+
+        .smaller-stat .ferry-item {
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .smaller-stat .vehicle-details span {
+            font-size: 12px;
+            padding: 1px 2px;
+        }
 
 
     </style>
@@ -973,7 +1008,7 @@
                 length: 1650, 
                 workingDays: 240,
                 avgKm: 11000,
-                advFixedPerMonth: 6000,
+                advFixedPerMonth: 7000,
                 advVariablePerKM: 0.00
             },
             {
@@ -993,7 +1028,7 @@
                 length: 1650,
                 workingDays: 240,
                 avgKm: 11000,
-                advFixedPerMonth: 5700,
+                advFixedPerMonth: 6500,
                 advVariablePerKM: 0.00
             },
             {
@@ -1013,7 +1048,7 @@
                 length: 1750,
                 workingDays: 250,
                 avgKm: 12000,
-                advFixedPerMonth: 5500,
+                advFixedPerMonth: 6300,
                 advVariablePerKM: 0.00
             },
             {
@@ -3356,12 +3391,14 @@
                                             <div class="stat-value">${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min</div>
                                         </div>
                                     </div>
-                                    ${tollInfo}
-                                    <div class="route-stat">
+                                    <div class="route-stat smaller-stat">
+                                        ${tollInfo}
+                                    </div>
+                                    <div class="route-stat smaller-stat">
                                         <div class="stat-label">${translations.fuelCosts}</div>
                                         ${fuelCostsHTML}
                                     </div>
-                                    <div class="route-stat">
+                                    <div class="route-stat smaller-stat">
                                         <div class="stat-label">${translations.otherCosts}</div>
                                         ${otherCostsHTML}
                                     </div>
@@ -3373,8 +3410,7 @@
                                                 <span style="color: #666; margin-left: 12px"> <strong>${((totalToll + fuelCosts.totalCost + otherCosts.total) / (totalDistance / 1000)).toFixed(2)} €/km</strong></span>
                                             </div>
                                         </div>
-                                    </div>
-                                `;
+                                    </div>`;
                                     // Event listenery dla przycisków rozwijania i czasu (dodaj zaraz po document.getElementById('route-info').innerHTML = ...)
                                     function addEventListeners() {
                                         document.querySelectorAll('.toll-details-toggle').forEach(button => {
