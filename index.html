@@ -456,7 +456,7 @@
         .route-stats-container {
             display: flex;
             gap: 20px; /* Zwiększony gap */
-            margin-bottom: 8px; /* Zwiększony margin */
+            margin-bottom: 16px; /* Zwiększony margin */
         }
 
         /* Dostosowanie rozmiaru tekstu w szczegółach opłat */
@@ -596,64 +596,6 @@
             border-color: #0066CC;
         }
         
-        .costs-summary {
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid rgba(0, 0, 0, 0.1);
-        }
-
-        .total-costs {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .total-costs .stat-label {
-            font-size: 13px;
-            color: #666;
-            margin-bottom: 3px;
-        }
-
-        .total-costs .stat-value {
-            font-size: 16px;
-            color: #323130;
-            font-weight: 500;
-        }
-        .smaller-stat {
-            font-size: 14px;
-        }
-
-        .smaller-stat .stat-label {
-            font-size: 12px;
-            margin-bottom: 1px;
-        }
-
-        .smaller-stat .stat-value {
-            font-size: 14px;
-        }
-
-        .smaller-stat .country-toll {
-            font-size: 12px;
-            margin: 2px 0;
-        }
-
-        .smaller-stat .toll-details-content {
-            font-size: 12px;
-        }
-
-        .smaller-stat .toll-details {
-            margin-top: 4px;
-            padding-left: 8px;
-        }
-
-        .smaller-stat .ferry-item {
-            font-size: 12px;
-            margin-top: 2px;
-        }
-
-        .smaller-stat .vehicle-details span {
-            font-size: 12px;
-            padding: 1px 2px;
-        }
 
 
     </style>
@@ -769,7 +711,6 @@
                     costsPerKm: 'Costs per km',
                     dailyRate: 'Daily rate',
                     totalCosts: 'Total costs',
-                    otherCostsPerKm: 'Other costs per km',
                 },
                 de: {
                     inputPlaceholder: 'Adresse oder GPS-Koordinaten eingeben',
@@ -809,8 +750,6 @@
                     selectVehicle: 'Fahrzeug auswählen',
                     lowestPrice: 'Niedrigster Preis',
                     totalCosts: 'Gesamtkosten',
-                    otherCostsPerKm: 'Andere Kosten pro km',
-
                 },
                 fr: {
                     inputPlaceholder: 'Entrez l\'adresse ou les coordonnées GPS',
@@ -850,8 +789,6 @@
                     selectVehicle: 'Sélectionner le véhicule',
                     lowestPrice: 'Prix le plus bas',
                     totalCosts: 'Coûts totaux',
-                    otherCostsPerKm: 'Autres coûts par km',
-
                 },
                 it: {
                     inputPlaceholder: 'Inserisci indirizzo o coordinate GPS',
@@ -891,8 +828,6 @@
                     selectVehicle: 'Seleziona veicolo',
                     lowestPrice: 'Prezzo più basso',
                     totalCosts: 'Costi totali',
-                    otherCostsPerKm: 'Altri costi per km',
-
                 },
                 es: {
                     inputPlaceholder: 'Introduce la dirección o coordenadas GPS',
@@ -932,8 +867,6 @@
                     selectVehicle: 'Seleccionar vehículo',
                     lowestPrice: 'Precio más bajo',
                     totalCosts: 'Costes totales',
-                    otherCostsPerKm: 'Otros costes por km',
-
                 },
                 pl: {
                     inputPlaceholder: 'Wpisz adres lub współrzędne GPS',
@@ -972,7 +905,7 @@
                     fuel: 'Paliwo',
                     selectVehicle: 'Wybierz pojazd',
                     lowestPrice: 'Najniższa cena',
-                    workingTime: 'Czas podróży',
+                    workingTime: 'Czas pracy',
                     days: 'dni',
                     hours: 'godz',
                     theoreticalTime: 'Czas teoretyczny',
@@ -982,9 +915,7 @@
                     fixedCosts: 'Koszty stałe',
                     costsPerKm: 'Koszty za kilometr',
                     dailyRate: 'Stawka dzienna',
-                    totalCosts: 'Suma kosztów',
-                    otherCostsPerKm: 'Inne koszty za km',
-
+                    totalCosts: 'Koszty całkowite'
                 }
             };
             return translations[lang] || translations.en;
@@ -1000,7 +931,7 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 27,
+                fuelConsumption: 30,
                 adblueConsumption: 1.5,          
                 costPerKm: 0.20,
                 height: 400,
@@ -1009,7 +940,9 @@
                 workingDays: 240,
                 avgKm: 11000,
                 advFixedPerMonth: 7000,
-                advVariablePerKM: 0.00
+                advVariablePerKM: 0.05,
+                simpleCosts: false,  // ten będzie miał pełne wyliczenia
+                simpleCostValuePerKM: 0
             },
             {
                 id: 'standard',
@@ -1020,7 +953,7 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 27,
+                fuelConsumption: 30,
                 adblueConsumption: 1.5,
                 costPerKm: 0.15,
                 height: 400,
@@ -1028,8 +961,10 @@
                 length: 1650,
                 workingDays: 240,
                 avgKm: 11000,
-                advFixedPerMonth: 6500,
-                advVariablePerKM: 0.00
+                advFixedPerMonth: 5500,
+                advVariablePerKM: 0.00,
+                simpleCosts: false,  // ten będzie miał pełne wyliczenia
+                simpleCostValuePerKM: 0
             },
             {
                 id: 'jumbo',
@@ -1040,16 +975,18 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 24,
+                fuelConsumption: 30,
                 adblueConsumption: 1.5,
                 costPerKm: 0.10,
                 height: 400,
                 width: 255,
                 length: 1750,
                 workingDays: 250,
-                avgKm: 12000,
-                advFixedPerMonth: 6300,
-                advVariablePerKM: 0.00
+                avgKm: 120000,
+                advFixedPerMonth: 4500,
+                advVariablePerKM: 0.35,
+                simpleCosts: false,  // ten będzie miał pełne wyliczenia
+                simpleCostValuePerKM: 0
             },
             {
                 id: 'solo',
@@ -1067,9 +1004,11 @@
                 width: 255,
                 length: 850,
                 workingDays: 250,
-                avgKm: 12000,
+                avgKm: 120000,
                 advFixedPerMonth: 4500,
-                advVariablePerKM: 0.00
+                advVariablePerKM: 0.35,
+                simpleCosts: true,  // ten będzie miał uproszczone
+                simpleCostValuePerKM: 1.35
             }
         ];
 
@@ -2509,27 +2448,14 @@
                     if (!route.sections) return 0;
                     
                     const countryTolls = new Map();
-                    const minPassSubscriptionTolls = new Map();
                     const processedFareIds = new Set();
                     let totalToll = 0;
 
                     route.sections.forEach(section => {
                         if (section.tolls) {
                             section.tolls.forEach(toll => {
-                                // Sprawdzamy czy to jest system manualny i czy spełnia kryteria
                                 if (MANUAL_TOLL_SYSTEMS.hasOwnProperty(toll.tollSystem)) {
-                                    const criteria = MANUAL_TOLL_SYSTEMS[toll.tollSystem];
-                                    
-                                    // Jeśli mamy dodatkowe kryteria (np. dla ATMB)
-                                    if (criteria && criteria.checkLocation) {
-                                        // Sprawdź czy punkt poboru istnieje
-                                        const hasLocation = toll.tollCollectionLocations?.some(loc => 
-                                            loc.name === criteria.checkLocation
-                                        );
-                                        if (hasLocation) return; // Pomijamy jeśli to jest potwierdzony system manualny
-                                    } else {
-                                        return; // Pomijamy jeśli to jest system manualny bez dodatkowych kryteriów
-                                    }
+                                    return;
                                 }
 
                                 const countryCode = toll.countryCode;
@@ -2539,35 +2465,33 @@
 
                                 if (toll.fares) {
                                     let minFare = Infinity;
+                                    let hasPassSubscription = false;
+                                    let minPassSubscriptionFare = Infinity;
+
                                     toll.fares.forEach(fare => {
+                                        if (processedFareIds.has(fare.id)) return;
+                                        
                                         const value = fare.convertedPrice?.value || fare.price?.value || 0;
+                                        processedFareIds.add(fare.id);
                                         
                                         if (fare.paymentMethods?.includes('passSubscription')) {
-                                            const key = `${toll.countryCode}_${toll.tollSystem}`;
-                                            if (!minPassSubscriptionTolls.has(key) || value < minPassSubscriptionTolls.get(key)) {
-                                                minPassSubscriptionTolls.set(key, value);
-                                            }
-                                        } else if (!processedFareIds.has(fare.id)) {
-                                            processedFareIds.add(fare.id);
+                                            hasPassSubscription = true;
+                                            minPassSubscriptionFare = Math.min(minPassSubscriptionFare, value);
+                                        } else {
                                             minFare = Math.min(minFare, value);
                                         }
                                     });
                                     
-                                    if (minFare !== Infinity) {
+                                    // Użyj niższej wartości: albo minimalnej opłaty standardowej, albo minimalnej opłaty za pass subscription
+                                    if (hasPassSubscription && minPassSubscriptionFare !== Infinity) {
+                                        countryTolls.set(countryCode, countryTolls.get(countryCode) + minPassSubscriptionFare);
+                                    } else if (minFare !== Infinity) {
                                         countryTolls.set(countryCode, countryTolls.get(countryCode) + minFare);
                                     }
                                 }
                             });
                         }
                     });
-
-                    // Dodaj najniższe opłaty za pass subscription
-                    for (const [key, value] of minPassSubscriptionTolls.entries()) {
-                        const [countryCode, tollSystem] = key.split('_');
-                        if (!MANUAL_TOLL_SYSTEMS.hasOwnProperty(tollSystem) && countryTolls.has(countryCode)) {
-                            countryTolls.set(countryCode, countryTolls.get(countryCode) + value);
-                        }
-                    }
 
                     return Array.from(countryTolls.values()).reduce((a, b) => a + b, 0);
                 }
@@ -2817,29 +2741,29 @@
                         const countrySelect = document.querySelector('.fuel-country-select');
                         if (countrySelect) {
                             countrySelect.addEventListener('change', (e) => {
-                                const selectedCountry = e.target.value || null; // gdy wybrana opcja "Najniższa cena", value będzie puste
-                                
-                                // Przeliczamy tylko koszty paliwa
-                                const newFuelCosts = calculateFuelCosts(route, selectedVehicle, selectedCountry);
-                                
-                                // Aktualizujemy tylko odpowiednie elementy
-                                const mainValueElement = document.querySelector('.fuel-costs-main-value');
-                                const detailsElement = document.querySelector('.fuel-costs-details');
-                                
-                                if (mainValueElement) {
-                                    mainValueElement.textContent = `${newFuelCosts.totalCost.toFixed(2)} € (${(newFuelCosts.totalCost/totalDistance).toFixed(2)} €/km)`;
-                                }
-                                
-                                if (detailsElement) {
-                                    detailsElement.innerHTML = `
-                                        <div class="country-toll">
-                                            Paliwo: ${newFuelCosts.fuelNeeded.toFixed(0)}L × ${newFuelCosts.priceDetails.price.toFixed(2)}€/L = ${newFuelCosts.fuelCost.toFixed(2)}€
-                                        </div>
-                                        <div class="country-toll">
-                                            AdBlue: ${newFuelCosts.adblueNeeded.toFixed(1)}L × ${newFuelCosts.adbluePrice.toFixed(2)}€/L = ${newFuelCosts.adblueCost.toFixed(2)}€
-                                        </div>`;
-                                }
-                            });
+                            const selectedCountry = e.target.value || null;
+                            const newFuelCosts = calculateFuelCosts(route, selectedVehicle, selectedCountry);
+                            
+                            const mainValueElement = document.querySelector('.fuel-costs-main-value');
+                            const detailsElement = document.querySelector('.fuel-costs-details');
+                            
+                            if (mainValueElement) {
+                                mainValueElement.textContent = `${newFuelCosts.totalCost.toFixed(2)} € (${(newFuelCosts.totalCost/totalDistance).toFixed(2)} €/km)`;
+                            }
+                            
+                            if (detailsElement) {
+                                detailsElement.innerHTML = `
+                                    <div class="country-toll">
+                                        Paliwo: ${newFuelCosts.fuelNeeded.toFixed(0)}L × ${newFuelCosts.priceDetails.price.toFixed(2)}€/L = ${newFuelCosts.fuelCost.toFixed(2)}€
+                                    </div>
+                                    <div class="country-toll">
+                                        AdBlue: ${newFuelCosts.adblueNeeded.toFixed(1)}L × ${newFuelCosts.adbluePrice.toFixed(2)}€/L = ${newFuelCosts.adblueCost.toFixed(2)}€
+                                    </div>`;
+                            }
+
+                            // Dodaj to wywołanie:
+                            updateTotalCosts(route, selectedVehicle);
+                        });
                         }
                     }, 0);
 
@@ -2914,38 +2838,105 @@
 
                     function generateOtherCostsHTML(costs, vehicle) {
                         return `
-                            <div class="stat-value">
-                                <div style="display: flex; align-items: center; gap: 8px">
-                                    <span>${costs.total.toFixed(2)} € (${costs.costPerKm.toFixed(2)} €/km)</span>
-                                    <button class="toll-details-toggle">▼</button>
-                                </div>
+                            <div class="stat-value other-costs-main">
+                                <span>${costs.total.toFixed(2)} € (${costs.costPerKm.toFixed(2)} €/km)</span>
+                                <button class="toll-details-toggle">▼</button>
                                 <div class="toll-details" style="display: none;">
                                     <div class="toll-details-content">
                                         <div class="country-toll">
                                             ${translations.fixedCosts}: ${costs.fixedCosts.toFixed(2)} €
                                         </div>
                                         <div class="country-toll">
-                                            ${translations.otherCostsPerKm} (${vehicle.advVariablePerKM.toFixed(2)} €/km): ${costs.variableCosts.toFixed(2)} €
+                                            Koszty zmienne (${vehicle.advVariablePerKM.toFixed(2)} €/km): ${costs.variableCosts.toFixed(2)} €
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="route-stat">
-                                <div class="stat-label">${translations.workingTime}</div>
-                                <div class="stat-value">
-                                    <div style="display: flex; align-items: center; gap: 8px">
-                                        <span>${costs.actualTime.days} ${translations.days} ${costs.actualTime.hours} ${translations.hours}</span>
-                                        <div class="time-controls">
-                                            <button class="time-adjust plus">+</button>
-                                            <button class="time-adjust minus">-</button>
-                                        </div>
-                                    </div>
+                            <div class="stat-label">${translations.workingTime}</div>
+                            <div class="stat-value working-time-value">
+                                <span>${costs.actualTime.days} ${translations.days} ${costs.actualTime.hours} ${translations.hours}</span>
+                                <div class="time-controls">
+                                    <button class="time-adjust plus">+</button>
+                                    <button class="time-adjust minus">-</button>
                                 </div>
                             </div>
                         `;
                     }
 
+                    function updateTotalCosts(route, selectedVehicle) {
+                        const hasferryOrTrain = route.sections.some(section => 
+                            section.transport?.mode === 'ferry' || 
+                            section.transport?.mode.toLowerCase().includes('shuttletrain')
+                        );
 
+                        // Obliczanie całkowitego dystansu w km (tylko dla odcinków drogowych)
+                        const totalDistance = route.sections.reduce((sum, section) => {
+                            if (section.transport?.mode === 'truck') {
+                                return sum + section.summary.length;
+                            }
+                            return sum;
+                        }, 0) / 1000;
+
+                        if (selectedVehicle.simpleCosts) {
+                            const simpleCosts = totalDistance * selectedVehicle.simpleCostValuePerKM;
+                            const totalCostsElement = document.querySelector('.total-costs-value');
+                            if (totalCostsElement) {
+                                totalCostsElement.textContent = `${simpleCosts.toFixed(2)} € (${selectedVehicle.simpleCostValuePerKM.toFixed(2)} €/km)`;
+                            }
+                            return;
+                        }
+
+                        // 1. Koszty paliwa
+                        const fuelCountrySelect = document.querySelector('.fuel-country-select');
+                        const selectedCountry = fuelCountrySelect ? fuelCountrySelect.value : null;
+                        const fuelCosts = calculateFuelCosts(route, selectedVehicle, selectedCountry);
+                        
+                        // 2. Pozostałe koszty (z aktualnym czasem pracy)
+                        const timeText = document.querySelector('.working-time-value span').textContent;
+                        const [days, hours] = timeText.match(/(\d+)/g).map(Number);
+                        const otherCosts = calculateOtherCosts(route, selectedVehicle, { days, hours });
+                        
+                        // 3. Opłaty drogowe automatyczne
+                        const totalToll = calculateTotalTolls(route);
+                        
+                        // 4. Opłaty manualne i promy
+                        let ferryAndManualTotal = 0;
+
+                        // Promy i pociągi
+                        route.sections.forEach(section => {
+                            if (section.transport?.mode === 'ferry' || 
+                                section.transport?.mode.toLowerCase().includes('shuttletrain')) {
+                                const transportName = section.transport.name;
+                                const inputElement = document.querySelector(`input[data-ferry-name="${transportName}"]`);
+                                if (inputElement && inputElement.value && !isNaN(inputElement.value)) {
+                                    ferryAndManualTotal += parseFloat(inputElement.value);
+                                }
+                            }
+                        });
+                        
+                        // Manualne opłaty drogowe
+                        route.sections.forEach(section => {
+                            if (section.tolls) {
+                                section.tolls.forEach(toll => {
+                                    if (MANUAL_TOLL_SYSTEMS.hasOwnProperty(toll.tollSystem)) {
+                                        const inputElement = document.querySelector(`input[data-toll-system="${toll.tollSystem}"]`);
+                                        if (inputElement && inputElement.value && !isNaN(inputElement.value)) {
+                                            ferryAndManualTotal += parseFloat(inputElement.value);
+                                        }
+                                    }
+                                });
+                            }
+                        });
+
+                        const totalCosts = fuelCosts.totalCost + otherCosts.total + totalToll + ferryAndManualTotal;
+                        const costPerKm = totalCosts / totalDistance;
+
+                        // Aktualizacja wyświetlanej sumy
+                        const totalCostsElement = document.querySelector('.total-costs-value');
+                        if (totalCostsElement) {
+                            totalCostsElement.textContent = `${totalCosts.toFixed(2)} € (${costPerKm.toFixed(2)} €/km)`;
+                        }
+                    }
 
 
                 function displayRoutes(routes, activeIndex) {
@@ -3300,23 +3291,23 @@
                                 }
 
                                 let ferriesHtml = '';
-                                    if (ferries.size > 0) {
-                                        ferriesHtml = Array.from(ferries.entries())
-                                            .map(([name, data]) => `
-                                                <div class="ferry-item" style="margin-top: 2px;">
-                                                    ${data.icon} ${name}: 
-                                                    <input type="number" 
-                                                        class="ferry-price" 
-                                                        data-ferry-name="${name}"
-                                                        value="${data.value}"
-                                                        min="0" 
-                                                        max="5000" 
-                                                        step="1" 
-                                                        style="width: 60px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;"
-                                                        placeholder="EUR">
-                                                </div>
-                                            `).join('');
-                                    }
+                                if (ferries.size > 0) {
+                                    ferriesHtml = Array.from(ferries.entries())
+                                        .map(([name, data]) => `
+                                            <div class="ferry-item" style="margin-top: 2px;">
+                                                ${data.icon} ${name}: 
+                                                <input type="number" 
+                                                    class="ferry-price" 
+                                                    data-ferry-name="${name}"
+                                                    value="${localStorage.getItem(`ferry_${name}`) || ''}"
+                                                    min="0" 
+                                                    max="5000" 
+                                                    step="1" 
+                                                    style="width: 60px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;"
+                                                    placeholder="EUR">
+                                            </div>
+                                        `).join('');
+                                }
                                 
                                 let manualTollsHtml = '';
                                 if (route.sections) {
@@ -3343,22 +3334,23 @@
                                         }
                                     });
                                     
-                                    if (manualTollSystems.size > 0) {
-                                        manualTollsHtml = Array.from(manualTollSystems).map(system => `
-                                            <div class="ferry-item" style="margin-top: 2px;">
-                                                🛤️ ${MANUAL_TOLL_SYSTEMS[system].displayName}: 
-                                                <input type="number" 
-                                                    class="manual-toll-price" 
-                                                    data-toll-system="${system}"
-                                                    value="${localStorage.getItem(`toll_${system}`) || ''}"
-                                                    min="0" 
-                                                    max="5000" 
-                                                    step="1" 
-                                                    style="width: 60px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;"
-                                                    placeholder="EUR">
-                                            </div>
-                                        `).join('');
-                                    }
+                                // Znajdź ten fragment:
+                                if (manualTollSystems.size > 0) {
+                                    manualTollsHtml = Array.from(manualTollSystems).map(system => `
+                                        <div class="ferry-item" style="margin-top: 2px;">
+                                            🛤️ ${MANUAL_TOLL_SYSTEMS[system].displayName}: 
+                                            <input type="number" 
+                                                class="manual-toll-price" 
+                                                data-toll-system="${system}"
+                                                value="${localStorage.getItem(`toll_${system}`) || ''}"
+                                                min="0" 
+                                                max="5000" 
+                                                step="1" 
+                                                style="width: 60px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 3px;"
+                                                placeholder="EUR">
+                                        </div>
+                                    `).join('');
+                                }
                                 }
 
                                 tollInfo = roadTollsHtml + ferriesHtml + manualTollsHtml;
@@ -3366,51 +3358,116 @@
                                 tollInfo = `<br>${translations.noRoadCharges}`;
                             }
 
-                                // Najpierw sprawdzamy czy trasa zawiera prom lub pociąg
-                                const selectedVehicle = vehicles.find(v => v.id === localStorage.getItem('selectedVehicleId')) || vehicles[0];
+                            // Najpierw sprawdzamy czy trasa zawiera prom lub pociąg
+                            const selectedVehicle = vehicles.find(v => v.id === localStorage.getItem('selectedVehicleId')) || vehicles[0];
+
+                            const hasferryOrTrain = route.sections.some(section => 
+                                section.transport?.mode === 'ferry' || section.transport?.mode === 'shuttletrain'
+                            );
+
+                            // Przygotuj sekcję kosztów
+                            let costsSection = '';
+                            if (selectedVehicle.simpleCosts) {
+                                // Prosty system kosztów
+                                const totalDistance = route.sections.reduce((sum, section) => {
+                                    // Dodajemy tylko kilometry dla sekcji drogowych (truck)
+                                    if (section.transport?.mode === 'truck') {
+                                        return sum + section.summary.length;
+                                    }
+                                    return sum;
+                                }, 0) / 1000; // konwersja na km
+
+                                const simpleCosts = totalDistance * selectedVehicle.simpleCostValuePerKM;
+                                
+                                costsSection = `
+                                    <div class="route-stat" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0, 0, 0, 0.1);">
+                                        <div class="stat-label">${translations.totalCosts}</div>
+                                        <div class="stat-value" style="font-weight: 600;">
+                                            ${simpleCosts.toFixed(2)} € (${selectedVehicle.simpleCostValuePerKM.toFixed(2)} €/km)
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                // Oryginalny system kosztów
                                 const fuelCosts = calculateFuelCosts(route, selectedVehicle);
                                 const fuelCostsHTML = generateFuelCostsHTML(fuelCosts, route, selectedVehicle);
                                 const otherCosts = calculateOtherCosts(route, selectedVehicle);
                                 const otherCostsHTML = generateOtherCostsHTML(otherCosts, selectedVehicle);
                                 
-
-                                const hasferryOrTrain = route.sections.some(section => 
-                                    section.transport?.mode === 'ferry' || section.transport?.mode === 'shuttletrain'
-                                );
+                                // Obliczanie sumy wszystkich kosztów
+                                const totalDistance = route.sections.reduce((sum, section) => 
+                                    sum + section.summary.length, 0) / 1000; // w km
+                                
+                                // Pobierz wartości z localStorage dla promów i opłat manualnych
+                                let ferryAndManualTotal = 0;
+                                
+                                // Oblicz sumę dla promów
+                                if (route.sections) {
+                                    route.sections.forEach(section => {
+                                        if (section.transport?.mode === 'ferry' || section.transport?.mode.toLowerCase().includes('shuttletrain')) {
+                                            const transportName = section.transport.name;
+                                            const savedValue = localStorage.getItem(`ferry_${transportName}`);
+                                            if (savedValue && !isNaN(savedValue)) {
+                                                ferryAndManualTotal += parseFloat(savedValue);
+                                            }
+                                        }
+                                    });
+                                }
+                                
+                                // Oblicz sumę dla manualnych opłat
+                                if (route.sections) {
+                                    const manualTollSystems = new Set();
+                                    route.sections.forEach(section => {
+                                        if (section.tolls) {
+                                            section.tolls.forEach(toll => {
+                                                if (MANUAL_TOLL_SYSTEMS.hasOwnProperty(toll.tollSystem)) {
+                                                    const savedValue = localStorage.getItem(`toll_${toll.tollSystem}`);
+                                                    if (savedValue && !isNaN(savedValue)) {
+                                                        ferryAndManualTotal += parseFloat(savedValue);
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    });
+                                }
 
                                 const totalToll = calculateTotalTolls(route);
-                                document.getElementById('route-info').innerHTML = `
-                                    <div class="route-info-label">${translations.routeInfo}</div>
-                                    <div class="route-stats-container">
-                                        <div class="route-stat">
-                                            <div class="stat-label">${translations.distance}${hasferryOrTrain ? ` (${translations.withoutFerryTrainKm})` : ''}</div>
-                                            <div class="stat-value">${(totalDistance / 1000).toFixed(1)} km</div>
-                                        </div>
-                                        <div class="route-stat">
-                                            <div class="stat-label">${translations.time}</div>
-                                            <div class="stat-value">${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min</div>
-                                        </div>
-                                    </div>
-                                    <div class="route-stat smaller-stat">
-                                        ${tollInfo}
-                                    </div>
-                                    <div class="route-stat smaller-stat">
+                                const totalCosts = fuelCosts.totalCost + otherCosts.total + totalToll + ferryAndManualTotal;
+                                const costPerKm = totalCosts / totalDistance;
+
+                                costsSection = `
+                                    <div class="route-stat">
                                         <div class="stat-label">${translations.fuelCosts}</div>
                                         ${fuelCostsHTML}
                                     </div>
-                                    <div class="route-stat smaller-stat">
+                                    <div class="route-stat">
                                         <div class="stat-label">${translations.otherCosts}</div>
                                         ${otherCostsHTML}
                                     </div>
-                                    <div class="costs-summary">
-                                        <div class="route-stat">
-                                            <div class="stat-label">${translations.totalCosts}</div>
-                                            <div class="stat-value">
-                                                <strong>${(totalToll + fuelCosts.totalCost + otherCosts.total).toFixed(2)} €</strong>  
-                                                <span style="color: #666; margin-left: 12px"> <strong>${((totalToll + fuelCosts.totalCost + otherCosts.total) / (totalDistance / 1000)).toFixed(2)} €/km</strong></span>
-                                            </div>
+                                    <div class="route-stat" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0, 0, 0, 0.1);">
+                                        <div class="stat-label">${translations.totalCosts}</div>
+                                        <div class="stat-value total-costs-value" style="font-weight: 600;">
+                                            ${totalCosts.toFixed(2)} € (${costPerKm.toFixed(2)} €/km)
                                         </div>
-                                    </div>`;
+                                    </div>
+                                `;
+                            }
+
+                            document.getElementById('route-info').innerHTML = `
+                                <div class="route-info-label">${translations.routeInfo}</div>
+                                <div class="route-stats-container">
+                                    <div class="route-stat">
+                                        <div class="stat-label">${translations.distance}${hasferryOrTrain ? ` (${translations.withoutFerryTrainKm})` : ''}</div>
+                                        <div class="stat-value">${(totalDistance / 1000).toFixed(1)} km</div>
+                                    </div>
+                                    <div class="route-stat">
+                                        <div class="stat-label">${translations.time}</div>
+                                        <div class="stat-value">${Math.floor(totalTime / 3600)}h ${Math.round((totalTime % 3600) / 60)}min</div>
+                                    </div>
+                                </div>
+                                ${tollInfo}
+                                ${costsSection}
+                            `;
                                     // Event listenery dla przycisków rozwijania i czasu (dodaj zaraz po document.getElementById('route-info').innerHTML = ...)
                                     function addEventListeners() {
                                         document.querySelectorAll('.toll-details-toggle').forEach(button => {
@@ -3425,8 +3482,8 @@
                                     // NA TEN KOD:
                                     document.querySelectorAll('.time-adjust').forEach(button => {
                                         button.addEventListener('click', function() {
-                                            const routeStat = this.closest('.route-stat');
-                                            const timeText = routeStat.querySelector('.stat-value span').textContent;
+                                            const workingTimeValue = this.closest('.working-time-value');
+                                            const timeText = workingTimeValue.querySelector('span').textContent;
                                             const [days, hours] = timeText.match(/(\d+)/g).map(Number);
                                             let totalHours = days * 24 + hours;
 
@@ -3439,70 +3496,48 @@
                                             const newDays = Math.floor(totalHours / 24);
                                             const newHours = totalHours % 24;
 
+                                            // Aktualizacja wartości czasu
+                                            workingTimeValue.querySelector('span').textContent = 
+                                                `${newDays} ${translations.days} ${newHours} ${translations.hours}`;
+
+                                            // Przeliczenie i aktualizacja wszystkich kosztów
                                             const selectedVehicle = vehicles.find(v => v.id === localStorage.getItem('selectedVehicleId')) || vehicles[0];
                                             const otherCosts = calculateOtherCosts(route, selectedVehicle, { days: newDays, hours: newHours });
 
-                                            // Aktualizacja czasu
-                                            const timeSpan = routeStat.querySelector('.stat-value span');
-                                            if (timeSpan) {
-                                                timeSpan.textContent = `${newDays} ${translations.days} ${newHours} ${translations.hours}`;
-                                            }
-
-                                            // Aktualizacja głównej kwoty kosztów
-                                            const otherCostsValue = routeStat.previousElementSibling.querySelector('span');
-                                            if (otherCostsValue) {
-                                                otherCostsValue.textContent = `${otherCosts.total.toFixed(2)} € (${otherCosts.costPerKm.toFixed(2)} €/km)`;
+                                            // Aktualizacja kosztów w sekcji pozostałych kosztów
+                                            const otherCostsMain = document.querySelector('.other-costs-main span');
+                                            if (otherCostsMain) {
+                                                otherCostsMain.textContent = 
+                                                    `${otherCosts.total.toFixed(2)} € (${otherCosts.costPerKm.toFixed(2)} €/km)`;
                                             }
 
                                             // Aktualizacja szczegółów kosztów
-                                            const detailsContent = routeStat.previousElementSibling.querySelector('.toll-details-content');
+                                            const detailsContent = document.querySelector('.other-costs-main .toll-details-content');
                                             if (detailsContent) {
                                                 detailsContent.innerHTML = `
                                                     <div class="country-toll">
                                                         ${translations.fixedCosts}: ${otherCosts.fixedCosts.toFixed(2)} €
                                                     </div>
                                                     <div class="country-toll">
-                                                        ${translations.otherCostsPerKm} (${selectedVehicle.advVariablePerKM.toFixed(2)} €/km): ${otherCosts.variableCosts.toFixed(2)} €
+                                                        Koszty zmienne (${selectedVehicle.advVariablePerKM.toFixed(2)} €/km): ${otherCosts.variableCosts.toFixed(2)} €
                                                     </div>
                                                 `;
                                             }
 
-                                            // Aktualizacja sumy kosztów
-                                            const totalToll = calculateTotalTolls(route);
-                                            const fuelCostsElement = document.querySelector('.fuel-costs-main-value');
-                                            const fuelCostsMatch = fuelCostsElement.textContent.match(/([\d.]+)/);
-                                            const fuelCostsValue = fuelCostsMatch ? parseFloat(fuelCostsMatch[0]) : 0;
-                                            const totalDistance = route.sections.reduce((sum, section) => sum + section.summary.length, 0) / 1000;
-
-                                            const costsSummary = document.querySelector('.costs-summary');
-                                            costsSummary.innerHTML = `
-                                                <div class="route-stat">
-                                                    <div class="stat-label">${translations.totalCosts}</div>
-                                                    <div class="stat-value">
-                                                        <strong>${(totalToll + fuelCostsValue + otherCosts.total).toFixed(2)} €</strong>
-                                                        <span style="color: #666; margin-left: 12px"> <strong>${((totalToll + fuelCostsValue + otherCosts.total) / totalDistance).toFixed(2)} €/km</strong></span>
-                                                    </div>
-                                                </div>
-                                            `;
+                                            // Aktualizacja kosztów całkowitych
+                                            updateTotalCosts(route, selectedVehicle);
                                         });
                                     });
                                     }
 
                                     // Wywołaj funkcję po wygenerowaniu HTML
                                     addEventListeners();
+                                    setTimeout(() => {
+                                        const selectedVehicle = vehicles.find(v => v.id === localStorage.getItem('selectedVehicleId')) || vehicles[0];
+                                        updateTotalCosts(route, selectedVehicle);
+                                    }, 0);
                             
-                            // TUTAJ dodajmy event listenery
-                            document.querySelectorAll('.manual-toll-price').forEach(input => {
-                                input.addEventListener('input', (e) => {
-                                    const value = e.target.value;
-                                    const tollSystem = e.target.dataset.tollSystem;
-                                    console.log('Manual toll input changed:', tollSystem, value); // debug
-                                    if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
-                                        localStorage.setItem(`toll_${tollSystem}`, value);
-                                        console.log('Saved to localStorage:', tollSystem, value); // debug
-                                    }
-                                });
-                            });    
+
 
 
                             // Dodaj event listenery dla szczegółów opłat
@@ -3515,27 +3550,24 @@
                                     this.textContent = isExpanded ? '▼' : '▲';
                                 });
                             }
-
-                            // Dodaj event listenery dla cen promów
-                            document.querySelectorAll('.ferry-price').forEach(input => {
+                            // Na to:
+                            document.querySelectorAll('.ferry-price, .manual-toll-price').forEach(input => {
                                 input.addEventListener('input', (e) => {
                                     const value = e.target.value;
-                                    const ferryName = e.target.dataset.ferryName;
-                                    if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
-                                        localStorage.setItem(`ferry_${ferryName}`, value);
-                                }
-                            });
-                            // Dodaj event listenery dla manualnych opłat drogowych
-                            document.querySelectorAll('.manual-toll-price').forEach(input => {
-                                input.addEventListener('input', (e) => {
-                                    const value = e.target.value;
-                                    const tollSystem = e.target.dataset.tollSystem;
-                                    if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
-                                        localStorage.setItem(`toll_${tollSystem}`, value);
+                                    if (e.target.classList.contains('ferry-price')) {
+                                        const ferryName = e.target.dataset.ferryName;
+                                        if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
+                                            localStorage.setItem(`ferry_${ferryName}`, value);
+                                        }
+                                    } else {
+                                        const tollSystem = e.target.dataset.tollSystem;
+                                        if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 5000)) {
+                                            localStorage.setItem(`toll_${tollSystem}`, value);
+                                        }
                                     }
+                                    updateTotalCosts(route, selectedVehicle);
                                 });
                             });
-                        });
                     }
                     // Dodaj InfoBubbles dla tras alternatywnych
                     if (routes.length > 1) {
