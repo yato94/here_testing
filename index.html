@@ -961,7 +961,7 @@
                 length: 1650,
                 workingDays: 240,
                 avgKm: 11000,
-                advFixedPerMonth: 5500,
+                advFixedPerMonth: 6500,
                 advVariablePerKM: 0.00,
                 simpleCosts: false,  // ten będzie miał pełne wyliczenia
                 simpleCostValuePerKM: 0
@@ -984,7 +984,7 @@
                 workingDays: 250,
                 avgKm: 120000,
                 advFixedPerMonth: 4500,
-                advVariablePerKM: 0.00,
+                advVariablePerKM: 0.35,
                 simpleCosts: false,  // ten będzie miał pełne wyliczenia
                 simpleCostValuePerKM: 0
             },
@@ -2800,11 +2800,13 @@
                         // Obliczenie kosztu stałego na dzień roboczy (24h)
                         const fixedCostPerDay = vehicle.advFixedPerMonth / (vehicle.workingDays / 12);
                         
-                        // Obliczenie teoretycznego czasu
+                        // Obliczenie teoretycznego czasu i zaokrąglenie w górę do pełnych godzin
                         const theoreticalDays = routeDistance / kmPerDay;
+                        const theoreticalHoursTotal = Math.ceil(theoreticalDays * 24); // zaokrąglamy w górę do pełnych godzin
+                        
                         const theoreticalTime = {
-                            days: Math.floor(theoreticalDays),
-                            hours: Math.round((theoreticalDays - Math.floor(theoreticalDays)) * 24)
+                            days: Math.floor(theoreticalHoursTotal / 24),
+                            hours: theoreticalHoursTotal % 24
                         };
                         
                         // Jeśli nie ma aktualnego czasu, użyj teoretycznego
@@ -2812,12 +2814,11 @@
                             actualTime = {...theoreticalTime};
                         }
 
-                        const theoreticalHours = theoreticalTime.days * 24 + theoreticalTime.hours;
-                        const actualHours = actualTime.days * 24 + actualTime.hours;
-
-                        // Obliczenie kosztów stałych z uwzględnieniem proporcji czasu
-                        const timeRatio = actualHours / theoreticalHours;
-                        const fixedCosts = ((routeDistance / kmPerDay) * fixedCostPerDay) * timeRatio;
+                        const actualHoursTotal = actualTime.days * 24 + actualTime.hours;
+                        
+                        // Obliczenie kosztów stałych na podstawie całkowitej liczby godzin
+                        const fixedCostPerHour = fixedCostPerDay / 24;
+                        const fixedCosts = fixedCostPerHour * actualHoursTotal;
 
                         // Obliczenie kosztów zmiennych (zawsze stałe na km)
                         const variableCosts = routeDistance * vehicle.advVariablePerKM;
