@@ -599,7 +599,7 @@
         .excluded-lists-container {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;  /* Reduced gap */
             width: 100%;
         }
 
@@ -612,14 +612,20 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 12px;
+            padding: 6px 10px;  /* Reduced padding */
             background: white;
             border: 1px solid rgba(0, 0, 0, 0.1);
             border-radius: 4px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;  /* Smaller font */
+            color: #666;  /* Lighter text color */
             transition: all 0.2s ease;
         }
+        .dropdown-selected span {
+            color: #777;
+            font-size: 12px;
+        }
+
 
         .dropdown-selected:hover {
             border-color: #0066CC;
@@ -632,8 +638,9 @@
         }
 
         .dropdown-arrow {
-            font-size: 10px;
+            font-size: 9px;
             transition: transform 0.2s ease;
+            color: #999;
         }
 
         .dropdown-selected.active .dropdown-arrow {
@@ -667,10 +674,10 @@
 
         .dropdown-search-input {
             width: 100%;
-            padding: 6px 8px;
+            padding: 5px 8px;
             border: 1px solid rgba(0, 0, 0, 0.1);
             border-radius: 4px;
-            font-size: 13px;
+            font-size: 12px;  /* Smaller font */
         }
 
         .dropdown-search-input:focus {
@@ -679,16 +686,17 @@
         }
 
         .dropdown-items {
-            max-height: 200px;
+            max-height: 180px;
             overflow-y: auto;
         }
 
         .dropdown-item {
-            padding: 8px 12px;
+            padding: 5px 8px;  /* Smaller padding */
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            font-size: 12px;  /* Smaller font */
         }
 
         .dropdown-item:hover {
@@ -718,17 +726,18 @@
         .selected-items {
             display: flex;
             flex-wrap: wrap;
-            gap: 4px;
+            gap: 3px;  /* Smaller gap */
         }
 
         .selected-item {
-            background: #fcdcdc;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 12px;
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;  /* Smaller font */
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
         }
 
         .selected-item-remove {
@@ -738,9 +747,9 @@
         }
 
         .more-indicator {
-            font-size: 12px;
-            color: #666;
-            margin-left: 4px;
+            font-size: 11px;
+            color: #888;
+            margin-left: 3px;
         }
 
     </style>
@@ -1338,7 +1347,7 @@
                     west: 6.672028,
                     south: 45.12587,
                     east: 6.713914,
-                    north: 45.147666
+                    north: 45.8742
                 }
             },
         ];
@@ -1351,8 +1360,8 @@
             loadExcludedSelections();
             
             // Update placeholder texts with translations
-            document.getElementById('excluded-countries-selected').querySelector('span').textContent = translations.selectCountries;
-            document.getElementById('excluded-areas-selected').querySelector('span').textContent = translations.selectAreas;
+            document.getElementById('excluded-countries-selected').querySelector('span').innerHTML = translations.selectCountries;
+            document.getElementById('excluded-areas-selected').querySelector('span').innerHTML = translations.selectAreas;
             
             // Update search placeholders as well
             document.getElementById('countries-search').placeholder = `Search ${translations.selectCountries.toLowerCase()}`;
@@ -1574,7 +1583,7 @@
             const spanElement = selectedElement.querySelector('span');
             
             if (selectedItems.length === 0) {
-                spanElement.textContent = translations[type === 'countries' ? 'selectCountries' : 'selectAreas'];
+                spanElement.innerHTML = translations[type === 'countries' ? 'selectCountries' : 'selectAreas'];
                 return;
             }
             
