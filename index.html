@@ -855,15 +855,6 @@
                     coordinates: 'Coordinates',
                     addStartFirst: 'Add start point first',
                     routeSettings: 'Route Settings',
-                    defaultSettings: 'Default Settings',
-                    largeVehicle: 'Large Vehicle',
-                    mediumVehicle: 'Medium Vehicle',
-                    smallVehicle: 'Small Vehicle',
-                    vehicleWeight: 'Vehicle Weight (t)',
-                    axleCount: 'Number of Axles',
-                    euroClass: 'EUR Class',
-                    co2Class: 'CO2 Class',
-                    excludedAreas: 'Excluded Areas',
                     roadCharges: 'Road Charges',
                     noRoadCharges: 'No Road Charges',
                     withoutFerryTrainKm: 'without ferry/train km',
@@ -911,15 +902,6 @@
                     coordinates: 'Koordinaten',
                     addStartFirst: 'Fügen Sie zuerst den Startpunkt hinzu',
                     routeSettings: 'Routeneinstellungen',
-                    defaultSettings: 'Standardeinstellungen',
-                    largeVehicle: 'Großes Fahrzeug',
-                    mediumVehicle: 'Mittleres Fahrzeug',
-                    smallVehicle: 'Kleines Fahrzeug',
-                    vehicleWeight: 'Fahrzeuggewicht (t)',
-                    axleCount: 'Anzahl der Achsen',
-                    euroClass: 'EUR-Klasse',
-                    co2Class: 'CO2-Klasse',
-                    excludedAreas: 'Ausgeschlossene Gebiete',
                     roadCharges: 'Straßengebühren',
                     noRoadCharges: 'Keine Straßengebühren',
                     withoutFerryTrainKm: 'ohne Fähre/Zug km',
@@ -957,15 +939,6 @@
                     coordinates: 'Coordonnées',
                     addStartFirst: 'Ajoutez d\'abord le point de départ',
                     routeSettings: 'Paramètres d\'itinéraire',
-                    defaultSettings: 'Paramètres par défaut',
-                    largeVehicle: 'Grand véhicule',
-                    mediumVehicle: 'Véhicule moyen',
-                    smallVehicle: 'Petit véhicule',
-                    vehicleWeight: 'Poids du véhicule (t)',
-                    axleCount: 'Nombre d\'essieux',
-                    euroClass: 'Classe EUR',
-                    co2Class: 'Classe CO2',
-                    excludedAreas: 'Zones exclues',
                     roadCharges: 'Péages routiers',
                     noRoadCharges: 'Pas de péages',
                     withoutFerryTrainKm: 'sans km ferry/train',
@@ -1003,15 +976,6 @@
                     coordinates: 'Coordinate',
                     addStartFirst: 'Aggiungi prima il punto di partenza',
                     routeSettings: 'Impostazioni percorso',
-                    defaultSettings: 'Impostazioni predefinite',
-                    largeVehicle: 'Veicolo grande',
-                    mediumVehicle: 'Veicolo medio',
-                    smallVehicle: 'Veicolo piccolo',
-                    vehicleWeight: 'Peso del veicolo (t)',
-                    axleCount: 'Numero di assi',
-                    euroClass: 'Classe EUR',
-                    co2Class: 'Classe CO2',
-                    excludedAreas: 'Aree escluse',
                     roadCharges: 'Pedaggi stradali',
                     noRoadCharges: 'Nessun pedaggio',
                     withoutFerryTrainKm: 'senza km nave/treno',
@@ -1049,15 +1013,6 @@
                     coordinates: 'Coordenadas',
                     addStartFirst: 'Añade primero el punto de inicio',
                     routeSettings: 'Configuración de ruta',
-                    defaultSettings: 'Configuración predeterminada',
-                    largeVehicle: 'Vehículo grande',
-                    mediumVehicle: 'Vehículo mediano',
-                    smallVehicle: 'Vehículo pequeño',
-                    vehicleWeight: 'Peso del vehículo (t)',
-                    axleCount: 'Número de ejes',
-                    euroClass: 'Clase EUR',
-                    co2Class: 'Clase CO2',
-                    excludedAreas: 'Áreas excluidas',
                     roadCharges: 'Peajes',
                     noRoadCharges: 'Sin peajes',
                     withoutFerryTrainKm: 'sin km de ferry/tren',
@@ -1095,15 +1050,6 @@
                     coordinates: 'Koordynaty',
                     addStartFirst: 'Najpierw dodaj punkt startowy',
                     routeSettings: 'Ustawienia trasy',
-                    defaultSettings: 'Domyślne ustawienia',
-                    largeVehicle: 'Duży pojazd',
-                    mediumVehicle: 'Średni pojazd',
-                    smallVehicle: 'Mały pojazd',
-                    vehicleWeight: 'Waga pojazdu (t)',
-                    axleCount: 'Liczba osi',
-                    euroClass: 'Klasa EUR',
-                    co2Class: 'Klasa CO2',
-                    excludedAreas: 'Wyłączone obszary',
                     roadCharges: 'Opłaty drogowe',
                     noRoadCharges: 'Brak opłat drogowych',
                     withoutFerryTrainKm: 'bez km prom/kolej',
@@ -1388,6 +1334,7 @@
             populateCountriesSection();
             populateAreasSection();
             updateSelectedItemsSection();
+            updateDropdownText(); // DODAJ TĘ LINIĘ
             
             // Toggle dropdown on click
             selectedElement.addEventListener('click', () => {
@@ -1717,16 +1664,6 @@
 
 
 
-
-        function loadExcludedSelections() {
-            // Najpierw aktualizacja wyświetlanych wartości
-            updateSelectedDisplay('countries');
-            updateSelectedDisplay('areas');
-            
-            // Następnie zaktualizuj tłumaczenia w placeholderach wyszukiwania
-            document.getElementById('countries-search').placeholder = `Search ${translations.selectCountries.toLowerCase()}`;
-            document.getElementById('areas-search').placeholder = `Search ${translations.selectAreas.toLowerCase()}`;
-        }
         function getExcludedAreasForRoute() {
             const result = {
                 excludedCountries: [],
@@ -4388,33 +4325,7 @@
             };
         }
 
-        // Event listenery dla wyłączonych obszarów
-        document.querySelectorAll('#excluded-areas button').forEach(button => {
-            button.addEventListener('click', () => {
-                button.classList.toggle('active');
-                saveExcludedAreas(); // Dodajemy zapisywanie
-                if (typeof calculateRouteIfPossible === 'function') {
-                    calculateRouteIfPossible();
-                }
-            });
-        });
-        // Funkcja zapisująca stan wyłączonych obszarów
-        function saveExcludedAreas() {
-            const excludedAreas = Array.from(document.querySelectorAll('#excluded-areas button.active'))
-                .map(button => button.dataset.value);
-            localStorage.setItem('excludedAreas', JSON.stringify(excludedAreas));
-        }
 
-        // Funkcja wczytująca stan wyłączonych obszarów
-        function loadExcludedAreas() {
-            const savedAreas = localStorage.getItem('excludedAreas');
-            if (savedAreas) {
-                const excludedAreas = JSON.parse(savedAreas);
-                document.querySelectorAll('#excluded-areas button').forEach(button => {
-                    button.classList.toggle('active', excludedAreas.includes(button.dataset.value));
-                });
-            }
-        }
 
         ////////////////// FUNKCJE ODPOWIEDZIALNE ZA BUDOWE LINKU + ZMIANĘ PAGE TITLE
         // Function to update URL with current route and settings
@@ -4580,10 +4491,6 @@
 
             // Initialize excluded areas dropdowns
             initializeExcludedList();
-            
-            // Dodatkowo wywołaj aktualizację wyświetlania wybranych elementów
-            document.getElementById('excluded-areas-text').textContent = translations.excludeCountriesAndAreas;
-
 
             // Pozostała część funkcji bez zmian...
             const firstWaypoint = document.querySelector('.waypoint');
