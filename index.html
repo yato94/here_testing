@@ -596,7 +596,152 @@
             border-color: #0066CC;
         }
         
+        .excluded-lists-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+        }
 
+        .dropdown-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .dropdown-selected {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .dropdown-selected:hover {
+            border-color: #0066CC;
+            box-shadow: 0 2px 8px rgba(0, 102, 204, 0.15);
+        }
+
+        .dropdown-selected.active {
+            border-color: #0066CC;
+            box-shadow: 0 2px 8px rgba(0, 102, 204, 0.15);
+        }
+
+        .dropdown-arrow {
+            font-size: 10px;
+            transition: transform 0.2s ease;
+        }
+
+        .dropdown-selected.active .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            margin-bottom: 5px;
+            background: white;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .dropdown-search {
+            padding: 8px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 1;
+        }
+
+        .dropdown-search-input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .dropdown-search-input:focus {
+            outline: none;
+            border-color: #0066CC;
+        }
+
+        .dropdown-items {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .dropdown-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dropdown-item:hover {
+            background-color: #f8f8f8;
+        }
+
+        .dropdown-item.selected {
+            background-color: rgba(0, 102, 204, 0.1);
+        }
+
+        .dropdown-item img {
+            width: 16px;
+            height: 12px;
+            object-fit: cover;
+        }
+
+        .dropdown-item-flag {
+            width: 16px;
+            height: 12px;
+            display: inline-block;
+            margin-right: 8px;
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        .selected-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .selected-item {
+            background: #fcdcdc;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .selected-item-remove {
+            color: #0066CC;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .more-indicator {
+            font-size: 12px;
+            color: #666;
+            margin-left: 4px;
+        }
 
     </style>
 </head>
@@ -642,9 +787,36 @@
             <!-- Fifth Row: Excluded Areas -->
             <div class="row">
                 <p id="excluded-areas-text"></p>
-                <div class="button-group" id="excluded-areas">
-                    <button data-value="CH">CH</button>
-                    <button data-value="Fussen">Füssen</button>
+                <div class="excluded-lists-container">
+                    <div class="dropdown-container">
+                        <div class="dropdown-selected" id="excluded-countries-selected">
+                            <span></span>
+                            <i class="dropdown-arrow">▼</i>
+                        </div>
+                        <div class="dropdown-menu" id="excluded-countries-menu">
+                            <div class="dropdown-search">
+                                <input type="text" placeholder="" class="dropdown-search-input" id="countries-search">
+                            </div>
+                            <div class="dropdown-items" id="excluded-countries-items">
+                                <!-- Items will be populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dropdown-container">
+                        <div class="dropdown-selected" id="excluded-areas-selected">
+                            <span></span>
+                            <i class="dropdown-arrow">▼</i>
+                        </div>
+                        <div class="dropdown-menu" id="excluded-areas-menu">
+                            <div class="dropdown-search">
+                                <input type="text" placeholder="" class="dropdown-search-input" id="areas-search">
+                            </div>
+                            <div class="dropdown-items" id="excluded-areas-items">
+                                <!-- Items will be populated by JS -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -711,6 +883,8 @@
                     costsPerKm: 'Costs per km',
                     dailyRate: 'Daily rate',
                     totalCosts: 'Total costs',
+                    selectCountries: "Exclude countries...",
+                    selectAreas: "Exclude areas..."
                 },
                 de: {
                     inputPlaceholder: 'Adresse oder GPS-Koordinaten eingeben',
@@ -750,6 +924,8 @@
                     selectVehicle: 'Fahrzeug auswählen',
                     lowestPrice: 'Niedrigster Preis',
                     totalCosts: 'Gesamtkosten',
+                    selectCountries: "Länder ausschließen...",
+                    selectAreas: "Gebiete ausschließen..."
                 },
                 fr: {
                     inputPlaceholder: 'Entrez l\'adresse ou les coordonnées GPS',
@@ -789,6 +965,8 @@
                     selectVehicle: 'Sélectionner le véhicule',
                     lowestPrice: 'Prix le plus bas',
                     totalCosts: 'Coûts totaux',
+                    selectCountries: "Exclure des pays...",
+                    selectAreas: "Exclure des zones..."
                 },
                 it: {
                     inputPlaceholder: 'Inserisci indirizzo o coordinate GPS',
@@ -828,6 +1006,8 @@
                     selectVehicle: 'Seleziona veicolo',
                     lowestPrice: 'Prezzo più basso',
                     totalCosts: 'Costi totali',
+                    selectCountries: "Escludi paesi...",
+                    selectAreas: "Escludi aree..."
                 },
                 es: {
                     inputPlaceholder: 'Introduce la dirección o coordenadas GPS',
@@ -867,6 +1047,8 @@
                     selectVehicle: 'Seleccionar vehículo',
                     lowestPrice: 'Precio más bajo',
                     totalCosts: 'Costes totales',
+                    selectCountries: "Excluir países...",
+                    selectAreas: "Excluir áreas..."
                 },
                 pl: {
                     inputPlaceholder: 'Wpisz adres lub współrzędne GPS',
@@ -915,7 +1097,9 @@
                     fixedCosts: 'Koszty stałe',
                     costsPerKm: 'Koszty za kilometr',
                     dailyRate: 'Stawka dzienna',
-                    totalCosts: 'Koszty całkowite'
+                    totalCosts: 'Koszty całkowite',
+                    selectCountries: "Wyłącz kraje...",
+                    selectAreas: "Wyłącz obszary..."
                 }
             };
             return translations[lang] || translations.en;
@@ -982,7 +1166,7 @@
                 width: 255,
                 length: 1750,
                 workingDays: 250,
-                avgKm: 120000,
+                avgKm: 12000,
                 advFixedPerMonth: 4500,
                 advVariablePerKM: 0.35,
                 simpleCosts: false,  // ten będzie miał pełne wyliczenia
@@ -1063,8 +1247,457 @@
             }
         };
 
+        const excludableCountries = [
+            // Kraje zachodniej Europy
+            { code3: "CHE", code2: "CH" },
+            { code3: "AUT", code2: "AT" },
+            { code3: "DEU", code2: "DE" },
+            { code3: "FRA", code2: "FR" },
+            { code3: "ITA", code2: "IT" },
+            { code3: "NLD", code2: "NL" },
+            { code3: "BEL", code2: "BE" },
+            { code3: "LUX", code2: "LU" },
+            { code3: "GBR", code2: "GB" },
+            { code3: "IRL", code2: "IE" },
+            { code3: "DNK", code2: "DK" },
+            { code3: "NOR", code2: "NO" },
+            { code3: "SWE", code2: "SE" },
+            { code3: "FIN", code2: "FI" },
+            
+            // Kraje Europy Środkowej
+            { code3: "POL", code2: "PL" },
+            { code3: "CZE", code2: "CZ" },
+            { code3: "SVK", code2: "SK" },
+            { code3: "SVN", code2: "SI" },
+            { code3: "HRV", code2: "HR" },
+            { code3: "HUN", code2: "HU" },
+            
+            // Kraje Europy Wschodniej
+            { code3: "RUS", code2: "RU" },
+            { code3: "UKR", code2: "UA" },
+            { code3: "BLR", code2: "BY" },
+            { code3: "MDA", code2: "MD" },
+            { code3: "EST", code2: "EE" },
+            { code3: "LVA", code2: "LV" },
+            { code3: "LTU", code2: "LT" },
+            
+            // Kraje Europy Południowej
+            { code3: "ESP", code2: "ES" },
+            { code3: "PRT", code2: "PT" },
+            { code3: "GRC", code2: "GR" },
+            { code3: "CYP", code2: "CY" },
+            { code3: "MLT", code2: "MT" },
+            
+            // Kraje Bałkanów
+            { code3: "BGR", code2: "BG" },
+            { code3: "ROU", code2: "RO" },
+            { code3: "SRB", code2: "RS" },
+            { code3: "MNE", code2: "ME" },
+            { code3: "MKD", code2: "MK" },
+            { code3: "ALB", code2: "AL" },
+            { code3: "BIH", code2: "BA" },
+            
+            // Państwa na Kaukazie (część europejska)
+            { code3: "GEO", code2: "GE" },
+            { code3: "ARM", code2: "AM" },
+            { code3: "AZE", code2: "AZ" }
+        ];
 
+        // Define areas list for exclusion
+        const excludableAreas = [
+            { 
+                name: "Füssen", 
+                bbox: {
+                    west: 10.503569952001044,
+                    south: 47.40623942387259,
+                    east: 10.88272284357322,
+                    north: 47.648267570933086
+                }
+            },
+            { 
+                name: "Brenner Pass", 
+                bbox: {
+                    west: 11.3018,
+                    south: 46.9361,
+                    east: 11.5425,
+                    north: 47.0687
+                }
+            },
+            { 
+                name: "Mont Blanc Tunnel", 
+                bbox: {
+                    west: 6.82412,
+                    south: 45.8169,
+                    east: 6.9336,
+                    north: 45.8742
+                }
+            },
+            { 
+                name: "Frejus Tunnel", 
+                bbox: {
+                    west: 6.672028,
+                    south: 45.12587,
+                    east: 6.713914,
+                    north: 45.147666
+                }
+            },
+        ];
+        // Function to initialize dropdown lists
+        function initializeExcludedLists() {
+            initializeDropdown('countries', excludableCountries);
+            initializeDropdown('areas', excludableAreas);
+            
+            // Load saved selections
+            loadExcludedSelections();
+            
+            // Update placeholder texts with translations
+            document.getElementById('excluded-countries-selected').querySelector('span').textContent = translations.selectCountries;
+            document.getElementById('excluded-areas-selected').querySelector('span').textContent = translations.selectAreas;
+            
+            // Update search placeholders as well
+            document.getElementById('countries-search').placeholder = `Search ${translations.selectCountries.toLowerCase()}`;
+            document.getElementById('areas-search').placeholder = `Search ${translations.selectAreas.toLowerCase()}`;
+        }
 
+        function initializeDropdown(type, items) {
+            const selectedElement = document.getElementById(`excluded-${type}-selected`);
+            const menuElement = document.getElementById(`excluded-${type}-menu`);
+            const itemsContainer = document.getElementById(`excluded-${type}-items`);
+            const searchInput = document.getElementById(`${type}-search`);
+            
+            // Populate items
+            populateDropdownItems(type, items, itemsContainer);
+            
+            // Toggle dropdown on click
+            selectedElement.addEventListener('click', () => {
+                const isActive = selectedElement.classList.contains('active');
+                
+                // Close all dropdowns first
+                document.querySelectorAll('.dropdown-selected').forEach(el => {
+                    el.classList.remove('active');
+                });
+                document.querySelectorAll('.dropdown-menu').forEach(el => {
+                    el.style.display = 'none';
+                });
+                
+                // Toggle this dropdown
+                if (!isActive) {
+                    selectedElement.classList.add('active');
+                    menuElement.style.display = 'block';
+                    searchInput.focus();
+                    
+                    // Clear search input when opening dropdown
+                    searchInput.value = '';
+                    
+                    // Refresh items without filter when opening
+                    populateDropdownItems(type, items, itemsContainer);
+                    
+                    // Position check - if menu goes off screen, adjust position
+                    setTimeout(() => {
+                        const rect = menuElement.getBoundingClientRect();
+                        if (rect.top < 0) {
+                            menuElement.style.bottom = 'auto';
+                            menuElement.style.top = '100%';
+                            menuElement.style.marginBottom = '0';
+                            menuElement.style.marginTop = '5px';
+                        }
+                    }, 0);
+                }
+            });
+            
+            // Handle search input
+            searchInput.addEventListener('input', () => {
+                const searchTerm = searchInput.value.toLowerCase();
+                filterDropdownItems(type, items, itemsContainer, searchTerm);
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!selectedElement.contains(e.target) && !menuElement.contains(e.target)) {
+                    selectedElement.classList.remove('active');
+                    menuElement.style.display = 'none';
+                }
+            });
+        }
+
+        // Updated getItemName function to handle countries correctly
+        function getItemName(type, item) {
+            if (type === 'countries') {
+                return item.code2 || item.code3;
+            }
+            return item.name;
+        }
+
+        function populateDropdownItems(type, items, container, searchTerm = '') {
+            container.innerHTML = '';
+            
+            // Get already selected items
+            const selectedItems = getSelectedItems(type);
+            
+            // First add selected items section if any are selected
+            if (selectedItems.length > 0) {
+                const selectedSection = document.createElement('div');
+                selectedSection.className = 'dropdown-section';
+                selectedSection.innerHTML = '<div class="dropdown-section-title" style="padding: 8px 12px; font-size: 12px; color: #666; background: #f5f5f5;">Selected</div>';
+                container.appendChild(selectedSection);
+                
+                let hasVisibleSelected = false;
+                
+                selectedItems.forEach(itemId => {
+                    const item = items.find(i => getItemId(type, i) === itemId);
+                    if (item) {
+                        const itemName = getItemName(type, item);
+                        if (!searchTerm || itemName.toLowerCase().includes(searchTerm.toLowerCase())) {
+                            const itemElement = createItemElement(type, item, true);
+                            container.appendChild(itemElement);
+                            hasVisibleSelected = true;
+                        }
+                    }
+                });
+                
+                // Only add separator if there are visible selected items
+                if (hasVisibleSelected) {
+                    const separator = document.createElement('div');
+                    separator.style.borderBottom = '1px solid #eee';
+                    separator.style.margin = '4px 0';
+                    container.appendChild(separator);
+                } else {
+                    // Remove the "Selected" header if no items are visible
+                    container.removeChild(selectedSection);
+                }
+            }
+            
+            // Then add all other items
+            items.forEach(item => {
+                const itemId = getItemId(type, item);
+                const isSelected = selectedItems.includes(itemId);
+                
+                // Skip already displayed selected items
+                if (selectedItems.length > 0 && isSelected) return;
+                
+                // Filter by search term
+                const itemName = getItemName(type, item);
+                if (searchTerm && !itemName.toLowerCase().includes(searchTerm.toLowerCase())) return;
+                
+                const itemElement = createItemElement(type, item, isSelected);
+                container.appendChild(itemElement);
+            });
+        }
+
+        function filterDropdownItems(type, items, container, searchTerm) {
+            populateDropdownItems(type, items, container, searchTerm);
+        }
+
+        function createItemElement(type, item, isSelected) {
+            const itemElement = document.createElement('div');
+            itemElement.className = `dropdown-item ${isSelected ? 'selected' : ''}`;
+            itemElement.dataset.id = getItemId(type, item);
+            
+            let itemContent = '';
+            
+            if (type === 'countries') {
+                itemContent = `<span class="item-name">${item.code2}</span>`;
+            } else { // areas
+                itemContent = `<span class="item-name">${item.name}</span>`;
+            }
+            
+            itemElement.innerHTML = itemContent;
+            
+            // Add click handler
+            itemElement.addEventListener('click', () => {
+                toggleItemSelection(type, item, itemElement);
+            });
+            
+            return itemElement;
+        }
+
+        function toggleItemSelection(type, item, element) {
+            const itemId = getItemId(type, item);
+            const selectedItems = getSelectedItems(type);
+            const isSelected = selectedItems.includes(itemId);
+            
+            if (isSelected) {
+                // Remove from selection
+                const newSelection = selectedItems.filter(id => id !== itemId);
+                saveSelectedItems(type, newSelection);
+                if (element) {
+                    element.classList.remove('selected');
+                }
+            } else {
+                // Add to selection
+                selectedItems.push(itemId);
+                saveSelectedItems(type, selectedItems);
+                if (element) {
+                    element.classList.add('selected');
+                }
+            }
+            
+            // Update the selected display immediately
+            updateSelectedDisplay(type);
+            
+            // Refresh dropdown items to update selected items section
+            const itemsContainer = document.getElementById(`excluded-${type}-items`);
+            const searchInput = document.getElementById(`${type}-search`);
+            const items = type === 'countries' ? excludableCountries : excludableAreas;
+            populateDropdownItems(type, items, itemsContainer, searchInput.value);
+            
+            // Recalculate route with new exclusions
+            calculateRouteIfPossible();
+        }
+
+        function getItemId(type, item) {
+            return type === 'countries' ? item.code3 : item.name;
+        }
+
+        function getItemName(type, item) {
+            if (type === 'countries') {
+                return item.code3 || item.code2; // Use code as the name for search purposes
+            }
+            return item.name;
+        }
+
+        function getSelectedItems(type) {
+            const savedItems = localStorage.getItem(`excluded${type.charAt(0).toUpperCase() + type.slice(1)}`);
+            return savedItems ? JSON.parse(savedItems) : [];
+        }
+
+        function saveSelectedItems(type, items) {
+            localStorage.setItem(`excluded${type.charAt(0).toUpperCase() + type.slice(1)}`, JSON.stringify(items));
+        }
+
+        function updateSelectedDisplay(type) {
+            const selectedElement = document.getElementById(`excluded-${type}-selected`);
+            const selectedItems = getSelectedItems(type);
+            const items = type === 'countries' ? excludableCountries : excludableAreas;
+            
+            // Get span element inside selected element
+            const spanElement = selectedElement.querySelector('span');
+            
+            if (selectedItems.length === 0) {
+                spanElement.textContent = translations[type === 'countries' ? 'selectCountries' : 'selectAreas'];
+                return;
+            }
+            
+            // Create display of selected items
+            spanElement.innerHTML = '';
+            const selectedItemsContainer = document.createElement('div');
+            selectedItemsContainer.className = 'selected-items';
+            
+            // Calculate available width and how many items we can show
+            const availableWidth = selectedElement.clientWidth - 30; // subtract padding and arrow
+            let currentWidth = 0;
+            let displayedCount = 0;
+            let moreCount = 0;
+            
+            // Create elements to measure width
+            const selectedItemsData = [];
+            
+            selectedItems.forEach((itemId) => {
+                const item = items.find(i => getItemId(type, i) === itemId);
+                if (!item) return;
+                
+                // Create a temporary element to measure width
+                const itemElement = document.createElement('div');
+                itemElement.className = 'selected-item';
+                
+                if (type === 'countries') {
+                    itemElement.textContent = item.code2;
+                } else {
+                    itemElement.textContent = item.name;
+                }
+                
+                // Append to DOM temporarily to measure
+                document.body.appendChild(itemElement);
+                const itemWidth = itemElement.offsetWidth + 4; // add gap
+                document.body.removeChild(itemElement);
+                
+                selectedItemsData.push({
+                    item,
+                    width: itemWidth
+                });
+            });
+            
+            // Now add items that fit
+            for (const itemData of selectedItemsData) {
+                if (currentWidth + itemData.width <= availableWidth || displayedCount === 0) {
+                    currentWidth += itemData.width;
+                    displayedCount++;
+                    
+                    // Add item to container
+                    const actualItemElement = document.createElement('div');
+                    actualItemElement.className = 'selected-item';
+                    
+                    if (type === 'countries') {
+                        actualItemElement.textContent = itemData.item.code2;
+                    } else {
+                        actualItemElement.textContent = itemData.item.name;
+                    }
+                    
+                    // Add remove button
+                    const removeButton = document.createElement('span');
+                    removeButton.className = 'selected-item-remove';
+                    removeButton.textContent = '×';
+                    removeButton.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent dropdown from opening
+                        const item = itemData.item;
+                        const itemId = getItemId(type, item);
+                        const element = document.querySelector(`.dropdown-item[data-id="${itemId}"]`);
+                        toggleItemSelection(type, item, element);
+                    });
+                    
+                    actualItemElement.appendChild(removeButton);
+                    selectedItemsContainer.appendChild(actualItemElement);
+                } else {
+                    moreCount++;
+                }
+            }
+            
+            // Add "more" indicator if not all items fit
+            if (moreCount > 0) {
+                const moreIndicator = document.createElement('div');
+                moreIndicator.className = 'more-indicator';
+                moreIndicator.textContent = `+${moreCount} more`;
+                selectedItemsContainer.appendChild(moreIndicator);
+            }
+            
+            spanElement.appendChild(selectedItemsContainer);
+        }
+
+        function loadExcludedSelections() {
+            // Najpierw aktualizacja wyświetlanych wartości
+            updateSelectedDisplay('countries');
+            updateSelectedDisplay('areas');
+            
+            // Następnie zaktualizuj tłumaczenia w placeholderach wyszukiwania
+            document.getElementById('countries-search').placeholder = `Search ${translations.selectCountries.toLowerCase()}`;
+            document.getElementById('areas-search').placeholder = `Search ${translations.selectAreas.toLowerCase()}`;
+        }
+
+        // Extract excluded areas for route calculation
+        function getExcludedAreasForRoute() {
+            const result = {
+                excludedCountries: [],
+                excludedAreas: []
+            };
+            
+            // Add excluded countries
+            const selectedCountries = getSelectedItems('countries');
+            result.excludedCountries = selectedCountries;
+            
+            // Add excluded areas
+            const selectedAreas = getSelectedItems('areas');
+            selectedAreas.forEach(areaName => {
+                const area = excludableAreas.find(a => a.name === areaName);
+                if (area) {
+                    result.excludedAreas.push({
+                        type: 'bbox',
+                        ...area.bbox
+                    });
+                }
+            });
+            
+            return result;
+        }
 
         const currentLang = getPreferredLanguage();
         const translations = getUITranslations(currentLang);
@@ -2259,23 +2892,8 @@
                 // Get vehicle parameters
                 const vehicleParams = getVehicleParameters();
 
-                // Check excluded areas
-                const excludedAreas = [];
-                const excludedButtons = document.querySelectorAll('#excluded-areas button.active');
-
-                excludedButtons.forEach(button => {
-                    if (button.dataset.value === 'CH') {
-                        excludedAreas.push('CHE'); // Country code for Switzerland
-                    } else if (button.dataset.value === 'Fussen') {
-                        excludedAreas.push({
-                            type: 'bbox',
-                            west: 10.503569952001044,
-                            south: 47.40623942387259,
-                            east: 10.88272284357322,
-                            north: 47.648267570933086
-                        });
-                    }
-                });
+                // Get excluded areas from dropdown selections
+                const excludedAreas = getExcludedAreasForRoute();
 
                 // Construct route URL with exclusions
                 let routeUrl = `https://router.hereapi.com/v8/routes` +
@@ -2314,13 +2932,20 @@
                     `&tolls[summaries]=total`;
 
                 // Add excluded areas
-                excludedAreas.forEach(area => {
-                    if (typeof area === 'string') {
-                        routeUrl += `&exclude[countries]=${area}`;
-                    } else if (area.type === 'bbox') {
-                        routeUrl += `&avoid[areas]=bbox:${area.west},${area.south},${area.east},${area.north}`;
-                    }
-                });
+                const excludedItems = getExcludedAreasForRoute();
+
+                // Add excluded countries as a comma-separated list (only one parameter)
+                if (excludedItems.excludedCountries.length > 0) {
+                    routeUrl += `&exclude[countries]=${excludedItems.excludedCountries.join(',')}`;
+                }
+
+                // Add excluded areas as a single parameter with multiple values
+                if (excludedItems.excludedAreas.length > 0) {
+                    const areasToAvoid = excludedItems.excludedAreas.map(area => 
+                        `bbox:${area.west},${area.south},${area.east},${area.north}`
+                    );
+                    routeUrl += `&avoid[areas]=${areasToAvoid.join('|')}`;
+                }
 
                 // Add waypoints
                 routeUrl += `&origin=${origin.lat},${origin.lng}` +
@@ -3901,8 +4526,12 @@
             // Inicjalizacja przycisków pojazdów
             initializeVehicleButtons();
 
-            // Wczytaj stan wyłączonych obszarów
-            loadExcludedAreas();
+            // Initialize excluded areas dropdowns
+            initializeExcludedLists();
+            
+            // Dodatkowo wywołaj aktualizację wyświetlania wybranych elementów
+            updateSelectedDisplay('countries');
+            updateSelectedDisplay('areas');
 
             // Pozostała część funkcji bez zmian...
             const firstWaypoint = document.querySelector('.waypoint');
