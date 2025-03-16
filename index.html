@@ -756,6 +756,263 @@
             margin-left: 3px;
         }
 
+        #traffic-bans-button {
+            position: absolute;
+            top: 10px;
+            left: 140px; /* Pozycja po przycisku restart */
+            padding: 6px 12px;
+            background-color: white;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #323130;
+            transition: all 0.2s ease;
+            z-index: 1;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            font-weight: 500;
+        }
+
+        #traffic-bans-button:hover {
+            background-color: #f3f2f1;
+            border-color: rgba(0, 0, 0, 0.15);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #traffic-bans-button:active {
+            background-color: #edebe9;
+            transform: scale(0.98);
+        }
+
+        #traffic-bans-button.active {
+            background-color: #0066CC;
+            color: white;
+        }
+        #traffic-bans-sidebar {
+            position: fixed;
+            top: 0;
+            right: -350px;
+            width: 320px;
+            height: 100vh;
+            background-color: white;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #traffic-bans-sidebar.visible {
+            right: 0;
+        }
+
+        .traffic-bans-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .traffic-bans-header h3 {
+            margin: 0;
+            font-size: 16px;
+        }
+
+        #close-traffic-bans-button {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        #traffic-bans-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        #bans-days-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .ban-day-card {
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .ban-day-header {
+            background-color: #f0f4f8;
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .ban-day-header:hover {
+            background-color: #e6ecf2;
+        }
+
+        .ban-day-header.active {
+            background-color: #0066CC;
+            color: white;
+        }
+
+        .ban-day-header.active .ban-day-name,
+        .ban-day-header.active .ban-day-date {
+            color: white;
+        }
+
+        .ban-day-date {
+            font-size: 16px;
+            font-weight: 500;
+            color: #0066CC;
+        }
+
+        .ban-day-name {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .ban-day-content {
+            padding: 10px 0;
+        }
+
+        .today-badge {
+            background-color: #28a745;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 8px;
+        }
+
+        #traffic-bans-legend {
+            padding: 15px 20px;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        #traffic-bans-legend h4 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            margin-top: 0;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+        /* Style dla elementów krajów */
+        .ban-country-item {
+            margin: 8px 0 4px 0; /* Zwiększony margines górny */
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            padding-bottom: 4px;
+        }
+
+        .ban-country-header {
+            display: flex;
+            align-items: center;
+            padding: 8px 10px; /* Dodany padding po bokach */
+            cursor: pointer; /* Kursor pokazuje, że element jest klikalny */
+            transition: background-color 0.2s ease;
+        }
+
+        .ban-country-header:hover {
+            background-color: #f5f9ff; /* Delikatne podświetlenie przy najechaniu */
+        }
+
+        .ban-country-flag {
+            width: 20px;
+            height: 15px;
+            margin-right: 8px;
+            background-size: cover;
+            flex-shrink: 0;
+        }
+
+        .ban-country-name {
+            font-weight: 500;
+            flex-grow: 1;
+            flex-basis: 25%;
+        }
+
+        .ban-country-time {
+            color: #333;
+            font-size: 13px;
+            text-align: right;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+
+        .ban-warning-icon {
+            color: #ff6600;
+            margin-left: 5px;
+            flex-shrink: 0;
+        }
+
+        .ban-details-button {
+            color: #0066CC;
+            border: 1px solid #0066CC;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 12px;
+            background: white;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .ban-details-button:hover {
+            background-color: #f0f7ff;
+        }
+
+        .ban-area-item {
+            padding: 4px 0 4px 28px;
+            display: flex;
+            align-items: center;
+            border-top: 1px dotted rgba(0, 0, 0, 0.05);
+        }
+
+        .ban-area-icon {
+            margin-right: 6px;
+            flex-shrink: 0;
+        }
+
+        .ban-area-name {
+            flex-grow: 1;
+        }
+
+        .ban-area-type {
+            font-size: 11px;
+            color: #666;
+            margin-left: 5px;
+            font-style: italic;
+        }
+        .ban-warning-text {
+            margin-top: 5px;
+            padding: 5px 8px;
+            background-color: #fff3e0;
+            border-left: 3px solid #ff9800;
+            font-size: 12px;
+            color: #e65100;
+            display: none; /* Domyślnie ukryty, będzie pokazywany razem z obszarami */
+        }
     </style>
 </head>
 <body>
@@ -828,6 +1085,27 @@
     </div>
     <div id="map-container">
         <button id="restart-button">Restart [CTRL+I]</button>
+        <button id="traffic-bans-button">Zakazy</button>
+    </div>
+    <div id="traffic-bans-sidebar">
+        <div class="traffic-bans-header">
+            <h3>Zakazy dla ciężarówek</h3>
+            <button id="close-traffic-bans-button">&times;</button>
+        </div>
+        <div id="traffic-bans-content">
+            <div id="bans-days-list"></div>
+        </div>
+        <div id="traffic-bans-legend">
+            <h4>Legenda:</h4>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: rgba(255, 0, 0, 0.3);"></span>
+                <span class="legend-text">Zakaz standardowy</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: rgba(255, 165, 0, 0.3);"></span>
+                <span class="legend-text">Zakaz z ostrzeżeniem</span>
+            </div>
+        </div>
     </div>
 	<script>
         let geocodedPoints = new Map();
@@ -1096,7 +1374,7 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 27,
+                fuelConsumption: 30,
                 adblueConsumption: 1.5,          
                 costPerKm: 0.20,
                 height: 400,
@@ -1146,8 +1424,8 @@
                 height: 400,
                 width: 255,
                 length: 1750,
-                workingDays: 250,
-                avgKm: 12000,
+                workingDays: 240,
+                avgKm: 12500,
                 advFixedPerMonth: 6500,
                 advVariablePerKM: 0.00,
                 simpleCosts: false,  // ten będzie miał pełne wyliczenia
@@ -4485,12 +4763,486 @@
             map.setZoom(5.5);
         }
 
+
+        // Zmienne globalne dla zakazów ruchu
+        let trafficBansData = null;
+        let predefinedAreasData = null;
+        let trafficBansPolygons = [];
+        let selectedDayElement = null;
+        let selectedDate = null;
+        let polygonsCache = new Map(); // Buforowanie wielokątów
+
+        // Funkcja do ładowania danych
+        async function loadAllData() {
+            try {
+                // Pobierz oba pliki równolegle
+                const [bansResponse, areasResponse] = await Promise.all([
+                    fetch('https://raw.githubusercontent.com/yato94/traffic_restriction/main/bans.json'),
+                    fetch('https://raw.githubusercontent.com/yato94/traffic_restriction/main/areas.json')
+                ]);
+                
+                if (!bansResponse.ok || !areasResponse.ok) {
+                    throw new Error('Nie udało się pobrać danych');
+                }
+                
+                trafficBansData = await bansResponse.json();
+                predefinedAreasData = await areasResponse.json();
+                
+                return { trafficBansData, predefinedAreasData };
+            } catch (error) {
+                console.error('Błąd podczas pobierania danych:', error);
+                return null;
+            }
+        }
+
+        // Funkcja do wyświetlania panelu z zakazami
+        function toggleTrafficBansPanel() {
+            const panel = document.getElementById('traffic-bans-sidebar');
+            const button = document.getElementById('traffic-bans-button');
+            
+            const isBansPanelVisible = panel.classList.contains('visible');
+            
+            if (!isBansPanelVisible) {
+                panel.classList.add('visible');
+                button.classList.add('active');
+                
+                // Załaduj dane o zakazach, jeśli jeszcze nie zostały załadowane
+                if (!trafficBansData || !predefinedAreasData) {
+                    loadAllData().then(() => {
+                        populateDaysList();
+                    });
+                } else {
+                    populateDaysList();
+                }
+            } else {
+                panel.classList.remove('visible');
+                button.classList.remove('active');
+                clearTrafficBansFromMap();
+            }
+        }
+
+        // Zamknięcie panelu zakazów
+        function closeTrafficBansPanel() {
+            const panel = document.getElementById('traffic-bans-sidebar');
+            const button = document.getElementById('traffic-bans-button');
+            
+            panel.classList.remove('visible');
+            button.classList.remove('active');
+            
+            // Wyczyść wszystkie polygony przy zamknięciu panelu
+            clearTrafficBansFromMap();
+            
+            // Zresetuj wybór
+            if (selectedDayElement) {
+                selectedDayElement.classList.remove('active');
+                selectedDayElement = null;
+            }
+            selectedDate = null;
+        }
+
+        // Formatowanie daty w postaci "YYYY-MM-DD"
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Pobranie nazwy dnia tygodnia po polsku
+        function getDayOfWeek(date) {
+            const days = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
+            return days[date.getDay()];
+        }
+
+        // Wypełnij listę dni
+        function populateDaysList() {
+            if (!trafficBansData || !trafficBansData.dates) return;
+            
+            const daysList = document.getElementById('bans-days-list');
+            daysList.innerHTML = '';
+            
+            // Utwórz dzisiejszą datę
+            const today = new Date();
+            const todayFormatted = formatDate(today);
+            
+            // Posortuj daty
+            const sortedDates = [...trafficBansData.dates].sort((a, b) => {
+                return new Date(a.date) - new Date(b.date);
+            });
+            
+            // Utwórz kartę dla każdej daty
+            sortedDates.forEach((dateData, index) => {
+                const date = new Date(dateData.date);
+                const isToday = dateData.date === todayFormatted;
+                
+                const dayCard = document.createElement('div');
+                dayCard.className = 'ban-day-card';
+                dayCard.dataset.date = dateData.date;
+                
+                // Utwórz nagłówek karty dnia
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'ban-day-header';
+                
+                // Dodaj informacje o dniu
+                dayHeader.innerHTML = `
+                    <div>
+                        <div class="ban-day-date">
+                            ${dateData.date}
+                            ${isToday ? '<span class="today-badge">Dziś</span>' : ''}
+                        </div>
+                        <div class="ban-day-name">${dateData.dayOfWeek || getDayOfWeek(date)}</div>
+                    </div>
+                `;
+                
+                // Utwórz zawartość karty dnia
+                const dayContent = document.createElement('div');
+                dayContent.className = 'ban-day-content';
+                
+                // Dodaj zawartość z krajami
+                if (dateData.countries && dateData.countries.length > 0) {
+                    dateData.countries.forEach(country => {
+                        const countryElement = createCountryElement(country);
+                        dayContent.appendChild(countryElement);
+                    });
+                } else {
+                    dayContent.innerHTML = '<div style="text-align: center; padding: 10px; color: #666;">Brak zakazów na ten dzień</div>';
+                }
+                
+                // Obsługa kliknięcia na nagłówek karty dnia
+                dayHeader.addEventListener('click', function() {
+                    // Usuń aktywną klasę z poprzedniego elementu
+                    if (selectedDayElement) {
+                        selectedDayElement.classList.remove('active');
+                    }
+                    
+                    // Dodaj aktywną klasę do klikniętego elementu
+                    dayHeader.classList.add('active');
+                    selectedDayElement = dayHeader;
+                    
+                    // Zapamętaj wybraną datę
+                    selectedDate = dateData.date;
+                    
+                    // Wyświetl zakazy na mapie
+                    clearTrafficBansFromMap(); // Wyczyść poprzednie
+                    displayBansOnMap(dateData);
+                });
+                
+                // Złóż kartę dnia
+                dayCard.appendChild(dayHeader);
+                dayCard.appendChild(dayContent);
+                
+                // Dodaj kartę do listy
+                daysList.appendChild(dayCard);
+                
+                // Automatycznie wybierz dzisiejszą datę przy ładowaniu
+                if (isToday) {
+                    setTimeout(() => {
+                        dayHeader.click();
+                        dayCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 300);
+                }
+            });
+            
+            // Przewiń do dzisiejszej daty
+            const todayCard = document.querySelector(`.ban-day-card[data-date="${todayFormatted}"]`);
+            if (todayCard) {
+                setTimeout(() => {
+                    todayCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+        }
+
+        // Utwórz element dla kraju
+        function createCountryElement(country) {
+            const countryContainer = document.createElement('div');
+            
+            country.restrictions.forEach((restriction, index) => {
+                const countryElement = document.createElement('div');
+                countryElement.className = 'ban-country-item';
+                
+                // Tworzenie nagłówka kraju
+                const headerElement = document.createElement('div');
+                headerElement.className = 'ban-country-header';
+                
+                // Flaga kraju
+                const flagElement = document.createElement('div');
+                flagElement.className = 'ban-country-flag';
+                flagElement.style.backgroundImage = `url('https://flagcdn.com/w20/${country.code.toLowerCase()}.png')`;
+                
+                // Nazwa kraju
+                const nameElement = document.createElement('div');
+                nameElement.className = 'ban-country-name';
+                nameElement.textContent = country.name;
+                
+                // Czas zakazu
+                const timeElement = document.createElement('div');
+                timeElement.className = 'ban-country-time';
+                timeElement.textContent = `${restriction.timeFrom} - ${restriction.timeTo}`;
+                
+                // Ikona ostrzeżenia (jeśli potrzebna)
+                const warningElement = document.createElement('div');
+                warningElement.className = 'ban-warning-icon';
+                if (restriction.warning) {
+                    warningElement.innerHTML = '⚠️';
+                }
+                
+                // Dodaj elementy do nagłówka
+                headerElement.appendChild(flagElement);
+                headerElement.appendChild(nameElement);
+                headerElement.appendChild(timeElement);
+                headerElement.appendChild(warningElement);
+                
+                // Tekst ostrzeżenia (jeśli istnieje)
+                let warningTextElement = null;
+                if (restriction.warning) {
+                    warningTextElement = document.createElement('div');
+                    warningTextElement.className = 'ban-warning-text';
+                    
+                    // Domyślny tekst ostrzeżenia, jeśli nie podano własnego
+                    const warningText = restriction.warningText || 
+                        "Uwaga! W tym czasie obowiązują szczególne ograniczenia. Mogą występować kontrole lub dodatkowe wymogi.";
+                    
+                    warningTextElement.textContent = warningText;
+                    warningTextElement.style.display = 'none'; // Domyślnie ukryte
+                }
+                
+                // Tworzenie kontenera dla obszarów
+                const areasContainer = document.createElement('div');
+                areasContainer.className = 'ban-areas-container';
+                areasContainer.style.display = 'none'; // Domyślnie ukryte
+                
+                // Dodaj obszary
+                restriction.areas.forEach(area => {
+                    const areaData = getAreaData(area.areaId, area.type);
+                    if (!areaData) return;
+                    
+                    const areaElement = document.createElement('div');
+                    areaElement.className = 'ban-area-item';
+                    
+                    let typeText = '';
+                    let typeIcon = '';
+                    
+                    switch (area.type) {
+                        case 'country':
+                            typeText = 'Cały kraj';
+                            typeIcon = '🏙️';
+                            break;
+                        case 'region':
+                            typeText = 'Region';
+                            typeIcon = '🏞️';
+                            break;
+                        case 'highway':
+                            typeText = 'Autostrada';
+                            typeIcon = '🛣️';
+                            break;
+                    }
+                    
+                    const iconElement = document.createElement('span');
+                    iconElement.className = 'ban-area-icon';
+                    iconElement.textContent = typeIcon;
+                    
+                    const nameElement = document.createElement('span');
+                    nameElement.className = 'ban-area-name';
+                    nameElement.textContent = areaData.name;
+                    
+                    const typeElement = document.createElement('span');
+                    typeElement.className = 'ban-area-type';
+                    typeElement.textContent = `(${typeText})`;
+                    
+                    areaElement.appendChild(iconElement);
+                    areaElement.appendChild(nameElement);
+                    areaElement.appendChild(typeElement);
+                    
+                    areasContainer.appendChild(areaElement);
+                });
+                
+                // Obsługa kliknięcia na nagłówek kraju
+                headerElement.addEventListener('click', function() {
+                    const isVisible = areasContainer.style.display !== 'none';
+                    
+                    if (isVisible) {
+                        // Chowamy szczegóły
+                        areasContainer.style.display = 'none';
+                        if (warningTextElement) {
+                            warningTextElement.style.display = 'none';
+                        }
+                        headerElement.style.backgroundColor = '';
+                    } else {
+                        // Pokazujemy szczegóły
+                        areasContainer.style.display = 'block';
+                        if (warningTextElement) {
+                            warningTextElement.style.display = 'block';
+                        }
+                        headerElement.style.backgroundColor = '#f0f7ff';
+                    }
+                });
+                
+                // Złóż elementy
+                countryElement.appendChild(headerElement);
+                
+                // Dodaj tekst ostrzeżenia bezpośrednio po nagłówku (jeśli istnieje)
+                if (warningTextElement) {
+                    countryElement.appendChild(warningTextElement);
+                }
+                
+                countryElement.appendChild(areasContainer);
+                
+                countryContainer.appendChild(countryElement);
+            });
+            
+            return countryContainer;
+        }
+
+        // Wyświetl zakazy dla wybranego dnia na mapie
+        function displayBansOnMap(dateData) {
+            // Najpierw wyczyść istniejące polygony
+            clearTrafficBansFromMap();
+            
+            if (!dateData || !dateData.countries) return;
+            
+            // Dodaj nowe polygony
+            dateData.countries.forEach(country => {
+                country.restrictions.forEach(restriction => {
+                    restriction.areas.forEach(area => {
+                        const areaData = getAreaData(area.areaId, area.type);
+                        if (areaData) {
+                            addPolygonToMap(areaData.polygons, area.areaId, area.type, restriction.warning);
+                        }
+                    });
+                });
+            });
+        }
+
+        // Pobierz dane obszaru na podstawie ID i typu
+        function getAreaData(areaId, type) {
+            if (!predefinedAreasData) return null;
+            
+            switch (type) {
+                case 'country':
+                    return predefinedAreasData.predefinedAreas.countries[areaId];
+                case 'region':
+                    return predefinedAreasData.predefinedAreas.regions[areaId];
+                case 'highway':
+                    return predefinedAreasData.predefinedAreas.highways[areaId];
+                default:
+                    return null;
+            }
+        }
+
+        // Naprawiona funkcja dodawania wielokątów do mapy
+        function addPolygonToMap(polygonCoords, areaId, areaType, isWarning) {
+            // Kolory dla zakazów
+            const colors = {
+                normal: 'rgba(255, 0, 0, 0.3)',
+                warning: 'rgba(255, 165, 0, 0.3)'
+            };
+            
+            // Klucz bufora
+            const cacheKey = `${areaId}_${areaType}_${isWarning ? 'warning' : 'normal'}`;
+            
+            // Sprawdź, czy wielokąt jest już w buforze
+            if (polygonsCache.has(cacheKey)) {
+                const cachedPolygon = polygonsCache.get(cacheKey);
+                // Utwórz kopię wielokąta z bufora
+                const polygon = new H.map.Polygon(
+                    cachedPolygon.getGeometry(),
+                    {
+                        style: {
+                            fillColor: isWarning ? colors.warning : colors.normal,
+                            strokeColor: 'rgba(0, 0, 0, 0.5)',
+                            lineWidth: 1
+                        }
+                    }
+                );
+                
+                // Skopiuj dane
+                polygon.setData(cachedPolygon.getData());
+                
+                trafficBansPolygons.push(polygon);
+                map.addObject(polygon);
+                return;
+            }
+            
+            const lineStrings = [];
+            
+            // Obsługa pojedynczego wielokąta lub wielu wielokątów
+            if (Array.isArray(polygonCoords[0]) && typeof polygonCoords[0][0] === 'number') {
+                // Pojedynczy wielokąt
+                const lineString = new H.geo.LineString();
+                polygonCoords.forEach(coord => {
+                    lineString.pushLatLngAlt(coord[0], coord[1], 0);
+                });
+                lineStrings.push(lineString);
+            } else {
+                // Wiele wielokątów
+                polygonCoords.forEach(polygonPart => {
+                    const lineString = new H.geo.LineString();
+                    polygonPart.forEach(coord => {
+                        lineString.pushLatLngAlt(coord[0], coord[1], 0);
+                    });
+                    lineStrings.push(lineString);
+                });
+            }
+            
+            lineStrings.forEach(lineString => {
+                const polygon = new H.map.Polygon(lineString, {
+                    style: {
+                        fillColor: isWarning ? colors.warning : colors.normal,
+                        strokeColor: 'rgba(0, 0, 0, 0.5)',
+                        lineWidth: 1
+                    }
+                });
+                
+                // Dodaj dane do wielokąta
+                const areaData = getAreaData(areaId, areaType);
+                if (areaData) {
+                    polygon.setData({
+                        id: areaId,
+                        type: areaType,
+                        name: areaData.name,
+                        warning: isWarning
+                    });
+                }
+                
+                // Zapisz w buforze
+                polygonsCache.set(cacheKey, polygon);
+                
+                trafficBansPolygons.push(polygon);
+                map.addObject(polygon);
+            });
+        }
+
+        // Usuwanie wszystkich wielokątów z mapy
+        function clearTrafficBansFromMap() {
+            trafficBansPolygons.forEach(polygon => {
+                if (map.getObjects().includes(polygon)) {
+                    map.removeObject(polygon);
+                }
+            });
+            trafficBansPolygons = [];
+        }
+
+        // Inicjalizacja funkcji dla zakazów ruchu
+        function initializeTrafficBans() {
+            // Dodanie obsługi kliknięcia na przycisk zakazów
+            const trafficBansButton = document.getElementById('traffic-bans-button');
+            trafficBansButton.addEventListener('click', toggleTrafficBansPanel);
+            
+            // Dodanie obsługi przycisku zamknięcia
+            const closeButton = document.getElementById('close-traffic-bans-button');
+            closeButton.addEventListener('click', closeTrafficBansPanel);
+        }
+
+
         function initializeApplication() {
             // Inicjalizacja przycisków pojazdów
             initializeVehicleButtons();
 
             // Initialize excluded areas dropdowns
             initializeExcludedList();
+
+            // Inicjalizacja funkcji dla zakazów ruchu
+            initializeTrafficBans();
 
             // Pozostała część funkcji bez zmian...
             const firstWaypoint = document.querySelector('.waypoint');
