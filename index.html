@@ -4930,7 +4930,25 @@
                     clearTrafficBansFromMap(); // Wyczyść poprzednie
                     displayBansOnMap(dateData);
                     
-                    // Rozwiń wszystkie szczegóły krajów dla tego dnia
+                    // Najpierw zwiń wszystkie szczegóły krajów dla wszystkich dni
+                    document.querySelectorAll('.ban-country-header').forEach(header => {
+                        const container = header.closest('.ban-country-item');
+                        const areasContainer = container.querySelector('.ban-areas-container');
+                        const warningText = container.querySelector('.ban-warning-text');
+                        
+                        // Ukryj szczegóły
+                        if (areasContainer) {
+                            areasContainer.style.display = 'none';
+                        }
+                        if (warningText) {
+                            warningText.style.display = 'none';
+                        }
+                        
+                        // Przywróć domyślny wygląd nagłówka
+                        header.style.backgroundColor = '';
+                    });
+                    
+                    // Teraz rozwiń szczegóły krajów tylko dla wybranego dnia
                     const allCountryHeaders = dayContent.querySelectorAll('.ban-country-header');
                     allCountryHeaders.forEach(header => {
                         const container = header.closest('.ban-country-item');
@@ -5036,8 +5054,14 @@
                 // Ukryte domyślnie, chyba że autoExpandDetails jest true
                 areasContainer.style.display = autoExpandDetails ? 'block' : 'none';
                 
-                // Dodaj obszary
-                restriction.areas.forEach(area => {
+                // Filtrujemy obszary, wykluczając typ 'country'
+                const filteredAreas = restriction.areas.filter(area => area.type !== 'country');
+                
+                // Sprawdzamy, czy mamy jakiekolwiek obszary do pokazania po filtrowaniu
+                const hasAreasToShow = filteredAreas.length > 0;
+                
+                // Dodaj obszary, tylko jeśli nie są typu 'country'
+                filteredAreas.forEach(area => {
                     const areaData = getAreaData(area.areaId, area.type);
                     if (!areaData) return;
                     
@@ -5051,10 +5075,6 @@
                     let typeIcon = '';
                     
                     switch (area.type) {
-                        case 'country':
-                            typeText = 'Country';
-                            typeIcon = '🏙️';
-                            break;
                         case 'region':
                             typeText = 'Region';
                             typeIcon = '🏞️';
@@ -5110,6 +5130,7 @@
                     
                     areasContainer.appendChild(areaElement);
                 });
+                
                 
                 // Ustawienie tła nagłówka, jeśli szczegóły są rozwinięte
                 if (autoExpandDetails) {
