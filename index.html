@@ -895,31 +895,6 @@
             border-radius: 3px;
             margin-left: 8px;
         }
-
-        #traffic-bans-legend {
-            padding: 15px 20px;
-            border-top: 1px solid rgba(0, 0, 0, 0.1);
-        }
-
-        #traffic-bans-legend h4 {
-            font-size: 14px;
-            margin-bottom: 10px;
-            margin-top: 0;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
-        }
-
-        .legend-color {
-            width: 16px;
-            height: 16px;
-            border: 1px solid rgba(0, 0, 0, 0.2);
-            border-radius: 3px;
-            margin-right: 8px;
-        }
         /* Style dla elementów krajów */
         .ban-country-item {
             margin: 8px 0 4px 0; /* Zwiększony margines górny */
@@ -1013,6 +988,20 @@
             color: #e65100;
             display: none; /* Domyślnie ukryty, będzie pokazywany razem z obszarami */
         }
+
+        .ban-area-item.selected {
+            background-color: #e6f0ff;
+            border-left: 3px solid #0066CC;
+        }
+
+        .ban-area-item {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .ban-area-item:hover {
+            background-color: #f0f7ff;
+        }
     </style>
 </head>
 <body>
@@ -1085,27 +1074,17 @@
     </div>
     <div id="map-container">
         <button id="restart-button">Restart [CTRL+I]</button>
-        <button id="traffic-bans-button">Zakazy</button>
+        <button id="traffic-bans-button" data-translation="trafficBans">Zakazy</button>
     </div>
     <div id="traffic-bans-sidebar">
         <div class="traffic-bans-header">
-            <h3>Zakazy dla ciężarówek</h3>
+            <h3 data-translation="truckRestrictions">Zakazy dla ciężarówek</h3>
             <button id="close-traffic-bans-button">&times;</button>
         </div>
         <div id="traffic-bans-content">
             <div id="bans-days-list"></div>
         </div>
-        <div id="traffic-bans-legend">
-            <h4>Legenda:</h4>
-            <div class="legend-item">
-                <span class="legend-color" style="background-color: rgba(255, 0, 0, 0.3);"></span>
-                <span class="legend-text">Zakaz standardowy</span>
-            </div>
-            <div class="legend-item">
-                <span class="legend-color" style="background-color: rgba(255, 165, 0, 0.3);"></span>
-                <span class="legend-text">Zakaz z ostrzeżeniem</span>
-            </div>
-        </div>
+        <button id="toggle-labels-button" style="background-color: white; color: #333; border: 1px solid #ddd; border-radius: 4px; padding: 4px 8px; margin-right: 10px; font-size: 12px;">Ukryj etykiety</button>
     </div>
 	<script>
         let geocodedPoints = new Map();
@@ -1163,7 +1142,9 @@
                     countries: "Countries",
                     areas: "Areas",
                     search: "Search...",
-                    more: "more"
+                    more: "more",
+                    trafficBans: 'Restrictions',
+                    truckRestrictions: 'Truck Restrictions',
                 },
                 de: {
                     inputPlaceholder: 'Adresse oder GPS-Koordinaten eingeben',
@@ -1200,7 +1181,9 @@
                     countries: "Länder",
                     areas: "Gebiete",
                     search: "Suchen...",
-                    more: "mehr"
+                    more: "mehr",
+                    trafficBans: 'Fahrverbote',
+                    truckRestrictions: 'LKW-Fahrverbote',
                 },
                 fr: {
                     inputPlaceholder: 'Entrez l\'adresse ou les coordonnées GPS',
@@ -1237,7 +1220,9 @@
                     countries: "Pays",
                     areas: "Zones",
                     search: "Rechercher...",
-                    more: "plus"
+                    more: "plus",
+                    trafficBans: 'Restrictions',
+                    truckRestrictions: 'Restrictions pour camions',
                 },
                 it: {
                     inputPlaceholder: 'Inserisci indirizzo o coordinate GPS',
@@ -1274,7 +1259,11 @@
                     countries: "Paesi",
                     areas: "Aree",
                     search: "Cerca...",
-                    more: "più"
+                    more: "più",
+                    trafficBans: 'Restrictions',
+                    truckRestrictions: 'Restrictions pour camions',
+                    trafficBans: 'Divieti',
+                    truckRestrictions: 'Divieti per camion',
                 },
                 es: {
                     inputPlaceholder: 'Introduce la dirección o coordenadas GPS',
@@ -1311,7 +1300,10 @@
                     countries: "Países",
                     areas: "Áreas",
                     search: "Buscar...",
-                    more: "más"
+                    more: "más",
+                    trafficBans: 'Restricciones',
+                    truckRestrictions: 'Restricciones para camiones',
+                    
                 },
                 pl: {
                     inputPlaceholder: 'Wpisz adres lub współrzędne GPS',
@@ -1358,7 +1350,9 @@
                     countries: "Kraje",
                     areas: "Obszary",
                     search: "Szukaj...",
-                    more: "więcej"
+                    more: "więcej",
+                    trafficBans: 'Zakazy',
+                    truckRestrictions: 'Zakazy dla ciężarówek',
                 }
             };
             return translations[lang] || translations.en;
@@ -1418,16 +1412,16 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 22,
+                fuelConsumption: 20,
                 adblueConsumption: 1.5,
                 costPerKm: 0.10,
                 height: 400,
                 width: 255,
                 length: 1750,
-                workingDays: 240,
-                avgKm: 12500,
-                advFixedPerMonth: 6500,
-                advVariablePerKM: 0.00,
+                workingDays: 250,
+                avgKm: 12000,
+                advFixedPerMonth: 4500,
+                advVariablePerKM: 0.35,
                 simpleCosts: false,  // ten będzie miał pełne wyliczenia
                 simpleCostValuePerKM: 0
             },
@@ -1447,7 +1441,7 @@
                 width: 255,
                 length: 850,
                 workingDays: 250,
-                avgKm: 120000,
+                avgKm: 12000,
                 advFixedPerMonth: 4500,
                 advVariablePerKM: 0.35,
                 simpleCosts: true,  // ten będzie miał uproszczone
@@ -4515,6 +4509,8 @@
         function initializeUITranslations() {
             document.getElementById('settings-title').textContent = translations.routeSettings;
             document.getElementById('excluded-areas-text').textContent = translations.excludeCountriesAndAreas;
+            document.getElementById('traffic-bans-button').textContent = translations.trafficBans;
+            document.querySelector('#traffic-bans-sidebar h3').textContent = translations.truckRestrictions;
 
             // Dodajemy tłumaczenia dla elementów route-info
             document.querySelectorAll('[data-translation]').forEach(element => {
@@ -4771,6 +4767,9 @@
         let selectedDayElement = null;
         let selectedDate = null;
         let polygonsCache = new Map(); // Buforowanie wielokątów
+        let highlightedObjects = [];
+        let areaLabels = [];
+        let labelVisibility = true; // Flaga kontrolująca widoczność etykiet
 
         // Funkcja do ładowania danych
         async function loadAllData() {
@@ -4822,6 +4821,7 @@
         }
 
         // Zamknięcie panelu zakazów
+        // Zamknięcie panelu zakazów
         function closeTrafficBansPanel() {
             const panel = document.getElementById('traffic-bans-sidebar');
             const button = document.getElementById('traffic-bans-button');
@@ -4831,6 +4831,8 @@
             
             // Wyczyść wszystkie polygony przy zamknięciu panelu
             clearTrafficBansFromMap();
+            clearHighlights();
+            clearAreaLabels();
             
             // Zresetuj wybór
             if (selectedDayElement) {
@@ -4888,7 +4890,7 @@
                     <div>
                         <div class="ban-day-date">
                             ${dateData.date}
-                            ${isToday ? '<span class="today-badge">Dziś</span>' : ''}
+                            ${isToday ? '<span class="today-badge">Today</span>' : ''}
                         </div>
                         <div class="ban-day-name">${dateData.dayOfWeek || getDayOfWeek(date)}</div>
                     </div>
@@ -4900,8 +4902,10 @@
                 
                 // Dodaj zawartość z krajami
                 if (dateData.countries && dateData.countries.length > 0) {
+                    // Przekaż dodatkowy parametr autoExpandDetails
+                    const autoExpandDetails = isToday || (selectedDate === dateData.date);
                     dateData.countries.forEach(country => {
-                        const countryElement = createCountryElement(country);
+                        const countryElement = createCountryElement(country, autoExpandDetails);
                         dayContent.appendChild(countryElement);
                     });
                 } else {
@@ -4925,6 +4929,23 @@
                     // Wyświetl zakazy na mapie
                     clearTrafficBansFromMap(); // Wyczyść poprzednie
                     displayBansOnMap(dateData);
+                    
+                    // Rozwiń wszystkie szczegóły krajów dla tego dnia
+                    const allCountryHeaders = dayContent.querySelectorAll('.ban-country-header');
+                    allCountryHeaders.forEach(header => {
+                        const container = header.closest('.ban-country-item');
+                        const areasContainer = container.querySelector('.ban-areas-container');
+                        const warningText = container.querySelector('.ban-warning-text');
+                        
+                        // Pokaż szczegóły
+                        if (areasContainer) {
+                            areasContainer.style.display = 'block';
+                        }
+                        if (warningText) {
+                            warningText.style.display = 'block';
+                        }
+                        header.style.backgroundColor = '#f0f7ff';
+                    });
                 });
                 
                 // Złóż kartę dnia
@@ -4952,8 +4973,9 @@
             }
         }
 
+        // Zmodyfikowana funkcja createCountryElement
         // Utwórz element dla kraju
-        function createCountryElement(country) {
+        function createCountryElement(country, autoExpandDetails = false) {
             const countryContainer = document.createElement('div');
             
             country.restrictions.forEach((restriction, index) => {
@@ -4963,6 +4985,7 @@
                 // Tworzenie nagłówka kraju
                 const headerElement = document.createElement('div');
                 headerElement.className = 'ban-country-header';
+                headerElement.dataset.country = country.code;
                 
                 // Flaga kraju
                 const flagElement = document.createElement('div');
@@ -5003,13 +5026,15 @@
                         "Uwaga! W tym czasie obowiązują szczególne ograniczenia. Mogą występować kontrole lub dodatkowe wymogi.";
                     
                     warningTextElement.textContent = warningText;
-                    warningTextElement.style.display = 'none'; // Domyślnie ukryte
+                    // Ukryte domyślnie, chyba że autoExpandDetails jest true
+                    warningTextElement.style.display = autoExpandDetails ? 'block' : 'none';
                 }
                 
                 // Tworzenie kontenera dla obszarów
                 const areasContainer = document.createElement('div');
                 areasContainer.className = 'ban-areas-container';
-                areasContainer.style.display = 'none'; // Domyślnie ukryte
+                // Ukryte domyślnie, chyba że autoExpandDetails jest true
+                areasContainer.style.display = autoExpandDetails ? 'block' : 'none';
                 
                 // Dodaj obszary
                 restriction.areas.forEach(area => {
@@ -5018,13 +5043,16 @@
                     
                     const areaElement = document.createElement('div');
                     areaElement.className = 'ban-area-item';
+                    areaElement.dataset.areaId = area.areaId;
+                    areaElement.dataset.areaType = area.type;
+                    areaElement.dataset.country = country.code;
                     
                     let typeText = '';
                     let typeIcon = '';
                     
                     switch (area.type) {
                         case 'country':
-                            typeText = 'Cały kraj';
+                            typeText = 'Country';
                             typeIcon = '🏙️';
                             break;
                         case 'region':
@@ -5032,7 +5060,7 @@
                             typeIcon = '🏞️';
                             break;
                         case 'highway':
-                            typeText = 'Autostrada';
+                            typeText = 'Highway';
                             typeIcon = '🛣️';
                             break;
                     }
@@ -5053,11 +5081,43 @@
                     areaElement.appendChild(nameElement);
                     areaElement.appendChild(typeElement);
                     
+                    // Dodaj obsługę kliknięcia na obszar
+                    areaElement.addEventListener('click', function(e) {
+                        e.stopPropagation(); // Zapobiegnij propagacji do nagłówka
+                        
+                        // Dodaj lub usuń klasę podświetlenia
+                        const isSelected = this.classList.contains('selected');
+                        
+                        // Usuń podświetlenie ze wszystkich elementów
+                        document.querySelectorAll('.ban-area-item').forEach(item => {
+                            item.classList.remove('selected');
+                        });
+                        
+                        if (!isSelected) {
+                            // Podświetl ten element
+                            this.classList.add('selected');
+                            
+                            // Podświetl odpowiedni obszar na mapie
+                            highlightMapObjects({
+                                id: this.dataset.areaId,
+                                type: this.dataset.areaType
+                            });
+                        } else {
+                            // Usuń podświetlenie z mapy
+                            clearHighlights();
+                        }
+                    });
+                    
                     areasContainer.appendChild(areaElement);
                 });
                 
+                // Ustawienie tła nagłówka, jeśli szczegóły są rozwinięte
+                if (autoExpandDetails) {
+                    headerElement.style.backgroundColor = '#f0f7ff';
+                }
+                
                 // Obsługa kliknięcia na nagłówek kraju
-                headerElement.addEventListener('click', function() {
+                headerElement.addEventListener('click', function(e) {
                     const isVisible = areasContainer.style.display !== 'none';
                     
                     if (isVisible) {
@@ -5067,6 +5127,9 @@
                             warningTextElement.style.display = 'none';
                         }
                         headerElement.style.backgroundColor = '';
+                        
+                        // Usuń podświetlenie z mapy
+                        clearHighlights();
                     } else {
                         // Pokazujemy szczegóły
                         areasContainer.style.display = 'block';
@@ -5074,7 +5137,17 @@
                             warningTextElement.style.display = 'block';
                         }
                         headerElement.style.backgroundColor = '#f0f7ff';
+                        
+                        // Podświetl wszystkie obszary z tego kraju na mapie
+                        highlightMapObjects({
+                            country: this.dataset.country
+                        });
                     }
+                    
+                    // Usuń zaznaczenie ze wszystkich obszarów
+                    document.querySelectorAll('.ban-area-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
                 });
                 
                 // Złóż elementy
@@ -5094,9 +5167,12 @@
         }
 
         // Wyświetl zakazy dla wybranego dnia na mapie
+        // Wyświetl zakazy dla wybranego dnia na mapie
         function displayBansOnMap(dateData) {
             // Najpierw wyczyść istniejące polygony
             clearTrafficBansFromMap();
+            clearHighlights();
+            clearAreaLabels();
             
             if (!dateData || !dateData.countries) return;
             
@@ -5106,11 +5182,14 @@
                     restriction.areas.forEach(area => {
                         const areaData = getAreaData(area.areaId, area.type);
                         if (areaData) {
-                            addPolygonToMap(areaData.polygons, area.areaId, area.type, restriction.warning);
+                            addPolygonToMap(areaData.polygons, area.areaId, area.type, restriction.warning, country.code);
                         }
                     });
                 });
             });
+            
+            // Utwórz etykiety dla wszystkich obszarów
+            createAreaLabels(dateData);
         }
 
         // Pobierz dane obszaru na podstawie ID i typu
@@ -5129,89 +5208,370 @@
             }
         }
 
-        // Naprawiona funkcja dodawania wielokątów do mapy
-        function addPolygonToMap(polygonCoords, areaId, areaType, isWarning) {
+        // Zmodyfikowana funkcja dodawania obiektów do mapy
+        // Zmodyfikowana funkcja dodawania obiektów do mapy
+        function addPolygonToMap(polygonCoords, areaId, areaType, isWarning, countryCode) {
             // Kolory dla zakazów
             const colors = {
-                normal: 'rgba(255, 0, 0, 0.3)',
-                warning: 'rgba(255, 165, 0, 0.3)'
+                normal: {
+                    fill: 'rgba(255, 0, 0, 0.3)',
+                    stroke: 'rgba(255, 0, 0, 0.7)'
+                },
+                warning: {
+                    fill: 'rgba(255, 165, 0, 0.3)',
+                    stroke: 'rgba(255, 165, 0, 0.7)'
+                }
             };
             
             // Klucz bufora
             const cacheKey = `${areaId}_${areaType}_${isWarning ? 'warning' : 'normal'}`;
             
-            // Sprawdź, czy wielokąt jest już w buforze
+            // Sprawdź, czy obiekt jest już w buforze
             if (polygonsCache.has(cacheKey)) {
-                const cachedPolygon = polygonsCache.get(cacheKey);
-                // Utwórz kopię wielokąta z bufora
-                const polygon = new H.map.Polygon(
-                    cachedPolygon.getGeometry(),
-                    {
-                        style: {
-                            fillColor: isWarning ? colors.warning : colors.normal,
-                            strokeColor: 'rgba(0, 0, 0, 0.5)',
-                            lineWidth: 1
+                const cachedObject = polygonsCache.get(cacheKey);
+                
+                // Utwórz kopię obiektu z bufora
+                let mapObject;
+                
+                if (areaType === 'highway') {
+                    // Dla autostrad tworzymy polyline
+                    mapObject = new H.map.Polyline(
+                        cachedObject.getGeometry(),
+                        {
+                            style: {
+                                strokeColor: isWarning ? colors.warning.stroke : colors.normal.stroke,
+                                lineWidth: 5,
+                                lineCap: 'round',
+                                lineJoin: 'round'
+                            }
                         }
-                    }
-                );
+                    );
+                } else {
+                    // Dla krajów i regionów tworzymy polygon
+                    mapObject = new H.map.Polygon(
+                        cachedObject.getGeometry(),
+                        {
+                            style: {
+                                fillColor: isWarning ? colors.warning.fill : colors.normal.fill,
+                                strokeColor: 'rgba(0, 0, 0, 0.5)',
+                                lineWidth: 1
+                            }
+                        }
+                    );
+                }
                 
-                // Skopiuj dane
-                polygon.setData(cachedPolygon.getData());
+                // Skopiuj dane i dodaj informację o kraju
+                const data = cachedObject.getData();
+                data.country = countryCode; // Dodaj kod kraju
+                mapObject.setData(data);
                 
-                trafficBansPolygons.push(polygon);
-                map.addObject(polygon);
+                trafficBansPolygons.push(mapObject);
+                map.addObject(mapObject);
                 return;
             }
             
-            const lineStrings = [];
-            
-            // Obsługa pojedynczego wielokąta lub wielu wielokątów
-            if (Array.isArray(polygonCoords[0]) && typeof polygonCoords[0][0] === 'number') {
-                // Pojedynczy wielokąt
-                const lineString = new H.geo.LineString();
-                polygonCoords.forEach(coord => {
-                    lineString.pushLatLngAlt(coord[0], coord[1], 0);
-                });
-                lineStrings.push(lineString);
-            } else {
-                // Wiele wielokątów
-                polygonCoords.forEach(polygonPart => {
+            // Obsługa dwóch formatów danych
+            const processGeometry = (coords) => {
+                if (Array.isArray(coords[0]) && typeof coords[0][0] === 'number') {
+                    // Pojedynczy zestaw współrzędnych
                     const lineString = new H.geo.LineString();
-                    polygonPart.forEach(coord => {
+                    coords.forEach(coord => {
                         lineString.pushLatLngAlt(coord[0], coord[1], 0);
                     });
-                    lineStrings.push(lineString);
-                });
-            }
+                    return [lineString];
+                } else {
+                    // Wiele zestawów współrzędnych
+                    return coords.map(coordSet => {
+                        const lineString = new H.geo.LineString();
+                        coordSet.forEach(coord => {
+                            lineString.pushLatLngAlt(coord[0], coord[1], 0);
+                        });
+                        return lineString;
+                    });
+                }
+            };
+            
+            const lineStrings = processGeometry(polygonCoords);
             
             lineStrings.forEach(lineString => {
-                const polygon = new H.map.Polygon(lineString, {
-                    style: {
-                        fillColor: isWarning ? colors.warning : colors.normal,
-                        strokeColor: 'rgba(0, 0, 0, 0.5)',
-                        lineWidth: 1
-                    }
-                });
+                let mapObject;
                 
-                // Dodaj dane do wielokąta
+                if (areaType === 'highway') {
+                    // Dla autostrad tworzymy polyline
+                    mapObject = new H.map.Polyline(lineString, {
+                        style: {
+                            strokeColor: isWarning ? colors.warning.stroke : colors.normal.stroke,
+                            lineWidth: 5,
+                            lineCap: 'round',
+                            lineJoin: 'round'
+                        }
+                    });
+                } else {
+                    // Dla krajów i regionów tworzymy polygon
+                    mapObject = new H.map.Polygon(lineString, {
+                        style: {
+                            fillColor: isWarning ? colors.warning.fill : colors.normal.fill,
+                            strokeColor: 'rgba(0, 0, 0, 0.5)',
+                            lineWidth: 1
+                        }
+                    });
+                }
+                
+                // Dodaj dane do obiektu
                 const areaData = getAreaData(areaId, areaType);
                 if (areaData) {
-                    polygon.setData({
+                    mapObject.setData({
                         id: areaId,
                         type: areaType,
                         name: areaData.name,
-                        warning: isWarning
+                        warning: isWarning,
+                        country: countryCode // Dodaj kod kraju
                     });
                 }
                 
                 // Zapisz w buforze
-                polygonsCache.set(cacheKey, polygon);
+                polygonsCache.set(cacheKey, mapObject);
                 
-                trafficBansPolygons.push(polygon);
-                map.addObject(polygon);
+                trafficBansPolygons.push(mapObject);
+                map.addObject(mapObject);
             });
         }
 
+        // Funkcja do podświetlania obiektów na mapie
+        function highlightMapObjects(criteria) {
+            // Usuń poprzednie podświetlenia
+            clearHighlights();
+            
+            // Znajdź obiekty do podświetlenia
+            const objectsToHighlight = trafficBansPolygons.filter(obj => {
+                const data = obj.getData();
+                if (!data) return false;
+                
+                if (criteria.country && data.country !== criteria.country) return false;
+                if (criteria.id && data.id !== criteria.id) return false;
+                if (criteria.type && data.type !== criteria.type) return false;
+                
+                return true;
+            });
+            
+            // Podświetl znalezione obiekty
+            objectsToHighlight.forEach(obj => {
+                const data = obj.getData();
+                const isHighway = data.type === 'highway';
+                
+                // Klonujemy obiekt z nowymi stylami
+                let highlightedObj;
+                
+                if (isHighway) {
+                    // Dla autostrady tworzymy pogrubioną linię
+                    highlightedObj = new H.map.Polyline(
+                        obj.getGeometry(),
+                        {
+                            style: {
+                                strokeColor: data.warning ? '#FF8C00' : '#FF0000', // Pomarańczowy dla ostrzeżeń, czerwony dla zwykłych
+                                lineWidth: 8, // Grubsza linia
+                                lineCap: 'round',
+                                lineJoin: 'round',
+                                lineJoin: 'round',
+                                strokeLinecap: 'round',
+                                strokeLinejoin: 'round'
+                            },
+                            zIndex: 100 // Wyższy zIndex, aby był ponad innymi obiektami
+                        }
+                    );
+                } else {
+                    // Dla wielokątów tworzymy obiekt z grubszym obrysem
+                    highlightedObj = new H.map.Polygon(
+                        obj.getGeometry(),
+                        {
+                            style: {
+                                fillColor: data.warning ? 'rgba(255, 165, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)', // Bardziej nieprzezroczyste
+                                strokeColor: data.warning ? '#FF8C00' : '#FF0000',
+                                lineWidth: 3, // Grubsza linia
+                                lineJoin: 'round',
+                                strokeLinecap: 'round',
+                                strokeLinejoin: 'round'
+                            },
+                            zIndex: 100 // Wyższy zIndex
+                        }
+                    );
+                }
+                
+                // Kopiujemy dane
+                highlightedObj.setData(data);
+                
+                // Dodajemy do mapy i zapisujemy do tablicy podświetleń
+                map.addObject(highlightedObj);
+                highlightedObjects.push(highlightedObj);
+            });
+            
+            // Jeśli podświetlamy tylko jeden obiekt, przybliż do niego mapę
+            if (objectsToHighlight.length === 1 && (criteria.id || criteria.type === 'highway')) {
+                const obj = objectsToHighlight[0];
+                const bounds = obj.getBoundingBox();
+                map.getViewModel().setLookAtData({
+                    bounds: bounds,
+                    padding: 100 // Dodatkowy margines wokół
+                });
+            }
+        }
+
+        // Funkcja usuwająca podświetlenia
+        function clearHighlights() {
+            highlightedObjects.forEach(obj => {
+                if (map.getObjects().includes(obj)) {
+                    map.removeObject(obj);
+                }
+            });
+            highlightedObjects = [];
+        }
+
+        // Funkcja do tworzenia etykiet dla obszarów
+        function createAreaLabels(dateData) {
+            // Usuń istniejące etykiety
+            clearAreaLabels();
+            
+            if (!dateData || !dateData.countries) return;
+            
+            // Mapa do przechowywania etykiet wg ID obszaru
+            const labelsMap = new Map();
+            
+            // Zbierz informacje o wszystkich obszarach i ich ograniczeniach
+            dateData.countries.forEach(country => {
+                country.restrictions.forEach(restriction => {
+                    restriction.areas.forEach(area => {
+                        const areaData = getAreaData(area.areaId, area.type);
+                        if (!areaData) return;
+                        
+                        // Klucz dla tego obszaru
+                        const areaKey = `${area.type}_${area.areaId}`;
+                        
+                        // Jeśli etykieta dla tego obszaru już istnieje, zaktualizuj czasy
+                        if (labelsMap.has(areaKey)) {
+                            const labelInfo = labelsMap.get(areaKey);
+                            if (!labelInfo.times.includes(`${restriction.timeFrom}-${restriction.timeTo}`)) {
+                                labelInfo.times.push(`${restriction.timeFrom}-${restriction.timeTo}`);
+                            }
+                            if (restriction.warning) {
+                                labelInfo.hasWarning = true;
+                            }
+                        } else {
+                            // Utwórz nową informację o etykiecie
+                            labelsMap.set(areaKey, {
+                                areaId: area.areaId,
+                                type: area.type,
+                                name: areaData.name,
+                                country: country.code,
+                                countryName: country.name,
+                                times: [`${restriction.timeFrom}-${restriction.timeTo}`],
+                                polygons: areaData.polygons,
+                                hasWarning: restriction.warning
+                            });
+                        }
+                    });
+                });
+            });
+            
+            // Utwórz etykiety dla wszystkich obszarów
+            labelsMap.forEach(labelInfo => {
+                createSingleAreaLabel(labelInfo);
+            });
+        }
+
+        // Funkcja tworząca pojedynczą etykietę
+        function createSingleAreaLabel(labelInfo) {
+            try {
+                // Dla autostrad i wielokątów używamy różnych metod obliczania środka
+                let centerPoint;
+                
+                if (labelInfo.type === 'highway') {
+                    // Dla autostrad bierzemy punkt w środku długości linii
+                    const coords = labelInfo.polygons[0]; // Zakładamy, że jest co najmniej jeden zestaw współrzędnych
+                    const midPointIndex = Math.floor(coords.length / 2);
+                    centerPoint = {
+                        lat: coords[midPointIndex][0],
+                        lng: coords[midPointIndex][1]
+                    };
+                } else {
+                    // Dla wielokątów obliczamy środek jako średnią wszystkich punktów
+                    let sumLat = 0, sumLng = 0, pointCount = 0;
+                    
+                    labelInfo.polygons.forEach(polygon => {
+                        polygon.forEach(point => {
+                            sumLat += point[0];
+                            sumLng += point[1];
+                            pointCount++;
+                        });
+                    });
+                    
+                    centerPoint = {
+                        lat: sumLat / pointCount,
+                        lng: sumLng / pointCount
+                    };
+                }
+                
+                // Unikalne czasy jako string
+                const timesText = [...new Set(labelInfo.times)].join(', ');
+                
+                // Tworzenie zawartości HTML dla etykiety
+                const labelContent = `
+                    <div class="map-label" style="
+                        background-color: ${labelInfo.hasWarning ? 'rgba(255, 140, 0, 0.85)' : 'rgba(255, 0, 0, 0.85)'};
+                        color: white;
+                        padding: 3px 6px;
+                        border-radius: 3px;
+                        font-size: 11px;
+                        font-weight: bold;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                        pointer-events: none;
+                        white-space: nowrap;
+                        text-align: center;
+                    ">
+                        <div>${labelInfo.name}</div>
+                        <div style="font-size: 9px; font-weight: normal;">${selectedDate}</div>
+                        <div style="font-size: 9px; font-weight: normal;">${timesText}</div>
+                    </div>
+                `;
+                                
+                // Tworzenie markera z etykietą
+                const labelMarker = new H.map.DomMarker(centerPoint, {
+                    icon: new H.map.DomIcon(labelContent),
+                    zIndex: 1000 // Wysoki zIndex, aby etykieta była zawsze na wierzchu
+                });
+                
+                // Ustawianie danych dla etykiety
+                labelMarker.setData({
+                    id: labelInfo.areaId,
+                    type: labelInfo.type,
+                    country: labelInfo.country
+                });
+                
+                // Dodaj etykietę do mapy i zapisz do tablicy
+                map.addObject(labelMarker);
+                areaLabels.push(labelMarker);
+            } catch (error) {
+                console.error('Error creating label:', error, labelInfo);
+            }
+        }
+
+        // Funkcja usuwająca wszystkie etykiety
+        function clearAreaLabels() {
+            areaLabels.forEach(label => {
+                if (map.getObjects().includes(label)) {
+                    map.removeObject(label);
+                }
+            });
+            areaLabels = [];
+        }
+
+        // Funkcja przełączająca widoczność etykiet
+        function toggleLabelsVisibility() {
+            labelVisibility = !labelVisibility;
+            
+            areaLabels.forEach(label => {
+                label.setVisibility(labelVisibility);
+            });
+        }
         // Usuwanie wszystkich wielokątów z mapy
         function clearTrafficBansFromMap() {
             trafficBansPolygons.forEach(polygon => {
@@ -5231,6 +5591,13 @@
             // Dodanie obsługi przycisku zamknięcia
             const closeButton = document.getElementById('close-traffic-bans-button');
             closeButton.addEventListener('click', closeTrafficBansPanel);
+
+            // Dodanie obsługi przycisku przełączania etykiet
+            const toggleLabelsButton = document.getElementById('toggle-labels-button');
+            toggleLabelsButton.addEventListener('click', function() {
+                toggleLabelsVisibility();
+                this.textContent = labelVisibility ? 'Hide labels' : 'Show labels';
+            });
         }
 
 
