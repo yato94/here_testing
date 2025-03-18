@@ -4816,7 +4816,18 @@
             } else {
                 panel.classList.remove('visible');
                 button.classList.remove('active');
+                
+                // Wyczyść wszystkie polygony przy zamknięciu panelu
                 clearTrafficBansFromMap();
+                clearHighlights();
+                clearAreaLabels(); // Dodaj tę linię, żeby czyścić etykiety
+                
+                // Zresetuj wybór
+                if (selectedDayElement) {
+                    selectedDayElement.classList.remove('active');
+                    selectedDayElement = null;
+                }
+                selectedDate = null;
             }
         }
 
