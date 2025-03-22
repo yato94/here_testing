@@ -1450,25 +1450,25 @@
         ];
 
         const defaultFuelPrices = {
-            'POL': 1.17,
-            'DEU': 1.45,
-            'LUX': 1.20,
-            'CZE': 1.18,
-            'SVK': 1.28,
-            'HUN': 1.28,
+            'POL': 1.23,
+            'DEU': 1.46,
+            'LUX': 1.28,
+            'CZE': 1.19,
+            'SVK': 1.29,
+            'HUN': 1.25,
             'AUT': 1.37,
             'ITA': 1.48,
-            'FRA': 1.47,
+            'FRA': 1.31,
             'ESP': 1.27,
             'PRT': 1.41,
-            'BEL': 1.49,
-            'NLD': 1.58,
+            'BEL': 1.29,
+            'NLD': 1.57,
             'CHE': 1.79,
             'DNK': 1.61,
             'SWE': 1.29,
             'NOR': 1.46,
             'FIN': 1.43,
-            'EST': 1.27,
+            'EST': 1.22,
             'LVA': 1.31,
             'LTU': 1.36,
             'ROU': 1.28,
@@ -1488,7 +1488,7 @@
             fixedCostsPerHour: 50,
             variableCostsPerKm: 0.5,
             useLowestFuelPrice: true,
-            useCustomFuelPrices: false,
+            useCustomFuelPrices: true,
             globalFuelPrice: 1.35,
             globalAdBluePrice: 0.65,
             customFuelPrices: {
@@ -3039,10 +3039,11 @@
                         waypointsContainer.appendChild(createWaypointInput());
                     }
 
-                    // Przenieś focus do następnego pola tylko jeśli jest puste
+                    // Przenieś focus do następnego pola i zaznacz jego zawartość
                     setTimeout(() => {
-                        if (nextInput && nextInput.value.trim() === '') {
+                        if (nextInput) {
                             nextInput.focus();
+                            nextInput.select(); // Zaznacz cały tekst
                         }
                     }, 50);
 
