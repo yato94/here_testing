@@ -3802,19 +3802,21 @@
                             }
                         });
                         
-                        // Manualne opłaty drogowe
-                        route.sections.forEach(section => {
-                            if (section.tolls) {
-                                section.tolls.forEach(toll => {
-                                    if (MANUAL_TOLL_SYSTEMS.hasOwnProperty(toll.tollSystem)) {
-                                        const inputElement = document.querySelector(`input[data-toll-system="${toll.tollSystem}"]`);
-                                        if (inputElement && inputElement.value && !isNaN(inputElement.value)) {
-                                            ferryAndManualTotal += parseFloat(inputElement.value);
-                                        }
-                                    }
-                                });
-                            }
-                        });
+			// Manualne opłaty drogowe
+			const processedTollSystems = new Set(); // Keep track of processed toll systems
+			route.sections.forEach(section => {
+			    if (section.tolls) {
+			        section.tolls.forEach(toll => {
+			            if (MANUAL_TOLL_SYSTEMS.hasOwnProperty(toll.tollSystem) && !processedTollSystems.has(toll.tollSystem)) {
+			                processedTollSystems.add(toll.tollSystem); // Mark as processed
+			                const inputElement = document.querySelector(`input[data-toll-system="${toll.tollSystem}"]`);
+			                if (inputElement && inputElement.value && !isNaN(inputElement.value)) {
+			                    ferryAndManualTotal += parseFloat(inputElement.value);
+			                }
+			            }
+			        });
+			    }
+			});
 
                         const totalCosts = fuelCosts.totalCost + otherCosts.total + totalToll + ferryAndManualTotal;
                         const costPerKm = totalCosts / totalDistance;
