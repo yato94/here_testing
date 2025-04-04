@@ -4040,10 +4040,14 @@
 			    distanceIndicators.forEach(indicator => indicator.classList.remove('visible'));
 			
 			    if (route.sections) {
+			        // Important change: Start from the SECOND waypoint
+			        // because the distance indicator should show between points
 			        route.sections.forEach((section, index) => {
-			            const indicator = distanceIndicators[index];
+			            // Add +1 to index to match with the destination waypoint
+			            // of this section (not the origin)
+			            const indicator = distanceIndicators[index + 1];
+			            
 			            if (indicator && section.summary && section.summary.length) {
-			                // Check if this section is a ferry or train
 			                const isFerryOrTrain = section.transport && 
 			                    (section.transport.mode === 'ferry' || 
 			                     section.transport.mode.toLowerCase().includes('shuttletrain'));
@@ -4058,13 +4062,11 @@
 			                    `${minutes}min`;
 			                
 			                if (isFerryOrTrain) {
-			                    // For ferry/train sections, show different format
 			                    const transportIcon = section.transport.mode === 'ferry' ? '🛥️' : '🚆';
 			                    const transportName = section.transport.name || section.transport.mode;
-			                    indicator.innerHTML = `<span class="arrow">↓</span> ${transportIcon} ${transportName}: ${distanceInKm} km (${timeDisplay})`;
+			                    indicator.innerHTML = `<span class="arrow">↑</span> ${transportIcon} ${transportName}: ${distanceInKm} km (${timeDisplay})`;
 			                } else {
-			                    // Regular road sections
-			                    indicator.innerHTML = `<span class="arrow">↓</span> ${distanceInKm} km (${timeDisplay})`;
+			                    indicator.innerHTML = `<span class="arrow">↑</span> ${distanceInKm} km (${timeDisplay})`;
 			                }
 			                
 			                indicator.classList.add('visible');
