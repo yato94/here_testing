@@ -4035,39 +4035,29 @@
                                 });
                             }
                         });
-			function updateDistanceIndicators(route) {
-			    const distanceIndicators = document.querySelectorAll('.distance-indicator');
-			    distanceIndicators.forEach(indicator => indicator.classList.remove('visible'));
-			
-			    if (route.sections) {
-			        let currentWaypointIndex = 0;
-			        
-			        route.sections.forEach((section, index) => {
-			            // Skip ferry/train sections for distance indicators
-			            if (section.transport && (section.transport.mode === 'ferry' || section.transport.mode === 'shuttletrain')) {
-			                // This is a ferry/train section, increment waypoint index
-			                currentWaypointIndex++;
-			                return;
-			            }
-			            
-			            // For truck sections, update the distance indicator
-			            const indicator = distanceIndicators[currentWaypointIndex];
-			            if (indicator && section.summary && section.summary.length) {
-			                const distanceInKm = (section.summary.length / 1000).toFixed(1);
-			                const durationInSeconds = section.summary.duration;
-			                const hours = Math.floor(durationInSeconds / 3600);
-			                const minutes = Math.round((durationInSeconds % 3600) / 60);
-			                const timeDisplay = hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`;
-			                
-			                indicator.innerHTML = `<span class="arrow">↓</span> ${distanceInKm} km (${timeDisplay})`;
-			                indicator.classList.add('visible');
-			                
-			                // Increment for next waypoint
-			                currentWaypointIndex++;
-			            }
-			        });
-			    }
-			}
+                        function updateDistanceIndicators(route) {
+                            const distanceIndicators = document.querySelectorAll('.distance-indicator');
+                            distanceIndicators.forEach(indicator => indicator.classList.remove('visible'));
+
+                            if (route.sections) {
+                                route.sections.forEach((section, index) => {
+                                    const indicator = distanceIndicators[index];
+                                    if (indicator && section.summary && section.summary.length) {
+                                        const distanceInKm = (section.summary.length / 1000).toFixed(1);
+                                        const timeInHours = (distanceInKm / 73).toFixed(1);
+                                        const hours = Math.floor(timeInHours);
+                                        const minutes = Math.round((timeInHours - hours) * 60);
+                                        
+                                        const timeDisplay = hours > 0 ? 
+                                            `${hours}h ${minutes}min` : 
+                                            `${minutes}min`;
+                                        
+                                        indicator.innerHTML = `<span class="arrow">↓</span> ${distanceInKm} km (${timeDisplay})`;
+                                        indicator.classList.add('visible');
+                                    }
+                                });
+                            }
+                        }
 
                         // I wywołaj ją dla aktywnej trasy
                         if (routeIndex === currentRouteIndex) {
@@ -5684,4 +5674,4 @@
         });
     </script>
 </body>
-</html
+</html>
