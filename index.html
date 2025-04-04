@@ -4035,29 +4035,43 @@
                                 });
                             }
                         });
-                        function updateDistanceIndicators(route) {
-                            const distanceIndicators = document.querySelectorAll('.distance-indicator');
-                            distanceIndicators.forEach(indicator => indicator.classList.remove('visible'));
-
-                            if (route.sections) {
-                                route.sections.forEach((section, index) => {
-                                    const indicator = distanceIndicators[index];
-                                    if (indicator && section.summary && section.summary.length) {
-                                        const distanceInKm = (section.summary.length / 1000).toFixed(1);
-                                        const timeInHours = (distanceInKm / 73).toFixed(1);
-                                        const hours = Math.floor(timeInHours);
-                                        const minutes = Math.round((timeInHours - hours) * 60);
-                                        
-                                        const timeDisplay = hours > 0 ? 
-                                            `${hours}h ${minutes}min` : 
-                                            `${minutes}min`;
-                                        
-                                        indicator.innerHTML = `<span class="arrow">↓</span> ${distanceInKm} km (${timeDisplay})`;
-                                        indicator.classList.add('visible');
-                                    }
-                                });
-                            }
-                        }
+			function updateDistanceIndicators(route) {
+			    const distanceIndicators = document.querySelectorAll('.distance-indicator');
+			    distanceIndicators.forEach(indicator => indicator.classList.remove('visible'));
+			
+			    if (route.sections) {
+			        route.sections.forEach((section, index) => {
+			            const indicator = distanceIndicators[index];
+			            if (indicator && section.summary && section.summary.length) {
+			                // Check if this section is a ferry or train
+			                const isFerryOrTrain = section.transport && 
+			                    (section.transport.mode === 'ferry' || 
+			                     section.transport.mode.toLowerCase().includes('shuttletrain'));
+			                
+			                const distanceInKm = (section.summary.length / 1000).toFixed(1);
+			                const timeInHours = (distanceInKm / 73).toFixed(1);
+			                const hours = Math.floor(timeInHours);
+			                const minutes = Math.round((timeInHours - hours) * 60);
+			                
+			                const timeDisplay = hours > 0 ? 
+			                    `${hours}h ${minutes}min` : 
+			                    `${minutes}min`;
+			                
+			                if (isFerryOrTrain) {
+			                    // For ferry/train sections, show different format
+			                    const transportIcon = section.transport.mode === 'ferry' ? '🛥️' : '🚆';
+			                    const transportName = section.transport.name || section.transport.mode;
+			                    indicator.innerHTML = `<span class="arrow">↓</span> ${transportIcon} ${transportName}: ${distanceInKm} km (${timeDisplay})`;
+			                } else {
+			                    // Regular road sections
+			                    indicator.innerHTML = `<span class="arrow">↓</span> ${distanceInKm} km (${timeDisplay})`;
+			                }
+			                
+			                indicator.classList.add('visible');
+			            }
+			        });
+			    }
+			}
 
                         // I wywołaj ją dla aktywnej trasy
                         if (routeIndex === currentRouteIndex) {
