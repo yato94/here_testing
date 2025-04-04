@@ -1412,7 +1412,7 @@
                 trailerCount: 1,
                 euroClass: '6',
                 co2Class: '1',
-                fuelConsumption: 24,
+                fuelConsumption: 20,
                 adblueConsumption: 1.5,
                 costPerKm: 0.10,
                 height: 400,
@@ -1420,7 +1420,7 @@
                 length: 1750,
                 workingDays: 250,
                 avgKm: 12000,
-                advFixedPerMonth: 6000,
+                advFixedPerMonth: 6500,
                 advVariablePerKM: 0.00,
                 simpleCosts: false,  // ten będzie miał pełne wyliczenia
                 simpleCostValuePerKM: 0
@@ -1485,8 +1485,6 @@
         };
 
         const companyCosts = {
-            fixedCostsPerHour: 50,
-            variableCostsPerKm: 0.5,
             useLowestFuelPrice: true,
             useCustomFuelPrices: true,
             globalFuelPrice: 1.35,
@@ -3802,21 +3800,19 @@
                             }
                         });
                         
-			// Manualne opłaty drogowe
-			const processedTollSystems = new Set(); // Keep track of processed toll systems
-			route.sections.forEach(section => {
-			    if (section.tolls) {
-			        section.tolls.forEach(toll => {
-			            if (MANUAL_TOLL_SYSTEMS.hasOwnProperty(toll.tollSystem) && !processedTollSystems.has(toll.tollSystem)) {
-			                processedTollSystems.add(toll.tollSystem); // Mark as processed
-			                const inputElement = document.querySelector(`input[data-toll-system="${toll.tollSystem}"]`);
-			                if (inputElement && inputElement.value && !isNaN(inputElement.value)) {
-			                    ferryAndManualTotal += parseFloat(inputElement.value);
-			                }
-			            }
-			        });
-			    }
-			});
+                        // Manualne opłaty drogowe
+                        route.sections.forEach(section => {
+                            if (section.tolls) {
+                                section.tolls.forEach(toll => {
+                                    if (MANUAL_TOLL_SYSTEMS.hasOwnProperty(toll.tollSystem)) {
+                                        const inputElement = document.querySelector(`input[data-toll-system="${toll.tollSystem}"]`);
+                                        if (inputElement && inputElement.value && !isNaN(inputElement.value)) {
+                                            ferryAndManualTotal += parseFloat(inputElement.value);
+                                        }
+                                    }
+                                });
+                            }
+                        });
 
                         const totalCosts = fuelCosts.totalCost + otherCosts.total + totalToll + ferryAndManualTotal;
                         const costPerKm = totalCosts / totalDistance;
@@ -4040,22 +4036,82 @@
                             distanceIndicators.forEach(indicator => indicator.classList.remove('visible'));
 
                             if (route.sections) {
-                                route.sections.forEach((section, index) => {
-                                    const indicator = distanceIndicators[index];
-                                    if (indicator && section.summary && section.summary.length) {
-                                        const distanceInKm = (section.summary.length / 1000).toFixed(1);
-                                        const timeInHours = (distanceInKm / 73).toFixed(1);
-                                        const hours = Math.floor(timeInHours);
-                                        const minutes = Math.round((timeInHours - hours) * 60);
+                                let waypointIndex = 0;
+                                let roadDistance = 0; // Tylko odległość drogowa
+                                let ferryTrainDistance = 0; // Tylko odległość promowa/kolejowa
+                                let ferryTrainName = ''; // Nazwa promu/pociągu
+                                
+                                // Przetwarzamy każdą sekcję trasy
+                                for (let i = 0; i < route.sections.length; i++) {
+                                    const section = route.sections[i];
+                                    
+                                    // Sprawdź, czy to sekcja z promem/pociągiem
+                                    const isFerryOrTrain = section.transport && 
+                                                        section.transport.mode && 
+                                                        (section.transport.mode.toLowerCase().includes('ferry') || 
+                                                        section.transport.mode.toLowerCase().includes('train') ||
+                                                        section.transport.mode.toLowerCase().includes('shuttle'));
+                                    
+                                    // Jeśli to prom/pociąg, dodaj odległość do ferryTrainDistance
+                                    if (isFerryOrTrain) {
+                                        if (section.summary && section.summary.length) {
+                                            ferryTrainDistance += section.summary.length / 1000;
+                                            ferryTrainName = section.transport.name || '';
+                                        }
+                                    } 
+                                    // W przeciwnym razie to normalny odcinek drogowy
+                                    else {
+                                        // Tylko odcinki drogowe zwiększają indeks punktu
+                                        if (section.summary && section.summary.length) {
+                                            roadDistance += section.summary.length / 1000;
+                                        }
                                         
-                                        const timeDisplay = hours > 0 ? 
-                                            `${hours}h ${minutes}min` : 
-                                            `${minutes}min`;
+                                        // Jeśli to ostatnia sekcja trasy lub następna sekcja to normalny odcinek drogowy, 
+                                        // wyświetl wskaźnik
+                                        const isLastSection = i === route.sections.length - 1;
+                                        const nextSection = i < route.sections.length - 1 ? route.sections[i + 1] : null;
+                                        const nextIsRegularRoad = nextSection && 
+                                                                nextSection.transport && 
+                                                                nextSection.transport.mode && 
+                                                                !nextSection.transport.mode.toLowerCase().includes('ferry') && 
+                                                                !nextSection.transport.mode.toLowerCase().includes('train') &&
+                                                                !nextSection.transport.mode.toLowerCase().includes('shuttle');
                                         
-                                        indicator.innerHTML = `<span class="arrow">↓</span> ${distanceInKm} km (${timeDisplay})`;
-                                        indicator.classList.add('visible');
+                                        if (isLastSection || nextIsRegularRoad) {
+                                            const indicator = distanceIndicators[waypointIndex];
+                                            
+                                            if (indicator) {
+                                                // Obliczamy czas w godzinach i minutach (tylko dla odległości drogowej)
+                                                const timeInHours = roadDistance / 73;
+                                                const hours = Math.floor(timeInHours);
+                                                const minutes = Math.round((timeInHours - hours) * 60);
+                                                
+                                                const timeDisplay = hours > 0 ? 
+                                                    `${hours}h ${minutes}min` : 
+                                                    `${minutes}min`;
+                                                
+                                                // Pokazujemy odległość drogową przed nawiasem
+                                                let displayText = `<span class="arrow">↓</span> ${roadDistance.toFixed(1)} km (${timeDisplay})`;
+                                                
+                                                // Jeśli była przeprawa promem/pociągiem, dodaj informację w nawiasie na niebiesko
+                                                if (ferryTrainDistance > 0) {
+                                                    displayText += ` <span style="color:#0066CC">(+${ferryTrainDistance.toFixed(1)} km ${ferryTrainName})</span>`;
+                                                }
+                                                
+                                                indicator.innerHTML = displayText;
+                                                indicator.classList.add('visible');
+                                            }
+                                            
+                                            // Resetujemy liczniki dla nowego odcinka
+                                            roadDistance = 0;
+                                            ferryTrainDistance = 0;
+                                            ferryTrainName = '';
+                                            
+                                            // Zwiększamy indeks punktu
+                                            waypointIndex++;
+                                        }
                                     }
-                                });
+                                }
                             }
                         }
 
