@@ -4035,29 +4035,50 @@
                                 });
                             }
                         });
-                        function updateDistanceIndicators(route) {
-                            const distanceIndicators = document.querySelectorAll('.distance-indicator');
-                            distanceIndicators.forEach(indicator => indicator.classList.remove('visible'));
-
-                            if (route.sections) {
-                                route.sections.forEach((section, index) => {
-                                    const indicator = distanceIndicators[index];
-                                    if (indicator && section.summary && section.summary.length) {
-                                        const distanceInKm = (section.summary.length / 1000).toFixed(1);
-                                        const timeInHours = (distanceInKm / 73).toFixed(1);
-                                        const hours = Math.floor(timeInHours);
-                                        const minutes = Math.round((timeInHours - hours) * 60);
-                                        
-                                        const timeDisplay = hours > 0 ? 
-                                            `${hours}h ${minutes}min` : 
-                                            `${minutes}min`;
-                                        
-                                        indicator.innerHTML = `<span class="arrow">↓</span> ${distanceInKm} km (${timeDisplay})`;
-                                        indicator.classList.add('visible');
-                                    }
-                                });
-                            }
-                        }
+			function updateDistanceIndicators(route) {
+			    const distanceIndicators = document.querySelectorAll('.distance-indicator');
+			    distanceIndicators.forEach(indicator => indicator.classList.remove('visible'));
+			
+			    // Create a mapping between waypoint indices and section indices
+			    let waypointToSectionMap = [];
+			    let currentWaypoint = 0;
+			    
+			    route.sections.forEach((section, sectionIndex) => {
+			        // Each section connects a departure to an arrival
+			        // First section starts from waypoint 0
+			        if (sectionIndex === 0) {
+			            waypointToSectionMap[currentWaypoint] = sectionIndex;
+			            currentWaypoint++;
+			        }
+			        
+			        // All non-vehicle sections (like ferry) count as a single segment
+			        // between waypoints
+			        if (section.transport && section.transport.mode !== 'truck') {
+			            waypointToSectionMap[currentWaypoint] = sectionIndex;
+			            currentWaypoint++;
+			        } 
+			        // For vehicle sections, we need to check if this is a new waypoint
+			        else {
+			            // Add logic to identify if this is a new waypoint
+			            waypointToSectionMap[currentWaypoint] = sectionIndex;
+			            currentWaypoint++;
+			        }
+			    });
+			    
+			    // Now update the indicators using the mapping
+			    waypointToSectionMap.forEach((sectionIndex, waypointIndex) => {
+			        const indicator = distanceIndicators[waypointIndex];
+			        const section = route.sections[sectionIndex];
+			        
+			        if (indicator && section && section.summary && section.summary.length) {
+			            const distanceInKm = (section.summary.length / 1000).toFixed(1);
+			            const timeDisplay = calculateTimeDisplay(section.summary.duration);
+			            
+			            indicator.innerHTML = `<span class="arrow">↓</span> ${distanceInKm} km (${timeDisplay})`;
+			            indicator.classList.add('visible');
+			        }
+			    });
+			}
 
                         // I wywołaj ją dla aktywnej trasy
                         if (routeIndex === currentRouteIndex) {
