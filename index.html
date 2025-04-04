@@ -4040,35 +4040,42 @@
 			    distanceIndicators.forEach(indicator => indicator.classList.remove('visible'));
 			
 			    if (route.sections) {
-			        // Important change: Start from the SECOND waypoint
-			        // because the distance indicator should show between points
+			        // Each section corresponds to the journey between two consecutive waypoints
 			        route.sections.forEach((section, index) => {
-			            // Add +1 to index to match with the destination waypoint
-			            // of this section (not the origin)
-			            const indicator = distanceIndicators[index + 1];
+			            // The distance indicator should appear after the waypoint
+			            // that starts this section (so before the next waypoint)
+			            const indicator = distanceIndicators[index];
 			            
-			            if (indicator && section.summary && section.summary.length) {
-			                const isFerryOrTrain = section.transport && 
-			                    (section.transport.mode === 'ferry' || 
-			                     section.transport.mode.toLowerCase().includes('shuttletrain'));
+			            if (indicator && section.summary) {
+			                let displayContent = '';
+			                let hasFerryOrTrain = false;
+			                let hasTruck = false;
 			                
-			                const distanceInKm = (section.summary.length / 1000).toFixed(1);
-			                const timeInHours = (distanceInKm / 73).toFixed(1);
-			                const hours = Math.floor(timeInHours);
-			                const minutes = Math.round((timeInHours - hours) * 60);
-			                
-			                const timeDisplay = hours > 0 ? 
-			                    `${hours}h ${minutes}min` : 
-			                    `${minutes}min`;
-			                
-			                if (isFerryOrTrain) {
-			                    const transportIcon = section.transport.mode === 'ferry' ? '🛥️' : '🚆';
-			                    const transportName = section.transport.name || section.transport.mode;
-			                    indicator.innerHTML = `<span class="arrow">↑</span> ${transportIcon} ${transportName}: ${distanceInKm} km (${timeDisplay})`;
+			                // Check if section has subsections with different transport modes
+			                if (section.transport) {
+			                    const isFerryOrTrain = section.transport.mode === 'ferry' || 
+			                                           section.transport.mode.toLowerCase().includes('shuttletrain');
+			                    
+			                    const distanceInKm = (section.summary.length / 1000).toFixed(1);
+			                    const timeInMinutes = Math.round(section.summary.duration / 60);
+			                    
+			                    if (isFerryOrTrain) {
+			                        const transportIcon = section.transport.mode === 'ferry' ? '🛥️' : '🚆';
+			                        const transportName = section.transport.name || section.transport.mode;
+			                        displayContent = `<span class="arrow">↓</span> ${transportIcon} ${transportName}: ${distanceInKm} km (${timeInMinutes}min)`;
+			                        hasFerryOrTrain = true;
+			                    } else {
+			                        displayContent = `<span class="arrow">↓</span> 🚚 ${distanceInKm} km (${timeInMinutes}min)`;
+			                        hasTruck = true;
+			                    }
 			                } else {
-			                    indicator.innerHTML = `<span class="arrow">↑</span> ${distanceInKm} km (${timeDisplay})`;
+			                    // Default case - just road transport
+			                    const distanceInKm = (section.summary.length / 1000).toFixed(1);
+			                    const timeInMinutes = Math.round(section.summary.duration / 60);
+			                    displayContent = `<span class="arrow">↓</span> ${distanceInKm} km (${timeInMinutes}min)`;
 			                }
 			                
+			                indicator.innerHTML = displayContent;
 			                indicator.classList.add('visible');
 			            }
 			        });
