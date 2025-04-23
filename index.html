@@ -3445,8 +3445,13 @@
 
                 // Funkcja obliczająca koszty paliwa
                 function calculateFuelCosts(route, vehicle, selectedCountry = null) {
-                    const totalDistance = route.sections.reduce((sum, section) => 
-                        sum + (section.summary?.length || 0), 0);
+			const totalDistance = route.sections.reduce((sum, section) => {
+			    // Only add distance for road sections (truck mode)
+			    if (section.transport?.mode === 'truck') {
+			        return sum + (section.summary?.length || 0);
+			    }
+			    return sum;
+			}, 0);
                     
                     const distanceInKm = totalDistance / 1000;
                     const fuelConsumption = vehicle.fuelConsumption / 100; // L/km
