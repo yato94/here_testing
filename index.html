@@ -324,7 +324,7 @@
         #restart-button {
             position: absolute;
             top: 10px;
-            left: 10px;
+            left: 110px;
             padding: 6px 12px;
             background-color: white;
             border: 1px solid rgba(0, 0, 0, 0.1);
@@ -759,7 +759,7 @@
         #traffic-bans-button {
             position: absolute;
             top: 10px;
-            left: 140px; /* Pozycja po przycisku restart */
+            left: 240px; /* Pozycja po przycisku restart */
             padding: 6px 12px;
             background-color: white;
             border: 1px solid rgba(0, 0, 0, 0.1);
@@ -1002,6 +1002,59 @@
         .ban-area-item:hover {
             background-color: #f0f7ff;
         }
+        #live-traffic-button {
+            position: absolute;
+            top: 10px;
+            left: 320px; /* Zmniejszona odległość */
+            padding: 6px 12px;
+            background-color: white;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #323130;
+            transition: all 0.2s ease;
+            z-index: 1;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            font-weight: 500;
+        }
+
+        #live-traffic-button:hover {
+            background-color: #f3f2f1;
+            border-color: rgba(0, 0, 0, 0.15);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #live-traffic-button:active {
+            background-color: #edebe9;
+            transform: scale(0.98);
+        }
+
+        #live-traffic-button.active {
+            background-color: #0066CC;
+            color: white;
+        }
+        #logo-link {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        #logo-image {
+            height: 32px;
+            width: auto;
+            display: block;
+            transition: all 0.2s ease;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+        }
+
+        #logo-link:hover #logo-image {
+            transform: scale(1.05);
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.15));
+        }
     </style>
 </head>
 <body>
@@ -1073,8 +1126,12 @@
         </div>
     </div>
     <div id="map-container">
+        <a href="https://transport-nomad.com/" target="_blank" id="logo-link">
+            <img src="https://transport-nomad.com/images/logo-black.png" alt="Transport Nomad" id="logo-image">
+        </a>
         <button id="restart-button">Restart [CTRL+I]</button>
         <button id="traffic-bans-button" data-translation="trafficBans">Zakazy</button>
+        <button id="live-traffic-button" data-translation="liveTraffic">Ruch live</button>
     </div>
     <div id="traffic-bans-sidebar">
         <div class="traffic-bans-header">
@@ -1145,6 +1202,7 @@
                     more: "more",
                     trafficBans: 'Restrictions',
                     truckRestrictions: 'Truck Restrictions',
+                    liveTraffic: 'Live Traffic',  
                 },
                 de: {
                     inputPlaceholder: 'Adresse oder GPS-Koordinaten eingeben',
@@ -1184,6 +1242,7 @@
                     more: "mehr",
                     trafficBans: 'Fahrverbote',
                     truckRestrictions: 'LKW-Fahrverbote',
+                    liveTraffic: 'Live-Verkehr',  
                 },
                 fr: {
                     inputPlaceholder: 'Entrez l\'adresse ou les coordonnées GPS',
@@ -1223,6 +1282,7 @@
                     more: "plus",
                     trafficBans: 'Restrictions',
                     truckRestrictions: 'Restrictions pour camions',
+                    liveTraffic: 'Trafic en direct',
                 },
                 it: {
                     inputPlaceholder: 'Inserisci indirizzo o coordinate GPS',
@@ -1264,6 +1324,7 @@
                     truckRestrictions: 'Restrictions pour camions',
                     trafficBans: 'Divieti',
                     truckRestrictions: 'Divieti per camion',
+                    liveTraffic: 'Traffico live',
                 },
                 es: {
                     inputPlaceholder: 'Introduce la dirección o coordenadas GPS',
@@ -1303,6 +1364,7 @@
                     more: "más",
                     trafficBans: 'Restricciones',
                     truckRestrictions: 'Restricciones para camiones',
+                    liveTraffic: 'Tráfico en vivo', 
                     
                 },
                 pl: {
@@ -1353,6 +1415,7 @@
                     more: "więcej",
                     trafficBans: 'Zakazy',
                     truckRestrictions: 'Zakazy dla ciężarówek',
+                    liveTraffic: 'Ruch live', 
                 }
             };
             return translations[lang] || translations.en;
@@ -1960,6 +2023,9 @@
 
         const currentLang = getPreferredLanguage();
         const translations = getUITranslations(currentLang);
+        // Zmienna dla kontroli ruchu live
+        let isLiveTrafficEnabled = false;
+        let trafficLayer = null;
         const API_KEY = 'yuwY_LTItp881XAaYOHShjcBhdc0sHWuj4TQwGKwjms';
         
         const MANUAL_TOLL_SYSTEMS = {
@@ -3445,13 +3511,8 @@
 
                 // Funkcja obliczająca koszty paliwa
                 function calculateFuelCosts(route, vehicle, selectedCountry = null) {
-			const totalDistance = route.sections.reduce((sum, section) => {
-			    // Only add distance for road sections (truck mode)
-			    if (section.transport?.mode === 'truck') {
-			        return sum + (section.summary?.length || 0);
-			    }
-			    return sum;
-			}, 0);
+                    const totalDistance = route.sections.reduce((sum, section) => 
+                        sum + (section.summary?.length || 0), 0);
                     
                     const distanceInKm = totalDistance / 1000;
                     const fuelConsumption = vehicle.fuelConsumption / 100; // L/km
@@ -4576,6 +4637,7 @@
             document.getElementById('settings-title').textContent = translations.routeSettings;
             document.getElementById('excluded-areas-text').textContent = translations.excludeCountriesAndAreas;
             document.getElementById('traffic-bans-button').textContent = translations.trafficBans;
+            document.getElementById('live-traffic-button').textContent = translations.liveTraffic;
             document.querySelector('#traffic-bans-sidebar h3').textContent = translations.truckRestrictions;
 
             // Dodajemy tłumaczenia dla elementów route-info
@@ -5698,8 +5760,41 @@
             });
         }
 
+        // Funkcje dla ruchu live
+        function toggleLiveTraffic() {
+            const button = document.getElementById('live-traffic-button');
+            
+            if (!isLiveTrafficEnabled) {
+                // Włącz ruch live
+                if (!trafficLayer) {
+                    const defaultLayers = platform.createDefaultLayers();
+                    trafficLayer = defaultLayers.vector.traffic.map;
+                }
+                map.addLayer(trafficLayer);
+                button.classList.add('active');
+                isLiveTrafficEnabled = true;
+            } else {
+                // Wyłącz ruch live
+                if (trafficLayer) {
+                    map.removeLayer(trafficLayer);
+                }
+                button.classList.remove('active');
+                isLiveTrafficEnabled = false;
+            }
+        }
+
+        function initializeLiveTraffic() {
+            const liveTrafficButton = document.getElementById('live-traffic-button');
+            liveTrafficButton.addEventListener('click', toggleLiveTraffic);
+        }
 
         function initializeApplication() {
+            // Inicjalizacja funkcji dla zakazów ruchu
+            initializeTrafficBans();
+
+            // Inicjalizacja funkcji dla ruchu live
+            initializeLiveTraffic();
+
             // Inicjalizacja przycisków pojazdów
             initializeVehicleButtons();
 
