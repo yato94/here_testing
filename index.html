@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transport Nomad</title>
+    <!-- Ładowanie Tailwind CSS z CDN dla łatwego stylowania -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 antialiased">
+    <!-- Kontener tła, który zajmuje całą wysokość ekranu -->
+    <div class="relative min-h-screen bg-cover bg-center"
+         style="background-image: url('https://images.unsplash.com/photo-1616236812482-6bcf025f7074?q=80&w=1171&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D');">
+        <!-- Overlay, aby obraz był bardziej widoczny na tle (opcjonalnie) -->
+        <div class="absolute inset-0 bg-black opacity-50"></div>
+
+        <!-- Kontener na środku ekranu, który centruje zawartość -->
+        <div class="relative z-10 flex items-center justify-center min-h-screen p-4">
+            <!-- Link otaczający obraz -->
+            <a href="https://transport-nomad.com/app?" target="_blank" rel="noopener noreferrer"
+               class="block rounded-lg shadow-xl hover:scale-105 transition-transform duration-300 ease-in-out">
+                <!-- Obraz logo -->
+                <img src="logo_black_small_cropped.PNG" alt="Transport Nomad Logo"
+                     class="max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg h-auto rounded-lg">
+            </a>
+        </div>
+    </div>
+</body>
+</html>
