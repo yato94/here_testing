@@ -14,7 +14,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Connect cargo removal callback
     scene3d.onCargoRemoved = (removedCargo) => {
         cargoManager.removeCargoItem(removedCargo);
-        ui.updateCargoList();
+        ui.updateLoadedUnitsList();
+        ui.updateStatistics();
+        ui.updateAxleIndicators();
+    };
+    
+    // Connect cargo rearranged callback
+    cargoManager.onCargoRearranged = () => {
+        ui.updateLoadedUnitsList();
         ui.updateStatistics();
         ui.updateAxleIndicators();
     };

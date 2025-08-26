@@ -11,7 +11,7 @@
     <div class="app-container">
         <div class="main-content">
             <!-- Panel lewy -->
-            <aside class="left-panel">
+            <aside class="left-panel" id="leftPanel">
                 <!-- Wybór przestrzeni ładunkowej -->
                 <section class="panel-section">
                     <h3 class="section-title">Przestrzeń ładunkowa</h3>
@@ -858,7 +858,7 @@
                             <svg class="icon" viewBox="0 0 24 24">
                                 <path d="M9 3L5 7l4 4V8h7v3l4-4-4-4v3H9V3zm-4 9l-4 4 4 4v-3h7v3l4-4-4-4v3H5v-3z"/>
                             </svg>
-                            Automatyczne rozmieszczenie
+                            Rozmieszczenie
                         </button>
                         <button id="clearSpace" class="btn btn-secondary">
                             <svg class="icon" viewBox="0 0 24 24">
@@ -870,7 +870,7 @@
                             <svg class="icon" viewBox="0 0 24 24">
                                 <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                             </svg>
-                            Eksportuj PNG
+                            Eksportuj
                         </button>
                     </div>
                 </div>
@@ -919,10 +919,22 @@
                         <span class="axle-value">0 / 23000 kg</span>
                     </div>
                 </div>
+                
+                <!-- Mobile toggle buttons -->
+                <button class="toggle-left-panel" id="toggleLeftPanel" style="display: none;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 12h18m-9-7 7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <button class="toggle-right-panel" id="toggleRightPanel" style="display: none;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
             </main>
 
             <!-- Panel prawy -->
-            <aside class="right-panel">
+            <aside class="right-panel" id="rightPanel">
                 <!-- Lista załadowanych jednostek -->
                 <section class="panel-section units-section">
                     <h3 class="section-title">Załadowane jednostki</h3>

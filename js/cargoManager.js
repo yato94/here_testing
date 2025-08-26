@@ -178,7 +178,13 @@ class CargoManager {
             
             // Re-validate and reposition remaining items if needed
             if (this.cargoItems.length > 0 && this.cargoItems.length <= 50) {
-                setTimeout(() => this.autoArrange(), 100);
+                setTimeout(() => {
+                    this.autoArrange();
+                    // Update UI after rearranging
+                    if (this.onCargoRearranged) {
+                        this.onCargoRearranged();
+                    }
+                }, 100);
             }
         }
     }

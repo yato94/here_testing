@@ -16,7 +16,54 @@ class UI {
         this.setupControlButtons();
         this.setupViewControls();
         this.setupModalHandlers();
+        this.setupMobileToggles();
         this.updateStatistics();
+    }
+    
+    setupMobileToggles() {
+        const leftPanel = document.getElementById('leftPanel');
+        const rightPanel = document.getElementById('rightPanel');
+        const toggleLeft = document.getElementById('toggleLeftPanel');
+        const toggleRight = document.getElementById('toggleRightPanel');
+        
+        // Check screen size and show/hide toggle buttons
+        const checkScreenSize = () => {
+            if (window.innerWidth <= 768) {
+                toggleLeft.style.display = 'flex';
+                leftPanel.classList.add('collapsed');
+            } else {
+                toggleLeft.style.display = 'none';
+                leftPanel.classList.remove('collapsed');
+            }
+            
+            if (window.innerWidth <= 1024) {
+                toggleRight.style.display = 'flex';
+                rightPanel.classList.add('collapsed');
+            } else {
+                toggleRight.style.display = 'none';
+                rightPanel.classList.remove('collapsed');
+            }
+        };
+        
+        // Toggle left panel
+        toggleLeft.addEventListener('click', () => {
+            leftPanel.classList.toggle('collapsed');
+            toggleLeft.innerHTML = leftPanel.classList.contains('collapsed') ? 
+                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M15 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' :
+                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        });
+        
+        // Toggle right panel
+        toggleRight.addEventListener('click', () => {
+            rightPanel.classList.toggle('collapsed');
+            toggleRight.innerHTML = rightPanel.classList.contains('collapsed') ? 
+                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' :
+                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        });
+        
+        // Check on init and resize
+        checkScreenSize();
+        window.addEventListener('resize', checkScreenSize);
     }
     
     setupVehicleSelector() {
@@ -856,6 +903,20 @@ class UI {
             const unitVolume = group.sample.length * group.sample.width * group.sample.height;
             const totalVolume = unitVolume * group.items.length;
             
+            // Calculate floor area (M²) and LDM for ground units only
+            const groundItems = group.items.filter(item => {
+                // Check if item has position and is on ground level
+                return item.position && Math.abs(item.position.y - item.height/2) < 0.01;
+            });
+            const floorArea = groundItems.length * group.sample.length * group.sample.width;
+            
+            // Calculate LDM - Loading Meter
+            const containerWidth = this.cargoManager.containerDimensions ? 
+                Math.floor(this.cargoManager.containerDimensions.width * 10) / 10 : 2.4; // Default 2.4m if no container
+            const ldm = groundItems.reduce((sum, item) => {
+                return sum + (item.length * item.width) / containerWidth;
+            }, 0);
+            
             // Create color indicator
             const colorStyle = group.color ? `style="background-color: ${group.color};"` : '';
             
@@ -925,6 +986,14 @@ class UI {
                         <div class="unit-footer-item">
                             <div class="unit-footer-value">${totalVolume.toFixed(3)} m³</div>
                             <div class="unit-footer-label">OBJĘTOŚĆ</div>
+                        </div>
+                        <div class="unit-footer-item">
+                            <div class="unit-footer-value">${floorArea.toFixed(2)} m²</div>
+                            <div class="unit-footer-label">POWIERZCHNIA</div>
+                        </div>
+                        <div class="unit-footer-item">
+                            <div class="unit-footer-value">${ldm.toFixed(2)}</div>
+                            <div class="unit-footer-label">LDM</div>
                         </div>
                     </div>
                 </div>
