@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TransportNomad - Load Planner</title>
+    <link rel="icon" type="image/png" href="https://transport-nomad.com/favicon.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <div class="main-content">
+            <!-- Panel lewy -->
+            <aside class="left-panel" id="leftPanel">
+                <!-- Wybór przestrzeni ładunkowej -->
+                <section class="panel-section">
+                    <h3 class="section-title">Przestrzeń ładunkowa</h3>
+                    <div class="custom-select-wrapper">
+                        <div class="custom-select" id="vehicleSelect">
+                            <div class="custom-select-trigger">
+                                <div class="selected-option">
+                                    <div class="option-name">Naczepa standardowa</div>
+                                    <div class="option-dimensions">13.6m × 2.48m × 2.7m</div>
+                                </div>
+                                <svg class="select-arrow" viewBox="0 0 24 24" width="20" height="20">
+                                    <path d="M7 10l5 5 5-5z" fill="currentColor"/>
+                                </svg>
+                            </div>
+                            <div class="custom-options hidden">
+                                <div class="custom-option" data-value="standard">
+                                    <div class="option-name">Naczepa standardowa</div>
+                                    <div class="option-dimensions">13.6m × 2.48m × 2.7m</div>
+                                </div>
+                                <div class="custom-option" data-value="mega">
+                                    <div class="option-name">Mega trailer</div>
+                                    <div class="option-dimensions">13.6m × 2.48m × 3m</div>
+                                </div>
+                                <div class="custom-option" data-value="jumbo">
+                                    <div class="option-name">JUMBO (7.7m+7.7m)</div>
+                                    <div class="option-dimensions">15.4m × 2.48m × 3m</div>
+                                </div>
+                                <div class="custom-option" data-value="coilmuldeStandard">
+                                    <div class="option-name">Coilmulde Standard</div>
+                                    <div class="option-dimensions">13.6m × 2.48m × 2.7m (z rowkiem)</div>
+                                </div>
+                                <div class="custom-option" data-value="coilmuldeMega">
+                                    <div class="option-name">Coilmulde Mega</div>
+                                    <div class="option-dimensions">13.6m × 2.48m × 3m (z rowkiem)</div>
+                                </div>
+                                <div class="custom-option" data-value="container20">
+                                    <div class="option-name">Kontener 20'</div>
+                                    <div class="option-dimensions">6.06m × 2.44m × 2.59m</div>
+                                </div>
+                                <div class="custom-option" data-value="container40">
+                                    <div class="option-name">Kontener 40'</div>
+                                    <div class="option-dimensions">12.19m × 2.44m × 2.59m</div>
+                                </div>
+                                <div class="custom-option" data-value="container40hc">
+                                    <div class="option-name">Kontener 40' HC</div>
+                                    <div class="option-dimensions">12.19m × 2.44m × 2.90m</div>
+                                </div>
+                                <div class="custom-option" data-value="custom">
+                                    <div class="option-name">Własne wymiary</div>
+                                    <div class="option-dimensions">Zdefiniuj własne parametry</div>
+                                </div>
+                            </div>
+                        </div>
+                        <select id="vehicleType" class="hidden-select">
+                            <option value="standard">Naczepa standardowa</option>
+                            <option value="mega">Mega trailer</option>
+                            <option value="jumbo">JUMBO</option>
+                            <option value="coilmuldeStandard">Coilmulde Standard</option>
+                            <option value="coilmuldeMega">Coilmulde Mega</option>
+                            <option value="container20">Kontener 20'</option>
+                            <option value="container40">Kontener 40'</option>
+                            <option value="container40hc">Kontener 40' HC</option>
+                            <option value="custom">Własne wymiary</option>
+                        </select>
+                    </div>
+                    
+                    <div id="customDimensions" class="custom-dimensions hidden">
+                        <div class="input-group">
+                            <label>Długość (m)</label>
+                            <input type="number" id="customLength" step="0.1" value="13.6">
+                        </div>
+                        <div class="input-group">
+                            <label>Szerokość (m)</label>
+                            <input type="number" id="customWidth" step="0.1" value="2.48">
+                        </div>
+                        <div class="input-group">
+                            <label>Wysokość (m)</label>
+                            <input type="number" id="customHeight" step="0.1" value="2.7">
+                        </div>
+                    </div>
+
+                    <div class="vehicle-info">
+                        <div class="info-item">
+                            <span class="info-label">Wymiary:</span>
+                            <span id="dimensionsInfo" class="info-value">13.6 × 2.48 × 2.7 m</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Objętość:</span>
+                            <span id="volumeInfo" class="info-value">90 m³</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Max. ładowność:</span>
+                            <span id="maxLoad" class="info-value">24 ton</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Jednostki ładunkowe -->
+                <section class="panel-section">
+                    <h3 class="section-title">Jednostki ładunkowe</h3>
+                    <div class="cargo-units">
+                        <div class="unit-preset-card" data-type="eur-pallet">
+                            <div class="unit-preset-header">
+                                <div class="unit-preset-icon">📦</div>
+                                <div class="unit-preset-color"></div>
+                                <input type="text" class="unit-preset-name" value="Euro pallet">
+                            </div>
+                            <div class="unit-preset-params">
+                                <div class="unit-preset-dimensions">
+                                    <div class="unit-preset-dim-field">
+                                        <label>Długość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-length" value="120" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Szerokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-width" value="80" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Wysokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-height" value="100" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-weight-field">
+                                    <label>Waga</label>
+                                    <div class="unit-preset-weight-container">
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-kg" value="600" min="0.1" step="0.1">
+                                            <span class="input-unit">kg</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-t" value="0.6" min="0.001" step="0.001">
+                                            <span class="input-unit">t</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-grid">
+                                    <div class="unit-preset-field">
+                                        <label>Piętrowanie</label>
+                                        <div class="unit-preset-stack-group">
+                                            <div class="stack-input-group">
+                                                <input type="number" class="unit-preset-stack" value="2" min="0" max="10">
+                                                <span class="input-unit">szt</span>
+                                            </div>
+                                            <span class="field-separator">/</span>
+                                            <div class="stack-input-group">
+                                                <input type="number" class="unit-preset-max-weight" value="1200" min="0">
+                                                <span class="input-unit">kg</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-field">
+                                        <div class="unit-access-container">
+                                            <div class="access-group">
+                                                <div class="access-label">Loading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="loading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="loading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="loading">Top</span>
+                                                </div>
+                                            </div>
+                                            <div class="access-group">
+                                                <div class="access-label">Unloading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="unloading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="unloading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="unloading">Top</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-actions">
+                                    <button class="btn-preset-add" data-amount="1">+1</button>
+                                    <button class="btn-preset-add" data-amount="2">+2</button>
+                                    <button class="btn-preset-add" data-amount="5">+5</button>
+                                    <button class="btn-preset-add" data-amount="10">+10</button>
+                                    <button class="btn-preset-add-custom">
+                                        <span class="custom-plus">+</span>
+                                        <input type="number" class="custom-add-input" placeholder="..." min="1" max="99">
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="unit-preset-card" data-type="industrial-pallet">
+                            <div class="unit-preset-header">
+                                <div class="unit-preset-icon">📦</div>
+                                <div class="unit-preset-color"></div>
+                                <input type="text" class="unit-preset-name" value="Industrial pallet">
+                            </div>
+                            <div class="unit-preset-params">
+                                <div class="unit-preset-dimensions">
+                                    <div class="unit-preset-dim-field">
+                                        <label>Długość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-length" value="120" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Szerokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-width" value="100" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Wysokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-height" value="100" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-weight-field">
+                                    <label>Waga</label>
+                                    <div class="unit-preset-weight-container">
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-kg" value="900" min="0.1" step="0.1">
+                                            <span class="input-unit">kg</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-t" value="0.9" min="0.001" step="0.001">
+                                            <span class="input-unit">t</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-grid">
+                                    <div class="unit-preset-field">
+                                        <label>Piętrowanie</label>
+                                        <div class="unit-preset-stack-group">
+                                            <div class="stack-input-group">
+                                                <input type="number" class="unit-preset-stack" value="2" min="0" max="10">
+                                            <span class="input-unit">szt</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="stack-input-group">
+                                            <input type="number" class="unit-preset-max-weight" value="1800" min="0">
+                                                <span class="input-unit">kg</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-field">
+                                        <div class="unit-access-container">
+                                            <div class="access-group">
+                                                <div class="access-label">Loading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="loading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="loading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="loading">Top</span>
+                                                </div>
+                                            </div>
+                                            <div class="access-group">
+                                                <div class="access-label">Unloading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="unloading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="unloading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="unloading">Top</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-actions">
+                                    <button class="btn-preset-add" data-amount="1">+1</button>
+                                    <button class="btn-preset-add" data-amount="2">+2</button>
+                                    <button class="btn-preset-add" data-amount="5">+5</button>
+                                    <button class="btn-preset-add" data-amount="10">+10</button>
+                                    <button class="btn-preset-add-custom">
+                                        <span class="custom-plus">+</span>
+                                        <input type="number" class="custom-add-input" placeholder="..." min="1" max="99">
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="unit-preset-card" data-type="gitterbox">
+                            <div class="unit-preset-header">
+                                <div class="unit-preset-icon">📦</div>
+                                <div class="unit-preset-color"></div>
+                                <input type="text" class="unit-preset-name" value="GitterBox">
+                            </div>
+                            <div class="unit-preset-params">
+                                <div class="unit-preset-dimensions">
+                                    <div class="unit-preset-dim-field">
+                                        <label>Długość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-length" value="120" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Szerokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-width" value="80" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Wysokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-height" value="90" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-weight-field">
+                                    <label>Waga</label>
+                                    <div class="unit-preset-weight-container">
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-kg" value="950" min="0.1" step="0.1">
+                                            <span class="input-unit">kg</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-t" value="0.95" min="0.001" step="0.001">
+                                            <span class="input-unit">t</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-grid">
+                                    <div class="unit-preset-field">
+                                        <label>Piętrowanie</label>
+                                        <div class="unit-preset-stack-group">
+                                            <div class="stack-input-group">
+                                                <input type="number" class="unit-preset-stack" value="2" min="0" max="10">
+                                            <span class="input-unit">szt</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="stack-input-group">
+                                            <input type="number" class="unit-preset-max-weight" value="1900" min="0">
+                                                <span class="input-unit">kg</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-field">
+                                        <div class="unit-access-container">
+                                            <div class="access-group">
+                                                <div class="access-label">Loading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="loading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="loading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="loading">Top</span>
+                                                </div>
+                                            </div>
+                                            <div class="access-group">
+                                                <div class="access-label">Unloading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="unloading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="unloading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="unloading">Top</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-actions">
+                                    <button class="btn-preset-add" data-amount="1">+1</button>
+                                    <button class="btn-preset-add" data-amount="2">+2</button>
+                                    <button class="btn-preset-add" data-amount="5">+5</button>
+                                    <button class="btn-preset-add" data-amount="10">+10</button>
+                                    <button class="btn-preset-add-custom">
+                                        <span class="custom-plus">+</span>
+                                        <input type="number" class="custom-add-input" placeholder="..." min="1" max="99">
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="unit-preset-card" data-type="ibc-bin">
+                            <div class="unit-preset-header">
+                                <div class="unit-preset-icon">📦</div>
+                                <div class="unit-preset-color"></div>
+                                <input type="text" class="unit-preset-name" value="IBC Bin">
+                            </div>
+                            <div class="unit-preset-params">
+                                <div class="unit-preset-dimensions">
+                                    <div class="unit-preset-dim-field">
+                                        <label>Długość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-length" value="120" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Szerokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-width" value="100" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Wysokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-height" value="118" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-weight-field">
+                                    <label>Waga</label>
+                                    <div class="unit-preset-weight-container">
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-kg" value="1100" min="0.1" step="0.1">
+                                            <span class="input-unit">kg</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-t" value="1.1" min="0.001" step="0.001">
+                                            <span class="input-unit">t</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-grid">
+                                    <div class="unit-preset-field">
+                                        <label>Piętrowanie</label>
+                                        <div class="unit-preset-stack-group">
+                                            <div class="stack-input-group">
+                                                <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
+                                            <span class="input-unit">szt</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="stack-input-group">
+                                            <input type="number" class="unit-preset-max-weight" value="0" min="0">
+                                                <span class="input-unit">kg</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-field">
+                                        <div class="unit-access-container">
+                                            <div class="access-group">
+                                                <div class="access-label">Loading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="loading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="loading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="loading">Top</span>
+                                                </div>
+                                            </div>
+                                            <div class="access-group">
+                                                <div class="access-label">Unloading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="unloading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="unloading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="unloading">Top</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-actions">
+                                    <button class="btn-preset-add" data-amount="1">+1</button>
+                                    <button class="btn-preset-add" data-amount="2">+2</button>
+                                    <button class="btn-preset-add" data-amount="5">+5</button>
+                                    <button class="btn-preset-add" data-amount="10">+10</button>
+                                    <button class="btn-preset-add-custom">
+                                        <span class="custom-plus">+</span>
+                                        <input type="number" class="custom-add-input" placeholder="..." min="1" max="99">
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="unit-preset-card" data-type="big-euro-pallet">
+                            <div class="unit-preset-header">
+                                <div class="unit-preset-icon">📦</div>
+                                <div class="unit-preset-color"></div>
+                                <input type="text" class="unit-preset-name" value="BigEuroPalet">
+                            </div>
+                            <div class="unit-preset-params">
+                                <div class="unit-preset-dimensions">
+                                    <div class="unit-preset-dim-field">
+                                        <label>Długość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-length" value="120" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Szerokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-width" value="120" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Wysokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-height" value="100" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-weight-field">
+                                    <label>Waga</label>
+                                    <div class="unit-preset-weight-container">
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-kg" value="1200" min="0.1" step="0.1">
+                                            <span class="input-unit">kg</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-t" value="1.2" min="0.001" step="0.001">
+                                            <span class="input-unit">t</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-grid">
+                                    <div class="unit-preset-field">
+                                        <label>Piętrowanie</label>
+                                        <div class="unit-preset-stack-group">
+                                            <div class="stack-input-group">
+                                                <input type="number" class="unit-preset-stack" value="2" min="0" max="10">
+                                            <span class="input-unit">szt</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="stack-input-group">
+                                            <input type="number" class="unit-preset-max-weight" value="2400" min="0">
+                                                <span class="input-unit">kg</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-field">
+                                        <div class="unit-access-container">
+                                            <div class="access-group">
+                                                <div class="access-label">Loading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="loading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="loading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="loading">Top</span>
+                                                </div>
+                                            </div>
+                                            <div class="access-group">
+                                                <div class="access-label">Unloading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="unloading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="unloading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="unloading">Top</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-actions">
+                                    <button class="btn-preset-add" data-amount="1">+1</button>
+                                    <button class="btn-preset-add" data-amount="2">+2</button>
+                                    <button class="btn-preset-add" data-amount="5">+5</button>
+                                    <button class="btn-preset-add" data-amount="10">+10</button>
+                                    <button class="btn-preset-add-custom">
+                                        <span class="custom-plus">+</span>
+                                        <input type="number" class="custom-add-input" placeholder="..." min="1" max="99">
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="unit-preset-card" data-type="steel-coil">
+                            <div class="unit-preset-header">
+                                <div class="unit-preset-icon">💿</div>
+                                <div class="unit-preset-color"></div>
+                                <input type="text" class="unit-preset-name" value="Steel Coil">
+                            </div>
+                            <div class="unit-preset-params">
+                                <div class="unit-preset-dimensions steel-coil-dimensions">
+                                    <div class="unit-preset-dim-field">
+                                        <label>Długość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-length" value="180" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <!-- Hidden fields for width and height (both are diameter - 180cm) -->
+                                    <input type="hidden" class="unit-preset-width" value="180">
+                                    <input type="hidden" class="unit-preset-height" value="180">
+                                </div>
+                                <div class="unit-preset-weight-field">
+                                    <label>Waga</label>
+                                    <div class="unit-preset-weight-container">
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-kg" value="5000" min="0.1" step="0.1">
+                                            <span class="input-unit">kg</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-t" value="5" min="0.001" step="0.001">
+                                            <span class="input-unit">t</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-grid">
+                                    <div class="unit-preset-field">
+                                        <label>Piętrowanie</label>
+                                        <div class="unit-preset-stack-group">
+                                            <div class="stack-input-group">
+                                                <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
+                                            <span class="input-unit">szt</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="stack-input-group">
+                                            <input type="number" class="unit-preset-max-weight" value="0" min="0">
+                                                <span class="input-unit">kg</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-field">
+                                        <div class="unit-access-container">
+                                            <div class="access-group">
+                                                <div class="access-label">Loading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text" data-method="rear" data-type="loading">Back</span>
+                                                    <span class="method-text" data-method="side" data-type="loading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="loading">Top</span>
+                                                </div>
+                                            </div>
+                                            <div class="access-group">
+                                                <div class="access-label">Unloading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text" data-method="rear" data-type="unloading">Back</span>
+                                                    <span class="method-text" data-method="side" data-type="unloading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="unloading">Top</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-actions">
+                                    <button class="btn-preset-add" data-amount="1">+1</button>
+                                    <button class="btn-preset-add" data-amount="2">+2</button>
+                                    <button class="btn-preset-add" data-amount="3">+3</button>
+                                    <button class="btn-preset-add" data-amount="5">+5</button>
+                                    <button class="btn-preset-add-custom">
+                                        <span class="custom-plus">+</span>
+                                        <input type="number" class="custom-add-input" placeholder="..." min="1" max="99">
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="unit-preset-card" data-type="roll">
+                            <div class="unit-preset-header">
+                                <div class="unit-preset-icon">🔘</div>
+                                <div class="unit-preset-color"></div>
+                                <input type="text" class="unit-preset-name" value="Roll">
+                            </div>
+                            <div class="unit-preset-params">
+                                <div class="unit-preset-dimensions">
+                                    <div class="unit-preset-dim-field">
+                                        <label>Średnica</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-length unit-preset-diameter" data-dimension="diameter" value="80" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Wysokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-width unit-preset-roll-height" data-dimension="height" value="120" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <!-- Hidden field for consistency -->
+                                    <input type="hidden" class="unit-preset-height" value="120">
+                                </div>
+                                <div class="unit-preset-weight-field">
+                                    <label>Waga</label>
+                                    <div class="unit-preset-weight-container">
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-kg" value="500" min="0.1" step="0.1">
+                                            <span class="input-unit">kg</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-t" value="0.5" min="0.001" step="0.001">
+                                            <span class="input-unit">t</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-grid">
+                                    <div class="unit-preset-field">
+                                        <label>Piętrowanie</label>
+                                        <div class="unit-preset-stack-group">
+                                            <div class="stack-input-group">
+                                                <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
+                                            <span class="input-unit">szt</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="stack-input-group">
+                                            <input type="number" class="unit-preset-max-weight" value="0" min="0">
+                                                <span class="input-unit">kg</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-field">
+                                        <div class="unit-access-container">
+                                            <div class="access-group">
+                                                <div class="access-label">Loading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="loading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="loading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="loading">Top</span>
+                                                </div>
+                                            </div>
+                                            <div class="access-group">
+                                                <div class="access-label">Unloading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="unloading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="unloading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="unloading">Top</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-actions">
+                                    <button class="btn-preset-add" data-amount="1">+1</button>
+                                    <button class="btn-preset-add" data-amount="2">+2</button>
+                                    <button class="btn-preset-add" data-amount="3">+3</button>
+                                    <button class="btn-preset-add" data-amount="5">+5</button>
+                                    <button class="btn-preset-add-custom">
+                                        <span class="custom-plus">+</span>
+                                        <input type="number" class="custom-add-input" placeholder="..." min="1" max="99">
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="unit-preset-card" data-type="custom-box">
+                            <div class="unit-preset-header">
+                                <div class="unit-preset-icon">📋</div>
+                                <div class="unit-preset-color"></div>
+                                <input type="text" class="unit-preset-name" value="Własne wymiary">
+                            </div>
+                            <div class="unit-preset-params">
+                                <div class="unit-preset-dimensions">
+                                    <div class="unit-preset-dim-field">
+                                        <label>Długość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-length" placeholder="100" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Szerokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-width" placeholder="80" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-dim-field">
+                                        <label>Wysokość</label>
+                                        <div class="dim-input-group">
+                                            <input type="number" class="unit-preset-height" placeholder="60" min="1" step="1">
+                                            <span class="input-unit">cm</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-weight-field">
+                                    <label>Waga</label>
+                                    <div class="unit-preset-weight-container">
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-kg" value="100" min="0.1" step="0.1">
+                                            <span class="input-unit">kg</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="weight-input-group">
+                                            <input type="number" class="unit-preset-weight-t" value="0.1" min="0.001" step="0.001">
+                                            <span class="input-unit">t</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-grid">
+                                    <div class="unit-preset-field">
+                                        <label>Piętrowanie</label>
+                                        <div class="unit-preset-stack-group">
+                                            <div class="stack-input-group">
+                                                <input type="number" class="unit-preset-stack" value="2" min="0" max="10">
+                                            <span class="input-unit">szt</span>
+                                        </div>
+                                        <span class="field-separator">/</span>
+                                        <div class="stack-input-group">
+                                            <input type="number" class="unit-preset-max-weight" value="500" min="0">
+                                                <span class="input-unit">kg</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="unit-preset-field">
+                                        <div class="unit-access-container">
+                                            <div class="access-group">
+                                                <div class="access-label">Loading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="loading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="loading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="loading">Top</span>
+                                                </div>
+                                            </div>
+                                            <div class="access-group">
+                                                <div class="access-label">Unloading</div>
+                                                <div class="access-methods">
+                                                    <span class="method-text active" data-method="rear" data-type="unloading">Back</span>
+                                                    <span class="method-text active" data-method="side" data-type="unloading">Side</span>
+                                                    <span class="method-text active" data-method="top" data-type="unloading">Top</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="unit-preset-actions">
+                                    <button class="btn-preset-add" data-amount="1">+1</button>
+                                    <button class="btn-preset-add" data-amount="2">+2</button>
+                                    <button class="btn-preset-add" data-amount="5">+5</button>
+                                    <button class="btn-preset-add" data-amount="10">+10</button>
+                                    <button class="btn-preset-add-custom">
+                                        <span class="custom-plus">+</span>
+                                        <input type="number" class="custom-add-input" placeholder="..." min="1" max="99">
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+
+            <!-- Scena 3D -->
+            <main class="scene-container">
+                <!-- Górny pasek z logo i przyciskami -->
+                <div class="scene-top-bar">
+                    <div class="logo-section">
+                        <a href="https://transport-nomad.com" target="_blank" class="logo-link">
+                            <img src="https://transport-nomad.com/images/logo-black.png" alt="Transport Nomad" class="scene-logo">
+                        </a>
+                    </div>
+                    <div class="scene-controls">
+                        <button id="autoArrange" class="btn btn-primary">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M9 3L5 7l4 4V8h7v3l4-4-4-4v3H9V3zm-4 9l-4 4 4 4v-3h7v3l4-4-4-4v3H5v-3z"/>
+                            </svg>
+                            Rozmieszczenie
+                        </button>
+                        <button id="clearSpace" class="btn btn-secondary">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                            </svg>
+                            Wyczyść
+                        </button>
+                        <button id="exportPNG" class="btn btn-secondary">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                            </svg>
+                            Eksportuj
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="threejs-container"></div>
+                
+                <!-- Kontrolki widoku -->
+                <div class="view-controls">
+                    <button class="view-btn" data-view="3d" title="Widok 3D">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                        </svg>
+                    </button>
+                    <button class="view-btn" data-view="top" title="Widok z góry">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M3 3h18v18H3V3zm2 2v14h14V5H5z"/>
+                        </svg>
+                    </button>
+                    <button class="view-btn" data-view="side" title="Widok z boku">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M3 9h18v6H3V9zm0-4h18v2H3V5zm0 12h18v2H3v-2z"/>
+                        </svg>
+                    </button>
+                    <button class="view-btn" data-view="front" title="Widok z przodu">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M5 5h14v14H5V5zm2 2v10h10V7H7z"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Wskaźnik obciążenia osi -->
+                <div class="axle-load-indicator">
+                    <div class="axle-header">
+                        <h4>Obciążenie osi</h4>
+                        <button class="axle-settings-btn" id="axleSettingsBtn" title="Ustawienia osi">
+                            <svg viewBox="0 0 24 24" width="20" height="20">
+                                <path fill="currentColor" d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="axle-item">
+                        <span class="axle-label">Oś przednia (ciągnik)</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill front-axle" style="width: 0%"></div>
+                        </div>
+                        <span class="axle-value">0 / 7500 kg</span>
+                    </div>
+                    <div class="axle-item">
+                        <span class="axle-label">Osie napędowe (ciągnik)</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill rear-axle" style="width: 0%"></div>
+                        </div>
+                        <span class="axle-value">0 / 11500 kg</span>
+                    </div>
+                    <div class="axle-item">
+                        <span class="axle-label">Osie naczepy</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill trailer-axle" style="width: 0%"></div>
+                        </div>
+                        <span class="axle-value">0 / 23000 kg</span>
+                    </div>
+                </div>
+                
+                <!-- Mobile toggle buttons -->
+                <button class="toggle-left-panel" id="toggleLeftPanel" style="display: none;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 12h18m-9-7 7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <button class="toggle-right-panel" id="toggleRightPanel" style="display: none;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </main>
+
+            <!-- Panel prawy -->
+            <aside class="right-panel" id="rightPanel">
+                <!-- Lista załadowanych jednostek -->
+                <section class="panel-section units-section">
+                    <h3 class="section-title">Załadowane jednostki</h3>
+                    <div id="loadedUnits" class="loaded-units-list">
+                        <!-- Dynamicznie generowana lista -->
+                    </div>
+                </section>
+
+                <!-- Dolna sekcja z statystykami i akcjami -->
+                <div class="bottom-section">
+                    <!-- Statystyki -->
+                    <section class="panel-section statistics-section">
+                        <h3 class="section-title">Statystyki</h3>
+                        <div class="statistics compact">
+                            <div class="stat-row">
+                                <div class="stat-item-compact">
+                                    <span class="stat-label">Przestrzeń</span>
+                                    <span class="stat-value">0%</span>
+                                </div>
+                                <div class="stat-item-compact">
+                                    <span class="stat-label">Ładowność</span>
+                                    <span class="stat-value">0%</span>
+                                </div>
+                            </div>
+                            <div class="stat-row">
+                                <div class="stat-item-compact">
+                                    <span class="stat-label">Waga</span>
+                                    <span class="stat-value">0 kg</span>
+                                </div>
+                                <div class="stat-item-compact">
+                                    <span class="stat-label">Liczba</span>
+                                    <span class="stat-value">0</span>
+                                </div>
+                            </div>
+                            <div class="stat-item-compact full-width">
+                                <span class="stat-label">Środek ciężkości</span>
+                                <span class="stat-value-small">X: 0m Y: 0m Z: 0m</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Akcje -->
+                    <section class="panel-section actions-section">
+                        <div class="action-buttons compact">
+                            <button id="saveConfig" class="btn btn-small" title="Zapisz konfigurację">
+                                <svg class="icon" viewBox="0 0 24 24">
+                                    <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+                                </svg>
+                                Zapisz
+                            </button>
+                            <button id="loadConfig" class="btn btn-small" title="Wczytaj konfigurację">
+                                <svg class="icon" viewBox="0 0 24 24">
+                                    <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
+                                </svg>
+                                Wczytaj
+                            </button>
+                            <button id="generateReport" class="btn btn-small" title="Generuj raport">
+                                <svg class="icon" viewBox="0 0 24 24">
+                                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                                </svg>
+                                Raport
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Modal dla własnych wymiarów jednostki -->
+    <div id="customUnitModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Definiuj własną jednostkę</h3>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label>Nazwa</label>
+                    <input type="text" id="customUnitName" placeholder="np. Karton">
+                </div>
+                <div class="input-group">
+                    <label>Długość (cm)</label>
+                    <input type="number" id="customUnitLength" step="1" value="100">
+                </div>
+                <div class="input-group">
+                    <label>Szerokość (cm)</label>
+                    <input type="number" id="customUnitWidth" step="1" value="60">
+                </div>
+                <div class="input-group">
+                    <label>Wysokość (cm)</label>
+                    <input type="number" id="customUnitHeight" step="1" value="50">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCustomUnitModal()">Anuluj</button>
+                <button class="btn btn-primary" onclick="addCustomUnit()">Dodaj</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Skrypty -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Biblioteka bin packing będzie zaimplementowana lokalnie -->
+    <script src="js/binPacking.js"></script>
+    <script src="js/config.js"></script>
+    <!-- Modal ustawień osi -->
+    <div id="axleSettingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ustawienia osi i obciążeń</h2>
+                <div class="modal-header-buttons">
+                    <button class="btn btn-secondary btn-sm" id="resetAxleSettings">Przywróć domyślne</button>
+                    <button class="btn btn-primary btn-sm" id="saveAxleSettings">OK</button>
+                    <button class="modal-close" id="closeAxleSettings">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <!-- Konfiguracja liczby osi -->
+                <div class="settings-section">
+                    <h3>Konfiguracja osi</h3>
+                    
+                    <div class="settings-group">
+                        <label class="settings-label">Liczba osi ciągnących (ciągnik):</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="tractorAxles" value="1" checked>
+                                <span>1 oś</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="tractorAxles" value="2">
+                                <span>2 osie</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <label class="settings-label">Liczba osi naczepy:</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="trailerAxles" value="1">
+                                <span>1 oś</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="trailerAxles" value="2">
+                                <span>2 osie</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="trailerAxles" value="3" checked>
+                                <span>3 osie</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Odległości między osiami -->
+                <div class="settings-section">
+                    <h3>Odległości między punktami</h3>
+                    
+                    <div class="settings-grid">
+                        <div class="settings-field">
+                            <label>Przód naczepy → Siodło</label>
+                            <div class="input-group">
+                                <input type="number" id="distFrontToKingpin" value="1.7" min="0.5" max="3" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Siodło → Środek osi naczepy</label>
+                            <div class="input-group">
+                                <input type="number" id="distKingpinToTrailer" value="7.7" min="5" max="10" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Środek osi naczepy → Koniec naczepy</label>
+                            <div class="input-group">
+                                <input type="number" id="distTrailerToEnd" value="4.2" min="2" max="6" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Oś przednia → Siodło</label>
+                            <div class="input-group">
+                                <input type="number" id="distFrontAxleToKingpin" value="3.1" min="2" max="4" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Siodło → Środek osi napędowych</label>
+                            <div class="input-group">
+                                <input type="number" id="distKingpinToDrive" value="0.5" min="0.3" max="2" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Obciążenia na pusto -->
+                <div class="settings-section">
+                    <h3>Obciążenia na pusto</h3>
+                    
+                    <div class="settings-grid">
+                        <div class="settings-field">
+                            <label>Oś przednia (kierująca)</label>
+                            <div class="input-group">
+                                <input type="number" id="emptyFrontAxle" value="5800" min="3000" max="7000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Osie napędowe (razem)</label>
+                            <div class="input-group">
+                                <input type="number" id="emptyDriveAxles" value="3600" min="2000" max="6000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Osie naczepy (razem)</label>
+                            <div class="input-group">
+                                <input type="number" id="emptyTrailerAxles" value="5200" min="3000" max="8000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Limity obciążeń -->
+                <div class="settings-section">
+                    <h3>Limity obciążeń osi</h3>
+                    
+                    <div class="settings-grid">
+                        <div class="settings-field">
+                            <label>Max oś przednia</label>
+                            <div class="input-group">
+                                <input type="number" id="maxFrontAxle" value="7500" min="6000" max="8000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Max osie napędowe</label>
+                            <div class="input-group">
+                                <input type="number" id="maxDriveAxles" value="11500" min="9000" max="13000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Max osie naczepy</label>
+                            <div class="input-group">
+                                <input type="number" id="maxTrailerAxles" value="24000" min="15000" max="27000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-field">
+                            <label>Min obciążenie osi napędowej</label>
+                            <div class="input-group">
+                                <input type="number" id="minDriveAxleLoad" value="25" min="15" max="40" step="1">
+                                <span class="unit">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/scene3d.js"></script>
+    <script src="js/cargoManager.js"></script>
+    <script src="js/axleCalculator.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
