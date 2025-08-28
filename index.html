@@ -903,18 +903,32 @@
 
                 <!-- Wskaźnik obciążenia osi -->
                 <div class="axle-load-indicator">
-                    <h4>Obciążenie osi</h4>
+                    <div class="axle-header">
+                        <h4>Obciążenie osi</h4>
+                        <button class="axle-settings-btn" id="axleSettingsBtn" title="Ustawienia osi">
+                            <svg viewBox="0 0 24 24" width="20" height="20">
+                                <path fill="currentColor" d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
+                            </svg>
+                        </button>
+                    </div>
                     <div class="axle-item">
-                        <span class="axle-label">Oś przednia</span>
+                        <span class="axle-label">Oś przednia (ciągnik)</span>
                         <div class="progress-bar">
                             <div class="progress-fill front-axle" style="width: 0%"></div>
                         </div>
                         <span class="axle-value">0 / 7500 kg</span>
                     </div>
                     <div class="axle-item">
-                        <span class="axle-label">Osie tylne</span>
+                        <span class="axle-label">Osie napędowe (ciągnik)</span>
                         <div class="progress-bar">
                             <div class="progress-fill rear-axle" style="width: 0%"></div>
+                        </div>
+                        <span class="axle-value">0 / 11500 kg</span>
+                    </div>
+                    <div class="axle-item">
+                        <span class="axle-label">Osie naczepy</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill trailer-axle" style="width: 0%"></div>
                         </div>
                         <span class="axle-value">0 / 23000 kg</span>
                     </div>
@@ -1039,6 +1053,175 @@
     <!-- Biblioteka bin packing będzie zaimplementowana lokalnie -->
     <script src="js/binPacking.js"></script>
     <script src="js/config.js"></script>
+    <!-- Modal ustawień osi -->
+    <div id="axleSettingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ustawienia osi i obciążeń</h2>
+                <div class="modal-header-buttons">
+                    <button class="btn btn-secondary btn-sm" id="resetAxleSettings">Przywróć domyślne</button>
+                    <button class="btn btn-primary btn-sm" id="saveAxleSettings">OK</button>
+                    <button class="modal-close" id="closeAxleSettings">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <!-- Konfiguracja liczby osi -->
+                <div class="settings-section">
+                    <h3>Konfiguracja osi</h3>
+                    
+                    <div class="settings-group">
+                        <label class="settings-label">Liczba osi ciągnących (ciągnik):</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="tractorAxles" value="1" checked>
+                                <span>1 oś</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="tractorAxles" value="2">
+                                <span>2 osie</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <label class="settings-label">Liczba osi naczepy:</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="trailerAxles" value="1">
+                                <span>1 oś</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="trailerAxles" value="2">
+                                <span>2 osie</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="trailerAxles" value="3" checked>
+                                <span>3 osie</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Odległości między osiami -->
+                <div class="settings-section">
+                    <h3>Odległości między punktami</h3>
+                    
+                    <div class="settings-grid">
+                        <div class="settings-field">
+                            <label>Przód naczepy → Siodło</label>
+                            <div class="input-group">
+                                <input type="number" id="distFrontToKingpin" value="1.7" min="0.5" max="3" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Siodło → Środek osi naczepy</label>
+                            <div class="input-group">
+                                <input type="number" id="distKingpinToTrailer" value="7.7" min="5" max="10" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Środek osi naczepy → Koniec naczepy</label>
+                            <div class="input-group">
+                                <input type="number" id="distTrailerToEnd" value="4.2" min="2" max="6" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Oś przednia → Siodło</label>
+                            <div class="input-group">
+                                <input type="number" id="distFrontAxleToKingpin" value="3.1" min="2" max="4" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Siodło → Środek osi napędowych</label>
+                            <div class="input-group">
+                                <input type="number" id="distKingpinToDrive" value="0.5" min="0.3" max="2" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Obciążenia na pusto -->
+                <div class="settings-section">
+                    <h3>Obciążenia na pusto</h3>
+                    
+                    <div class="settings-grid">
+                        <div class="settings-field">
+                            <label>Oś przednia (kierująca)</label>
+                            <div class="input-group">
+                                <input type="number" id="emptyFrontAxle" value="5800" min="3000" max="7000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Osie napędowe (razem)</label>
+                            <div class="input-group">
+                                <input type="number" id="emptyDriveAxles" value="3600" min="2000" max="6000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Osie naczepy (razem)</label>
+                            <div class="input-group">
+                                <input type="number" id="emptyTrailerAxles" value="5200" min="3000" max="8000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Limity obciążeń -->
+                <div class="settings-section">
+                    <h3>Limity obciążeń osi</h3>
+                    
+                    <div class="settings-grid">
+                        <div class="settings-field">
+                            <label>Max oś przednia</label>
+                            <div class="input-group">
+                                <input type="number" id="maxFrontAxle" value="7500" min="6000" max="8000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Max osie napędowe</label>
+                            <div class="input-group">
+                                <input type="number" id="maxDriveAxles" value="11500" min="9000" max="13000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-field">
+                            <label>Max osie naczepy</label>
+                            <div class="input-group">
+                                <input type="number" id="maxTrailerAxles" value="24000" min="15000" max="27000" step="100">
+                                <span class="unit">kg</span>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-field">
+                            <label>Min obciążenie osi napędowej</label>
+                            <div class="input-group">
+                                <input type="number" id="minDriveAxleLoad" value="25" min="15" max="40" step="1">
+                                <span class="unit">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="js/scene3d.js"></script>
     <script src="js/cargoManager.js"></script>
     <script src="js/axleCalculator.js"></script>

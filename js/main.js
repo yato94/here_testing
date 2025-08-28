@@ -2,6 +2,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const scene3d = new Scene3D('threejs-container');
     const cargoManager = new CargoManager(scene3d);
     const axleCalculator = new AxleCalculator();
+    
+    // Make axleCalculator globally available for scene3d
+    window.axleCalculator = axleCalculator;
+    
     const ui = new UI(scene3d, cargoManager, axleCalculator);
     
     // Connect drag & drop callback

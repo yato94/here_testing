@@ -36,7 +36,28 @@ class Scene3D {
     
     init() {
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0xffffff);
+        
+        // Create gradient background
+        const canvas = document.createElement('canvas');
+        canvas.width = 2;
+        canvas.height = 256;
+        const context = canvas.getContext('2d');
+        
+        // Create gradient from very light blue to white
+        const gradient = context.createLinearGradient(0, 0, 0, 256);
+        gradient.addColorStop(0, '#e6f5ff');  // Almost white with tiny blue tint at top
+        gradient.addColorStop(0.3, '#f3faff'); // Even lighter
+        gradient.addColorStop(1, '#ffffff');   // Pure white at bottom
+        
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 2, 256);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        
+        // Apply gradient as scene background
+        this.scene.background = texture;
         
         const aspect = this.container.clientWidth / this.container.clientHeight;
         this.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
@@ -92,18 +113,16 @@ class Scene3D {
     }
     
     setupGrid() {
-        const gridHelper = new THREE.GridHelper(CONFIG.grid.size * 1.5, CONFIG.grid.divisions * 1.5, CONFIG.colors.gridHelper, CONFIG.colors.gridHelper);
-        gridHelper.position.y = 0.01;
-        this.scene.add(gridHelper);
-        
+        // Ground plane - light, almost white surface
         const planeGeometry = new THREE.PlaneGeometry(CONFIG.grid.size * 1.5, CONFIG.grid.size * 1.5);
         const planeMaterial = new THREE.MeshStandardMaterial({ 
-            color: CONFIG.colors.ground,
+            color: 0xf5f5f5,  // Very light gray, almost white
             roughness: 0.8,
-            metalness: 0.2
+            metalness: 0.1
         });
         const plane = new THREE.Mesh(planeGeometry, planeMaterial);
         plane.rotation.x = -Math.PI / 2;
+        plane.position.y = 0;
         plane.receiveShadow = true;
         this.scene.add(plane);
     }
@@ -117,6 +136,12 @@ class Scene3D {
         this.containerDimensions = dimensions;
         
         const containerGroup = new THREE.Group();
+        
+        // Get trailer height (default 1.2m if not specified)
+        const trailerHeight = dimensions.trailerHeight || 1.1;
+        
+        // Add truck and wheels visualization
+        this.addTruckAndWheels(containerGroup, dimensions, trailerHeight);
         
         // Check if this is a JUMBO with sections
         if (dimensions.sections && dimensions.sections.length > 0) {
@@ -133,14 +158,46 @@ class Scene3D {
                 // Floor for this section
                 const floorGeometry = new THREE.BoxGeometry(section.length, 0.02, section.width);
                 const floorMaterial = new THREE.MeshStandardMaterial({ 
-                    color: 0x444444,
+                    color: 0xc0c0c0,  // Light gray
                     roughness: 0.9,
                     metalness: 0.1
                 });
                 const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-                floor.position.set(xOffset + section.length / 2, 0, 0);
+                floor.position.set(xOffset + section.length / 2, trailerHeight, 0);
                 floor.receiveShadow = true;
                 containerGroup.add(floor);
+                
+                // Add grid on the floor of each section - square grid
+                const gridSquareSize = 0.5;  // 50cm squares
+                const gridDivisionsX = Math.round(section.length / gridSquareSize);
+                const gridDivisionsZ = Math.round(section.width / gridSquareSize);
+                
+                // Create custom grid with squares
+                const gridMaterial = new THREE.LineBasicMaterial({ color: 0x888888 });
+                const gridGeometry = new THREE.BufferGeometry();
+                const gridVertices = [];
+                
+                // Lines along X axis (length)
+                for (let i = 0; i <= gridDivisionsZ; i++) {
+                    const z = -section.width/2 + (i * gridSquareSize);
+                    gridVertices.push(
+                        xOffset, trailerHeight + 0.01, z,
+                        xOffset + section.length, trailerHeight + 0.01, z
+                    );
+                }
+                
+                // Lines along Z axis (width)
+                for (let i = 0; i <= gridDivisionsX; i++) {
+                    const x = xOffset + (i * gridSquareSize);
+                    gridVertices.push(
+                        x, trailerHeight + 0.01, -section.width/2,
+                        x, trailerHeight + 0.01, section.width/2
+                    );
+                }
+                
+                gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(gridVertices, 3));
+                const grid = new THREE.LineSegments(gridGeometry, gridMaterial);
+                containerGroup.add(grid);
                 
                 // Edges outline for this section
                 const edgesGeometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(section.length, section.height, section.width));
@@ -149,7 +206,7 @@ class Scene3D {
                     linewidth: 2
                 });
                 const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
-                edges.position.set(xOffset + section.length / 2, section.height / 2, 0);
+                edges.position.set(xOffset + section.length / 2, trailerHeight + section.height / 2, 0);
                 containerGroup.add(edges);
                 
                 // Add semi-transparent walls
@@ -160,12 +217,17 @@ class Scene3D {
                     side: THREE.DoubleSide
                 });
                 
-                // Back wall
+                // Back wall - gray fill like floor (front of trailer)
+                const backWallMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0xc0c0c0,  // Same gray as floor
+                    transparent: false,
+                    side: THREE.DoubleSide
+                });
                 const backWall = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.02, section.height, section.width),
-                    wallMaterial
+                    new THREE.BoxGeometry(0.001, section.height, section.width),
+                    backWallMaterial
                 );
-                backWall.position.set(xOffset, section.height / 2, 0);
+                backWall.position.set(xOffset - 0.003, trailerHeight + section.height / 2, 0);
                 containerGroup.add(backWall);
                 
                 // Front wall
@@ -173,7 +235,7 @@ class Scene3D {
                     new THREE.BoxGeometry(0.02, section.height, section.width),
                     wallMaterial
                 );
-                frontWall.position.set(xOffset + section.length, section.height / 2, 0);
+                frontWall.position.set(xOffset + section.length, trailerHeight + section.height / 2, 0);
                 containerGroup.add(frontWall);
                 
                 // Side walls
@@ -181,14 +243,14 @@ class Scene3D {
                     new THREE.BoxGeometry(section.length, section.height, 0.02),
                     wallMaterial
                 );
-                leftWall.position.set(xOffset + section.length / 2, section.height / 2, -section.width / 2);
+                leftWall.position.set(xOffset + section.length / 2, trailerHeight + section.height / 2, -section.width / 2);
                 containerGroup.add(leftWall);
                 
                 const rightWall = new THREE.Mesh(
                     new THREE.BoxGeometry(section.length, section.height, 0.02),
                     wallMaterial
                 );
-                rightWall.position.set(xOffset + section.length / 2, section.height / 2, section.width / 2);
+                rightWall.position.set(xOffset + section.length / 2, trailerHeight + section.height / 2, section.width / 2);
                 containerGroup.add(rightWall);
                 
                 // Add section label
@@ -209,7 +271,7 @@ class Scene3D {
                     side: THREE.DoubleSide
                 });
                 const label = new THREE.Mesh(labelGeometry, labelMaterial);
-                label.position.set(xOffset + section.length / 2, section.height + 0.5, 0);
+                label.position.set(xOffset + section.length / 2, trailerHeight + section.height + 0.5, 0);
                 label.rotation.x = -Math.PI / 4;
                 containerGroup.add(label);
                 
@@ -219,14 +281,46 @@ class Scene3D {
             // Standard single container
             const floorGeometry = new THREE.BoxGeometry(dimensions.length, 0.02, dimensions.width);
             const floorMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x444444,
+                color: 0xc0c0c0,  // Light gray
                 roughness: 0.9,
                 metalness: 0.1
             });
             const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-            floor.position.y = 0;
+            floor.position.y = trailerHeight;
             floor.receiveShadow = true;
             containerGroup.add(floor);
+            
+            // Add grid on the floor - square grid
+            const gridSquareSize = 0.5;  // 50cm squares
+            const gridDivisionsX = Math.round(dimensions.length / gridSquareSize);
+            const gridDivisionsZ = Math.round(dimensions.width / gridSquareSize);
+            
+            // Create custom grid with squares
+            const gridMaterial = new THREE.LineBasicMaterial({ color: 0x888888 });
+            const gridGeometry = new THREE.BufferGeometry();
+            const gridVertices = [];
+            
+            // Lines along X axis (length)
+            for (let i = 0; i <= gridDivisionsZ; i++) {
+                const z = -dimensions.width/2 + (i * gridSquareSize);
+                gridVertices.push(
+                    -dimensions.length/2, trailerHeight + 0.01, z,
+                    dimensions.length/2, trailerHeight + 0.01, z
+                );
+            }
+            
+            // Lines along Z axis (width)
+            for (let i = 0; i <= gridDivisionsX; i++) {
+                const x = -dimensions.length/2 + (i * gridSquareSize);
+                gridVertices.push(
+                    x, trailerHeight + 0.01, -dimensions.width/2,
+                    x, trailerHeight + 0.01, dimensions.width/2
+                );
+            }
+            
+            gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(gridVertices, 3));
+            const grid = new THREE.LineSegments(gridGeometry, gridMaterial);
+            containerGroup.add(grid);
             
             // Add groove for Coilmulde
             if (dimensions.hasGroove) {
@@ -244,7 +338,7 @@ class Scene3D {
                     metalness: 0.05
                 });
                 const groove = new THREE.Mesh(grooveGeometry, grooveMaterial);
-                groove.position.set(grooveXPosition, -dimensions.grooveDepth / 2, 0); // Position in middle of depth
+                groove.position.set(grooveXPosition, trailerHeight - dimensions.grooveDepth / 2, 0); // Position in middle of depth
                 groove.receiveShadow = true;
                 groove.castShadow = false;
                 containerGroup.add(groove);
@@ -264,12 +358,12 @@ class Scene3D {
                     frameThickness
                 );
                 const frontFrame = new THREE.Mesh(frameGeometry, frameMaterial);
-                frontFrame.position.set(grooveXPosition, 0.01, dimensions.grooveWidth / 2 + frameThickness / 2);
+                frontFrame.position.set(grooveXPosition, trailerHeight + 0.01, dimensions.grooveWidth / 2 + frameThickness / 2);
                 containerGroup.add(frontFrame);
                 
                 // Back frame
                 const backFrame = new THREE.Mesh(frameGeometry, frameMaterial);
-                backFrame.position.set(grooveXPosition, 0.01, -dimensions.grooveWidth / 2 - frameThickness / 2);
+                backFrame.position.set(grooveXPosition, trailerHeight + 0.01, -dimensions.grooveWidth / 2 - frameThickness / 2);
                 containerGroup.add(backFrame);
                 
                 // Left frame
@@ -279,12 +373,12 @@ class Scene3D {
                     dimensions.grooveWidth + frameThickness * 2
                 );
                 const leftFrame = new THREE.Mesh(sideFrameGeometry, frameMaterial);
-                leftFrame.position.set(-dimensions.length / 2 + dimensions.grooveStartX - frameThickness / 2, 0.01, 0);
+                leftFrame.position.set(-dimensions.length / 2 + dimensions.grooveStartX - frameThickness / 2, trailerHeight + 0.01, 0);
                 containerGroup.add(leftFrame);
                 
                 // Right frame
                 const rightFrame = new THREE.Mesh(sideFrameGeometry, frameMaterial);
-                rightFrame.position.set(-dimensions.length / 2 + dimensions.grooveStartX + dimensions.grooveLength + frameThickness / 2, 0.01, 0);
+                rightFrame.position.set(-dimensions.length / 2 + dimensions.grooveStartX + dimensions.grooveLength + frameThickness / 2, trailerHeight + 0.01, 0);
                 containerGroup.add(rightFrame);
                 
                 // Create "COIL WELL" text along the inner edge of the frame
@@ -309,7 +403,7 @@ class Scene3D {
                 textMesh.rotation.x = -Math.PI / 2; // Lay flat on floor
                 textMesh.position.set(
                     grooveXPosition, // Center along length
-                    0.02, // Just above floor level
+                    trailerHeight + 0.02, // Just above floor level
                     dimensions.grooveWidth / 2 - 0.15 // Inside the frame, along the front edge
                 );
                 containerGroup.add(textMesh);
@@ -322,32 +416,38 @@ class Scene3D {
                 side: THREE.DoubleSide
             });
             
+            // Back wall - gray fill like floor (front of trailer)
+            const backWallMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xc0c0c0,  // Same gray as floor
+                transparent: false,
+                side: THREE.DoubleSide
+            });
             const backWall = new THREE.Mesh(
-                new THREE.BoxGeometry(0.02, dimensions.height, dimensions.width),
-                wallMaterial
+                new THREE.BoxGeometry(0.001, dimensions.height, dimensions.width),
+                backWallMaterial
             );
-            backWall.position.set(-dimensions.length / 2, dimensions.height / 2, 0);
+            backWall.position.set(-dimensions.length / 2 - 0.003, trailerHeight + dimensions.height / 2, 0);
             containerGroup.add(backWall);
             
             const frontWall = new THREE.Mesh(
                 new THREE.BoxGeometry(0.02, dimensions.height, dimensions.width),
                 wallMaterial
             );
-            frontWall.position.set(dimensions.length / 2, dimensions.height / 2, 0);
+            frontWall.position.set(dimensions.length / 2, trailerHeight + dimensions.height / 2, 0);
             containerGroup.add(frontWall);
             
             const leftWall = new THREE.Mesh(
                 new THREE.BoxGeometry(dimensions.length, dimensions.height, 0.02),
                 wallMaterial
             );
-            leftWall.position.set(0, dimensions.height / 2, -dimensions.width / 2);
+            leftWall.position.set(0, trailerHeight + dimensions.height / 2, -dimensions.width / 2);
             containerGroup.add(leftWall);
             
             const rightWall = new THREE.Mesh(
                 new THREE.BoxGeometry(dimensions.length, dimensions.height, 0.02),
                 wallMaterial
             );
-            rightWall.position.set(0, dimensions.height / 2, dimensions.width / 2);
+            rightWall.position.set(0, trailerHeight + dimensions.height / 2, dimensions.width / 2);
             containerGroup.add(rightWall);
             
             const edgesGeometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(dimensions.length, dimensions.height, dimensions.width));
@@ -356,7 +456,7 @@ class Scene3D {
                 linewidth: 2
             });
             const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
-            edges.position.y = dimensions.height / 2;
+            edges.position.y = trailerHeight + dimensions.height / 2;
             containerGroup.add(edges);
         }
         
@@ -365,14 +465,425 @@ class Scene3D {
         
         this.camera.position.set(
             dimensions.length * 1.5,
-            dimensions.height * 2,
+            trailerHeight + dimensions.height * 2,
             dimensions.width * 1.5
         );
-        this.controls.target.set(0, dimensions.height / 2, 0);
+        this.controls.target.set(0, trailerHeight + dimensions.height / 2, 0);
         this.controls.update();
         
         // Update container bounds for drag & drop and context menu operations
         this.updateContainerBounds(dimensions);
+    }
+    
+    addTruckAndWheels(containerGroup, dimensions, trailerHeight, axleConfig = null) {
+        // Use provided config or get from axleCalculator if available
+        const config = axleConfig || (window.axleCalculator?.axleConfig ? {
+            tractorAxles: window.axleCalculator.axleConfig.tractorAxles,
+            trailerAxles: window.axleCalculator.axleConfig.trailerAxles,
+            distFrontToKingpin: window.axleCalculator.axleConfig.distFrontToKingpin,
+            distKingpinToTrailer: window.axleCalculator.axleConfig.distKingpinToTrailer,
+            distTrailerToEnd: window.axleCalculator.axleConfig.distTrailerToEnd,
+            distFrontAxleToKingpin: window.axleCalculator.axleConfig.distFrontAxleToKingpin,
+            distKingpinToDrive: window.axleCalculator.axleConfig.distKingpinToDrive
+        } : {
+            tractorAxles: 1,
+            trailerAxles: 3,
+            distFrontToKingpin: 1.7,
+            distKingpinToTrailer: 7.7,
+            distTrailerToEnd: 4.2,
+            distFrontAxleToKingpin: 3.1,
+            distKingpinToDrive: 0.5
+        });
+        
+        // Store reference to truck visualization group
+        this.truckVisualizationGroup = new THREE.Group();
+        // Create wireframe material for truck parts
+        const lineMaterial = new THREE.LineBasicMaterial({ 
+            color: 0x003d7a, // Dark blue color for outlines
+            linewidth: 2
+        });
+        
+        // Create fill material for truck parts
+        const fillMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00a6fb, // Vivid blue
+            transparent: true,
+            opacity: 0.95,
+            side: THREE.DoubleSide
+        });
+        
+        // Calculate positions based on provided distances
+        // a) 1.7m from front of loading space to kingpin
+        // b) 7.7m from kingpin to center of trailer axles
+        // c) 4.2m from center of trailer axles to end of loading space
+        // d) 3.1m from front axle to kingpin
+        // e) 0.5m from drive axle BEHIND kingpin
+        
+        const containerFront = -dimensions.length / 2;
+        const containerEnd = dimensions.length / 2;
+        const kingPinX = containerFront + config.distFrontToKingpin;
+        const trailerAxlesX = containerFront + config.distFrontToKingpin + config.distKingpinToTrailer;
+        const frontAxleX = kingPinX - config.distFrontAxleToKingpin;
+        const driveAxlesCenter = kingPinX + config.distKingpinToDrive
+        
+        // Trailer wheels (3 axles with more spacing)
+        const wheelRadius = 0.546;  // Zmniejszone o 4mm aby nie nachodziły na podłogę
+        const wheelWidth = 0.35;   // Zwiększone z 0.3 na 0.35 - szersze opony
+        
+        // Trailer axles based on configuration
+        if (config.trailerAxles === 1) {
+            // Single axle
+            this.addWheel(this.truckVisualizationGroup, trailerAxlesX, wheelRadius, -1.0, wheelRadius, wheelWidth);
+            this.addWheel(this.truckVisualizationGroup, trailerAxlesX, wheelRadius, 1.0, wheelRadius, wheelWidth);
+        } else if (config.trailerAxles === 2) {
+            // Tandem (2 axles)
+            const spacing = 1.31;
+            for (let i = -0.5; i <= 0.5; i += 1) {
+                const axleX = trailerAxlesX + i * spacing;
+                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, -1.0, wheelRadius, wheelWidth);
+                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, 1.0, wheelRadius, wheelWidth);
+            }
+        } else if (config.trailerAxles === 3) {
+            // Tridem (3 axles)
+            const spacing = 1.31;
+            for (let i = -1; i <= 1; i++) {
+                const axleX = trailerAxlesX + i * spacing;
+                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, -1.0, wheelRadius, wheelWidth);
+                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, 1.0, wheelRadius, wheelWidth);
+            }
+        }
+        
+        // Front axle wheels (always single)
+        this.addWheel(this.truckVisualizationGroup, frontAxleX, wheelRadius, -1.0, wheelRadius, wheelWidth);
+        this.addWheel(this.truckVisualizationGroup, frontAxleX, wheelRadius, 1.0, wheelRadius, wheelWidth);
+        
+        // Drive axle wheels based on configuration
+        if (config.tractorAxles === 1) {
+            // Single drive axle (double wheels on each side)
+            this.addWheel(this.truckVisualizationGroup, driveAxlesCenter, wheelRadius, -0.8, wheelRadius, wheelWidth);
+            this.addWheel(this.truckVisualizationGroup, driveAxlesCenter, wheelRadius, -1.1, wheelRadius, wheelWidth);
+            this.addWheel(this.truckVisualizationGroup, driveAxlesCenter, wheelRadius, 0.8, wheelRadius, wheelWidth);
+            this.addWheel(this.truckVisualizationGroup, driveAxlesCenter, wheelRadius, 1.1, wheelRadius, wheelWidth);
+        } else if (config.tractorAxles === 2) {
+            // Tandem drive axles
+            const spacing = 1.35;
+            for (let axle = -0.5; axle <= 0.5; axle += 1) {
+                const axleX = driveAxlesCenter + axle * spacing;
+                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, -0.8, wheelRadius, wheelWidth);
+                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, -1.1, wheelRadius, wheelWidth);
+                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, 0.8, wheelRadius, wheelWidth);
+                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, 1.1, wheelRadius, wheelWidth);
+            }
+        }
+        
+        // Draw simplified truck cabin outline
+        const cabinHeight = 2.3;
+        const cabinLength = 2.2; // Reduced by 10cm
+        const cabinWidth = 2.4;
+        
+        // Add chassis rectangle under the cabin first to calculate its position
+        const cabinX = frontAxleX - 0.2; // Moved 10cm closer to reduce gap to 45cm
+        const cabinFrontX = cabinX - cabinLength/2; // Front of both cabin and chassis align
+        const chassisEndX = driveAxlesCenter + 1.0;
+        const chassisHeight = 0.7; // Increased to be above wheels
+        const chassisWidth = cabinWidth; // Same width as cabin
+        const chassisTopY = 1.09; // Lowered by 1cm to avoid overlapping with floor
+        const chassisBottomY = chassisTopY - chassisHeight;
+        
+        // Create custom chassis geometry with wheel arches
+        const chassisShape = new THREE.Shape();
+        
+        // Start from front bottom left
+        chassisShape.moveTo(cabinFrontX, chassisBottomY);
+        
+        // Go up to top at front
+        chassisShape.lineTo(cabinFrontX, chassisTopY);
+        
+        // Move along top
+        const archRadius = 0.65; // Slightly larger than wheel radius (0.5)
+        
+        chassisShape.lineTo(chassisEndX, chassisTopY);
+        
+        // Go down at the back
+        chassisShape.lineTo(chassisEndX, chassisBottomY);
+        
+        // Return along bottom with wheel cutouts for drive axles
+        if (config.tractorAxles === 2) {
+            // Two drive axles - create two arches
+            const spacing = 1.35;
+            const axle2X = driveAxlesCenter + 0.5 * spacing;
+            const axle1X = driveAxlesCenter - 0.5 * spacing;
+            
+            // From back to second drive axle arch
+            chassisShape.lineTo(axle2X + archRadius, chassisBottomY);
+            chassisShape.lineTo(axle2X + archRadius, chassisTopY - archRadius);
+            chassisShape.arc(-archRadius, 0, archRadius, 0, Math.PI, false);
+            chassisShape.lineTo(axle2X - archRadius, chassisBottomY);
+            
+            // To first drive axle arch
+            chassisShape.lineTo(axle1X + archRadius, chassisBottomY);
+            chassisShape.lineTo(axle1X + archRadius, chassisTopY - archRadius);
+            chassisShape.arc(-archRadius, 0, archRadius, 0, Math.PI, false);
+            chassisShape.lineTo(axle1X - archRadius, chassisBottomY);
+        } else {
+            // Single drive axle - one arch
+            chassisShape.lineTo(driveAxlesCenter + archRadius, chassisBottomY);
+            chassisShape.lineTo(driveAxlesCenter + archRadius, chassisTopY - archRadius);
+            chassisShape.arc(-archRadius, 0, archRadius, 0, Math.PI, false);
+            chassisShape.lineTo(driveAxlesCenter - archRadius, chassisBottomY);
+        }
+        
+        // Continue to front axle arch
+        chassisShape.lineTo(frontAxleX + archRadius, chassisBottomY);
+        
+        // Front wheel arch cutout
+        chassisShape.lineTo(frontAxleX + archRadius, chassisTopY - archRadius);
+        chassisShape.arc(-archRadius, 0, archRadius, 0, Math.PI, false);
+        chassisShape.lineTo(frontAxleX - archRadius, chassisBottomY);
+        
+        // Return to front
+        chassisShape.lineTo(cabinFrontX, chassisBottomY);
+        
+        // Create line segments from the shape
+        const chassisPoints = chassisShape.getPoints(50);
+        const chassisGeometry = new THREE.BufferGeometry().setFromPoints(chassisPoints);
+        const chassisLine = new THREE.Line(chassisGeometry, lineMaterial);
+        
+        // Create the same for the other side
+        const chassisLine2 = chassisLine.clone();
+        chassisLine.position.z = -chassisWidth/2;
+        chassisLine2.position.z = chassisWidth/2;
+        
+        // Add connecting lines between the two sides
+        const connectGeometry = new THREE.BufferGeometry();
+        const connectPoints = [];
+        
+        // Front vertical edges
+        connectPoints.push(new THREE.Vector3(cabinFrontX, chassisBottomY, -chassisWidth/2));
+        connectPoints.push(new THREE.Vector3(cabinFrontX, chassisBottomY, chassisWidth/2));
+        connectPoints.push(new THREE.Vector3(cabinFrontX, chassisTopY, chassisWidth/2));
+        connectPoints.push(new THREE.Vector3(cabinFrontX, chassisTopY, -chassisWidth/2));
+        connectPoints.push(new THREE.Vector3(cabinFrontX, chassisBottomY, -chassisWidth/2));
+        
+        // Back vertical edges
+        connectPoints.push(new THREE.Vector3(chassisEndX, chassisBottomY, -chassisWidth/2));
+        connectPoints.push(new THREE.Vector3(chassisEndX, chassisBottomY, chassisWidth/2));
+        connectPoints.push(new THREE.Vector3(chassisEndX, chassisTopY, chassisWidth/2));
+        connectPoints.push(new THREE.Vector3(chassisEndX, chassisTopY, -chassisWidth/2));
+        connectPoints.push(new THREE.Vector3(chassisEndX, chassisBottomY, -chassisWidth/2));
+        
+        connectGeometry.setFromPoints(connectPoints);
+        const connectLines = new THREE.Line(connectGeometry, lineMaterial);
+        
+        // Cabin positioned to sit directly on top of chassis
+        // Create filled cabin
+        const cabinBoxGeometry = new THREE.BoxGeometry(cabinLength, cabinHeight, cabinWidth);
+        const cabinFill = new THREE.Mesh(cabinBoxGeometry, fillMaterial);
+        cabinFill.position.set(cabinX, chassisTopY + cabinHeight/2, 0);
+        
+        // Create cabin edges
+        const cabinGeometry = new THREE.EdgesGeometry(cabinBoxGeometry);
+        const cabinEdges = new THREE.LineSegments(cabinGeometry, lineMaterial);
+        cabinEdges.position.set(cabinX, chassisTopY + cabinHeight/2, 0);
+        
+        // Create filled chassis using ExtrudeGeometry
+        // Extrude along Z axis
+        const chassisExtrudeSettings = {
+            depth: chassisWidth,
+            bevelEnabled: false,
+            curveSegments: 12
+        };
+        
+        // Use the existing chassis shape
+        const chassisExtrudeGeometry = new THREE.ExtrudeGeometry(chassisShape, chassisExtrudeSettings);
+        const chassisFill = new THREE.Mesh(chassisExtrudeGeometry, fillMaterial);
+        // No rotation needed, just position it correctly
+        chassisFill.position.z = -chassisWidth/2;
+        
+        this.truckVisualizationGroup.add(cabinFill);
+        this.truckVisualizationGroup.add(cabinEdges);
+        this.truckVisualizationGroup.add(chassisFill);
+        // Add all elements to truck visualization group
+        this.truckVisualizationGroup.add(chassisLine);
+        this.truckVisualizationGroup.add(chassisLine2);
+        this.truckVisualizationGroup.add(connectLines);
+        
+        // Add the truck visualization group to the container
+        containerGroup.add(this.truckVisualizationGroup);
+    }
+    
+    addWheel(parent, x, y, z, radius, width) {
+        const wheelGroup = new THREE.Group();
+        
+        // Create rubber material for tire walls - dark gray like real rubber
+        const rubberMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x2a2a2a,  // Ciemnoszary/grafitowy jak prawdziwa guma
+            side: THREE.DoubleSide
+        });
+        
+        // Create black fill material for inner parts
+        const blackFillMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x1a1a1a,  // Prawie czarny dla wewnętrznych części
+            side: THREE.DoubleSide
+        });
+        
+        // Create metallic material for inner disc - using MeshBasicMaterial for guaranteed color
+        const metallicMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x808080,  // Średni srebrny kolor - dobrze wyważony
+            side: THREE.DoubleSide
+        });
+        
+        // Create wheel rim material for lines - changed to black
+        const rimMaterial = new THREE.LineBasicMaterial({ 
+            color: 0x000000,
+            linewidth: 2
+        });
+        
+        const innerRadius = radius * 0.5;  // Zmniejszone z 0.7 na 0.5 - mniejsza felga
+        const hubRadius = radius * 0.15;   // Zmniejszone z 0.2 na 0.15 - mniejsza piasta
+        
+        // Create side faces (both sides of the wheel)
+        // Outer ring (between outer edge and inner circle)
+        const outerRingShape = new THREE.Shape();
+        outerRingShape.absarc(0, 0, radius, 0, Math.PI * 2, false);
+        const outerRingHole = new THREE.Path();
+        outerRingHole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true);
+        outerRingShape.holes = [outerRingHole];
+        
+        // Front outer ring face - use rubber material for tire
+        const outerRingGeometry = new THREE.ShapeGeometry(outerRingShape);
+        const outerRingFront = new THREE.Mesh(outerRingGeometry, rubberMaterial);
+        outerRingFront.position.z = width / 2;
+        wheelGroup.add(outerRingFront);
+        
+        // Back outer ring face - use rubber material for tire
+        const outerRingBack = new THREE.Mesh(outerRingGeometry, rubberMaterial);
+        outerRingBack.position.z = -width / 2;
+        wheelGroup.add(outerRingBack);
+        
+        // Inner ring (between inner circle and hub) - single metallic disc in the center
+        const innerRingShape = new THREE.Shape();
+        innerRingShape.absarc(0, 0, innerRadius, 0, Math.PI * 2, false);
+        const innerRingHole = new THREE.Path();
+        innerRingHole.absarc(0, 0, hubRadius, 0, Math.PI * 2, true);
+        innerRingShape.holes = [innerRingHole];
+        
+        // Single center inner ring face with metallic material
+        const innerRingGeometry = new THREE.ShapeGeometry(innerRingShape);
+        const innerRingCenter = new THREE.Mesh(innerRingGeometry, metallicMaterial);
+        innerRingCenter.position.z = 0; // Centered in the middle of the wheel
+        wheelGroup.add(innerRingCenter);
+        
+        // Create dark gray material for hub
+        const hubMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x404040,  // Ciemnoszary - między czarnym a srebrnym
+            side: THREE.DoubleSide
+        });
+        
+        // Hub center (solid circle) - dark gray, single disc in center
+        const hubShape = new THREE.Shape();
+        hubShape.absarc(0, 0, hubRadius, 0, Math.PI * 2, false);
+        
+        // Single center hub face with dark gray material
+        const hubGeometryShape = new THREE.ShapeGeometry(hubShape);
+        const hubCenter = new THREE.Mesh(hubGeometryShape, hubMaterial);
+        hubCenter.position.z = 0; // Centered in the middle of the wheel
+        wheelGroup.add(hubCenter);
+        
+        // Create cylindrical walls
+        // Outer wall - use rubber material for tire
+        const outerWallGeometry = new THREE.CylinderGeometry(radius, radius, width, 32, 1, true);
+        const outerWall = new THREE.Mesh(outerWallGeometry, rubberMaterial);
+        outerWall.rotation.x = Math.PI / 2;
+        wheelGroup.add(outerWall);
+        
+        // Add caps at the ends of outer cylinder (tire ends) - use rubber material
+        const outerCapShape = new THREE.Shape();
+        outerCapShape.absarc(0, 0, radius, 0, Math.PI * 2, false);
+        const outerCapHole = new THREE.Path();
+        outerCapHole.absarc(0, 0, radius * 0.9, 0, Math.PI * 2, true);
+        outerCapShape.holes = [outerCapHole];
+        
+        // Front outer cap - rubber material
+        const outerCapGeometry = new THREE.ShapeGeometry(outerCapShape);
+        const outerCapFront = new THREE.Mesh(outerCapGeometry, rubberMaterial);
+        outerCapFront.position.z = width / 2;
+        wheelGroup.add(outerCapFront);
+        
+        // Back outer cap - rubber material
+        const outerCapBack = new THREE.Mesh(outerCapGeometry, rubberMaterial);
+        outerCapBack.position.z = -width / 2;
+        wheelGroup.add(outerCapBack);
+        
+        // Inner wall (slightly shorter) - keep it open
+        const innerWallGeometry = new THREE.CylinderGeometry(innerRadius, innerRadius, width * 0.9, 24, 1, true); // true = open cylinder
+        const innerWall = new THREE.Mesh(innerWallGeometry, blackFillMaterial);
+        innerWall.rotation.x = Math.PI / 2;
+        wheelGroup.add(innerWall);
+        
+        // Add small caps at the ends of inner cylinder
+        const innerCapShape = new THREE.Shape();
+        const innerCapOuter = new THREE.Path();
+        innerCapOuter.absarc(0, 0, innerRadius, 0, Math.PI * 2, false);
+        const innerCapInner = new THREE.Path();
+        innerCapInner.absarc(0, 0, innerRadius * 0.9, 0, Math.PI * 2, true);
+        innerCapShape.absarc(0, 0, innerRadius, 0, Math.PI * 2, false);
+        innerCapShape.holes = [innerCapInner];
+        
+        // Front cap
+        const innerCapGeometry = new THREE.ShapeGeometry(innerCapShape);
+        const innerCapFront = new THREE.Mesh(innerCapGeometry, blackFillMaterial);
+        innerCapFront.position.z = width * 0.45;
+        wheelGroup.add(innerCapFront);
+        
+        // Back cap  
+        const innerCapBack = new THREE.Mesh(innerCapGeometry, blackFillMaterial);
+        innerCapBack.position.z = -width * 0.45;
+        wheelGroup.add(innerCapBack);
+        
+        // Hub wall (shorter - doesn't protrude as much) - use hubMaterial for consistency
+        const hubWallGeometry = new THREE.CylinderGeometry(hubRadius, hubRadius, width * 0.7, 8, 1, true);
+        const hubWall = new THREE.Mesh(hubWallGeometry, hubMaterial);  // Changed to hubMaterial (dark gray)
+        hubWall.rotation.x = Math.PI / 2;
+        wheelGroup.add(hubWall);
+        
+        // Add caps at the ends of hub cylinder (smallest inner cylinder) - also dark gray
+        const hubCapShape = new THREE.Shape();
+        hubCapShape.absarc(0, 0, hubRadius, 0, Math.PI * 2, false);
+        // No hole for hub caps - they are solid
+        
+        // Front hub cap - use hubMaterial instead of black
+        const hubCapGeometry = new THREE.ShapeGeometry(hubCapShape);
+        const hubCapFront = new THREE.Mesh(hubCapGeometry, hubMaterial);
+        hubCapFront.position.z = width * 0.35;  // Zmniejszone z 0.55 na 0.35
+        wheelGroup.add(hubCapFront);
+        
+        // Back hub cap - use hubMaterial instead of black
+        const hubCapBack = new THREE.Mesh(hubCapGeometry, hubMaterial);
+        hubCapBack.position.z = -width * 0.35;  // Zmniejszone z -0.55 na -0.35
+        wheelGroup.add(hubCapBack);
+        
+        // Add edge lines for better definition - all black
+        // Outer circle edges
+        const rimGeometry = new THREE.EdgesGeometry(new THREE.CylinderGeometry(radius, radius, width, 32, 1));
+        const rim = new THREE.LineSegments(rimGeometry, rimMaterial);
+        rim.rotation.x = Math.PI / 2;
+        wheelGroup.add(rim);
+        
+        // Inner circle edges
+        const innerGeometry = new THREE.EdgesGeometry(new THREE.CylinderGeometry(innerRadius, innerRadius, width * 0.9, 24, 1));
+        const innerCircle = new THREE.LineSegments(innerGeometry, rimMaterial);
+        innerCircle.rotation.x = Math.PI / 2;
+        wheelGroup.add(innerCircle);
+        
+        // Hub edges - shortened to match the hub wall
+        const hubGeometry = new THREE.EdgesGeometry(new THREE.CylinderGeometry(hubRadius, hubRadius, width * 0.7, 8, 1));
+        const hub = new THREE.LineSegments(hubGeometry, rimMaterial);
+        hub.rotation.x = Math.PI / 2;
+        wheelGroup.add(hub);
+        
+        // Position the whole wheel group
+        wheelGroup.position.set(x, y, z);
+        parent.add(wheelGroup);
     }
     
     addCargo(cargoData) {
@@ -1290,14 +1801,21 @@ class Scene3D {
         // Sort units by Y position (bottom to top) to process them in order
         unitsToFall.sort((a, b) => a.position.y - b.position.y);
         
+        // Get trailer height
+        const trailerHeight = this.containerDimensions?.trailerHeight || 1.1;
+        
         unitsToFall.forEach(unit => {
             const unitData = unit.userData;
             const halfHeight = unitData.height / 2;
             const halfLength = unitData.length / 2;
             const halfWidth = unitData.width / 2;
             
+            // Check if unit is inside or outside container
+            const isOutside = this.isPositionOutsideContainer(unit.position);
+            
             // Start from current position and find where it should land
-            let landingY = halfHeight; // Ground level by default
+            // If inside container, ground is at trailer height, otherwise at 0
+            let landingY = isOutside ? halfHeight : (trailerHeight + halfHeight);
             
             // Check all other cargo to see if we can land on something
             for (let otherMesh of this.cargoMeshes) {
@@ -1342,10 +1860,7 @@ class Scene3D {
         const unitsAbove = this.getAllObjectsAbove(mesh).filter(u => u !== mesh);
         
         // Remove the selected unit from scene and cargo meshes array
-        const meshIndex = this.cargoMeshes.indexOf(mesh);
-        if (meshIndex > -1) {
-            this.cargoMeshes.splice(meshIndex, 1);
-        }
+        // Don't manually remove from cargoMeshes - let removeCargo handle it
         this.removeCargo(mesh);
         
         // Make units above fall down
@@ -1697,13 +2212,19 @@ class Scene3D {
         const draggedData = this.draggedObjects[0].userData;
         const halfHeight = draggedData.height / 2;
         
+        // Get trailer height from container dimensions
+        const trailerHeight = this.containerDimensions?.trailerHeight || 1.1;
+        
+        // Check if position is outside container
+        const isOutside = this.isPositionOutsideContainer(position);
+        
         // Special handling for steel coils in Coilmulde
-        if (draggedData.fixedDiameter && this.containerBounds && this.containerBounds.hasGroove) {
+        if (draggedData.fixedDiameter && this.containerBounds && this.containerBounds.hasGroove && !isOutside) {
             // Steel coil (with fixedDiameter) must stay in groove
             const coilRadius = draggedData.height / 2;
             return new THREE.Vector3(
                 position.x,
-                -this.containerBounds.grooveDepth / 2 + coilRadius,
+                trailerHeight - this.containerBounds.grooveDepth / 2 + coilRadius,
                 0  // Always centered in groove
             );
         }
@@ -1721,8 +2242,8 @@ class Scene3D {
         // Position is already clamped to container bounds, so just use it
         let adjustedPosition = position.clone();
         
-        // Start with ground level
-        let targetY = halfHeight;
+        // Start with ground level - use trailer height only if inside container
+        let targetY = isOutside ? halfHeight : (trailerHeight + halfHeight);
         let snapPosition = null;
         let canStack = true;
         let isStacking = false;
@@ -1776,7 +2297,10 @@ class Scene3D {
                 );
                 
                 // Only consider units at ground level for side snapping
-                const isGroundLevel = Math.abs(mesh.position.y - targetData.height / 2) < 0.1;
+                // Check if mesh is at ground level (considering trailer height if inside container)
+                const meshIsOutside = this.isPositionOutsideContainer(mesh.position);
+                const expectedGroundY = meshIsOutside ? targetData.height / 2 : (trailerHeight + targetData.height / 2);
+                const isGroundLevel = Math.abs(mesh.position.y - expectedGroundY) < 0.1;
                 
                 if (isGroundLevel && distance < closestDistance) {
                     closestDistance = distance;
@@ -1855,7 +2379,8 @@ class Scene3D {
                 
                 snapPosition = { x: snapX, z: snapZ };
             }
-            targetY = halfHeight; // Ground level for side placement
+            // Ground level for side placement - use trailer height if inside container
+            targetY = isOutside ? halfHeight : (trailerHeight + halfHeight);
             canStack = true; // Side placement is always valid
         }
         
@@ -1892,6 +2417,9 @@ class Scene3D {
         // Store dimensions for later use (needed for ruler in JUMBO)
         this.containerDimensions = dimensions;
         
+        // Get trailer height
+        const trailerHeight = dimensions.trailerHeight || 1.1;
+        
         // Calculate container bounds based on cargo space dimensions
         // Don't use Box3.setFromObject as it includes wall thickness
         if (dimensions.sections && dimensions.sections.length > 0) {
@@ -1899,12 +2427,12 @@ class Scene3D {
             this.containerBounds = {
                 min: new THREE.Vector3(
                     -dimensions.length / 2,  // Start of first section
-                    0,                        // Floor level
+                    trailerHeight,            // Floor level (elevated)
                     -dimensions.width / 2     // Inner edge of left wall
                 ),
                 max: new THREE.Vector3(
                     dimensions.length / 2,    // End of last section (includes gap)
-                    dimensions.height,        // Ceiling level
+                    trailerHeight + dimensions.height,  // Ceiling level (elevated)
                     dimensions.width / 2      // Inner edge of right wall
                 )
             };
@@ -1917,12 +2445,12 @@ class Scene3D {
             this.containerBounds = {
                 min: new THREE.Vector3(
                     -dimensions.length / 2,  // Inner edge of back wall
-                    0,                        // Floor level
+                    trailerHeight,            // Floor level (elevated)
                     -dimensions.width / 2     // Inner edge of left wall
                 ),
                 max: new THREE.Vector3(
                     dimensions.length / 2,    // Inner edge of front wall
-                    dimensions.height,        // Ceiling level
+                    trailerHeight + dimensions.height,  // Ceiling level (elevated)
                     dimensions.width / 2      // Inner edge of right wall
                 )
             };
@@ -2248,11 +2776,13 @@ class Scene3D {
             ? this.containerBounds.max.z + (isSecondSection ? 0.9 : 0.2)  // Front edge, much bigger offset for second ruler
             : this.containerBounds.min.z - (isSecondSection ? 0.9 : 0.2); // Back edge, much bigger offset for second ruler
         
-        const rulerY = isSecondSection ? 0.08 : 0.01; // Second ruler much higher to avoid overlap
+        // Get trailer height from container dimensions
+        const trailerHeight = this.containerDimensions?.trailerHeight || 1.1;
+        const rulerY = trailerHeight + (isSecondSection ? 0.08 : 0.01); // Place at trailer floor height
         
         const lineStart = new THREE.Vector3(startX, rulerY, rulerZ);
         const lineEnd = new THREE.Vector3(endX, rulerY, rulerZ);
-        const labelPos = new THREE.Vector3(endX, isSecondSection ? -0.35 : -0.15, rulerZ);
+        const labelPos = new THREE.Vector3(endX, trailerHeight + (isSecondSection ? -0.35 : -0.15), rulerZ);
         
         // Create main line - use different color for second section in JUMBO
         const lineColor = isSecondSection ? 0x0066cc : 0x000000; // Blue for second section
@@ -2418,5 +2948,29 @@ class Scene3D {
                 resolve(blob);
             });
         });
+    }
+    
+    updateAxleVisualization(config) {
+        // Check if container exists and has truck visualization
+        if (!this.containerMesh || !this.truckVisualizationGroup) {
+            return;
+        }
+        
+        // Get parent container group
+        const parent = this.truckVisualizationGroup.parent;
+        if (!parent) {
+            return;
+        }
+        
+        // Remove current truck visualization
+        parent.remove(this.truckVisualizationGroup);
+        this.truckVisualizationGroup = null;
+        
+        // Rebuild truck and wheels with new configuration
+        const trailerHeight = this.containerDimensions?.trailerHeight || 1.1;
+        this.addTruckAndWheels(parent, this.containerDimensions, trailerHeight, config);
+        
+        // Force render update
+        this.renderer.render(this.scene, this.camera);
     }
 }

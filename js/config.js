@@ -7,9 +7,12 @@ const CONFIG = {
             height: 2.7,
             maxLoad: 24000,
             axles: {
-                front: { position: 1.3, maxLoad: 7500 },
-                rear: { position: 11.5, maxLoad: 23000 }
-            }
+                kingPin: { position: 1.7 },  // a: czop siodła 1.7m od przodu naczepy
+                trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },  // 13.6-4.2=9.4m od przodu (4.2m od końca)
+                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },  // 1.7-3.1=-1.4m od przodu (3.1m przed siodłem)
+                rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }  // 1.7+0.5=2.2m od przodu (0.5m ZA siodłem)
+            },
+            trailerHeight: 1.2  // wysokość podłogi naczepy nad ziemią
         },
         mega: {
             name: 'Mega trailer',
@@ -18,9 +21,12 @@ const CONFIG = {
             height: 3.0,
             maxLoad: 24000,
             axles: {
-                front: { position: 1.3, maxLoad: 7500 },
-                rear: { position: 11.5, maxLoad: 23000 }
-            }
+                kingPin: { position: 1.7 },
+                trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
+                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
+            },
+            trailerHeight: 1.2
         },
         jumbo: {
             name: 'JUMBO',
@@ -33,9 +39,12 @@ const CONFIG = {
             height: 3.0,
             maxLoad: 24000,
             axles: {
-                front: { position: 1.3, maxLoad: 7500 },
-                rear: { position: 11.5, maxLoad: 23000 }
-            }
+                kingPin: { position: 1.7 },
+                trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
+                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
+            },
+            trailerHeight: 1.2
         },
         container20: {
             name: 'Kontener 20\'',
@@ -44,9 +53,12 @@ const CONFIG = {
             height: 2.59,
             maxLoad: 28000,
             axles: {
-                front: { position: 1.3, maxLoad: 7500 },
-                rear: { position: 5.0, maxLoad: 23000 }
-            }
+                kingPin: { position: 1.7 },
+                trailer: { position: 5.0, maxLoad: 24000, emptyWeight: 5200 },
+                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                rear: { position: 1.2, maxLoad: 11500, emptyWeight: 3600 }
+            },
+            trailerHeight: 1.2
         },
         container40: {
             name: 'Kontener 40\'',
@@ -55,9 +67,12 @@ const CONFIG = {
             height: 2.59,
             maxLoad: 28000,
             axles: {
-                front: { position: 1.3, maxLoad: 7500 },
-                rear: { position: 10.0, maxLoad: 23000 }
-            }
+                kingPin: { position: 1.7 },
+                trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
+                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
+            },
+            trailerHeight: 1.2
         },
         container40hc: {
             name: 'Kontener 40\' HC',
@@ -66,9 +81,12 @@ const CONFIG = {
             height: 2.90,
             maxLoad: 28000,
             axles: {
-                front: { position: 1.3, maxLoad: 7500 },
-                rear: { position: 10.0, maxLoad: 23000 }
-            }
+                kingPin: { position: 1.7 },
+                trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
+                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
+            },
+            trailerHeight: 1.2
         },
         coilmuldeStandard: {
             name: 'Coilmulde Standard',
@@ -77,14 +95,17 @@ const CONFIG = {
             height: 2.7,
             maxLoad: 24000,
             hasGroove: true,
-            grooveWidth: 1.25,  // Reduced by 0.85m total
+            grooveWidth: 1.25,
             grooveDepth: 0.3,
             grooveLength: 8.59,
-            grooveStartX: 3.99,  // Start position from the beginning
+            grooveStartX: 3.99,
             axles: {
-                front: { position: 1.3, maxLoad: 7500 },
-                rear: { position: 11.5, maxLoad: 23000 }
-            }
+                kingPin: { position: 1.7 },
+                trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
+                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
+            },
+            trailerHeight: 1.2
         },
         coilmuldeMega: {
             name: 'Coilmulde Mega',
@@ -93,14 +114,17 @@ const CONFIG = {
             height: 3.0,
             maxLoad: 24000,
             hasGroove: true,
-            grooveWidth: 1.25,  // Reduced by 0.85m total
+            grooveWidth: 1.25,
             grooveDepth: 0.3,
             grooveLength: 8.59,
-            grooveStartX: 3.99,  // Start position from the beginning
+            grooveStartX: 3.99,
             axles: {
-                front: { position: 1.3, maxLoad: 7500 },
-                rear: { position: 11.5, maxLoad: 23000 }
-            }
+                kingPin: { position: 1.7 },
+                trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
+                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
+            },
+            trailerHeight: 1.2
         }
     },
     

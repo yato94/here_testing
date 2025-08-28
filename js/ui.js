@@ -17,6 +17,7 @@ class UI {
         this.setupViewControls();
         this.setupModalHandlers();
         this.setupMobileToggles();
+        this.setupAxleSettingsModal();
         this.updateStatistics();
     }
     
@@ -110,11 +111,13 @@ class UI {
                 if (value === 'custom') {
                     customDimensions.classList.remove('hidden');
                     this.currentVehicle = value;
+                    // Axle configuration will be updated in loadCustomVehicle
                 } else {
                     customDimensions.classList.add('hidden');
                     // Pass previous vehicle type to loadVehicle
                     this.loadVehicle(value, previousVehicleType);
                     this.currentVehicle = value;
+                    // Axle configuration is updated in loadVehicle via axleCalculator.setVehicle
                 }
             });
         });
@@ -194,9 +197,10 @@ class UI {
         // Update Steel Coil card based on vehicle type
         this.updateSteelCoilAvailability(vehicle.hasGroove);
         
-        this.cargoManager.setContainer(containerDimensions, vehicle.maxLoad);
-        
+        // First update axle configuration so it's available when creating container visualization
         this.axleCalculator.setVehicle(vehicle);
+        
+        this.cargoManager.setContainer(containerDimensions, vehicle.maxLoad);
         
         document.getElementById('dimensionsInfo').textContent = `${vehicle.length} × ${vehicle.width} × ${vehicle.height} m`;
         const volume = (vehicle.length * vehicle.width * vehicle.height).toFixed(1);
@@ -224,19 +228,20 @@ class UI {
             maxLoad: 24000,
             axles: {
                 front: { position: length * 0.1, maxLoad: 7500 },
-                rear: { position: length * 0.85, maxLoad: 23000 }
+                rear: { position: length * 0.85, maxLoad: 24000 }
             }
         };
         
         // Update Steel Coil availability (custom vehicles don't have groove)
         this.updateSteelCoilAvailability(false);
         
+        // First update axle configuration so it's available when creating container visualization
+        this.axleCalculator.setVehicle(customVehicle);
+        
         this.cargoManager.setContainer(
             { length: length, width: width, height: height },
             customVehicle.maxLoad
         );
-        
-        this.axleCalculator.setVehicle(customVehicle);
         
         document.getElementById('dimensionsInfo').textContent = `${length} × ${width} × ${height} m`;
         const volume = (length * width * height).toFixed(1);
@@ -904,9 +909,12 @@ class UI {
             const totalVolume = unitVolume * group.items.length;
             
             // Calculate floor area (M²) and LDM for ground units only
+            const trailerHeight = this.cargoManager.containerDimensions?.trailerHeight || 1.2;
             const groundItems = group.items.filter(item => {
-                // Check if item has position and is on ground level
-                return item.position && Math.abs(item.position.y - item.height/2) < 0.01;
+                // Check if item has position and is on ground level (trailer floor)
+                // Item is on ground if its bottom is at trailer height
+                const expectedGroundY = trailerHeight + item.height/2;
+                return item.position && Math.abs(item.position.y - expectedGroundY) < 0.1;
             });
             const floorArea = groundItems.length * group.sample.length * group.sample.width;
             
@@ -1588,7 +1596,9 @@ class UI {
         
         const frontAxleElement = document.querySelector('.front-axle');
         const rearAxleElement = document.querySelector('.rear-axle');
+        const trailerAxleElement = document.querySelector('.trailer-axle');
         
+        // Front axle (truck)
         frontAxleElement.style.width = `${Math.min(axleLoads.front.percentage, 100)}%`;
         frontAxleElement.classList.remove('warning', 'danger');
         if (axleLoads.front.status === 'warning') {
@@ -1597,19 +1607,48 @@ class UI {
             frontAxleElement.classList.add('danger');
         }
         
-        rearAxleElement.style.width = `${Math.min(axleLoads.rear.percentage, 100)}%`;
+        // Drive axles (truck drive axles)
+        rearAxleElement.style.width = `${Math.min(axleLoads.drive.percentage, 100)}%`;
         rearAxleElement.classList.remove('warning', 'danger');
-        if (axleLoads.rear.status === 'warning') {
+        if (axleLoads.drive.status === 'warning') {
             rearAxleElement.classList.add('warning');
-        } else if (axleLoads.rear.status === 'danger') {
+        } else if (axleLoads.drive.status === 'danger') {
             rearAxleElement.classList.add('danger');
         }
         
+        // Trailer axles
+        trailerAxleElement.style.width = `${Math.min(axleLoads.trailer.percentage, 100)}%`;
+        trailerAxleElement.classList.remove('warning', 'danger');
+        if (axleLoads.trailer.status === 'warning') {
+            trailerAxleElement.classList.add('warning');
+        } else if (axleLoads.trailer.status === 'danger') {
+            trailerAxleElement.classList.add('danger');
+        }
+        
+        // Update text values
         document.querySelector('.axle-item:nth-child(2) .axle-value').textContent = 
             `${axleLoads.front.load} / ${axleLoads.front.max} kg`;
         
+        // Drive axle with percentage info
+        const driveValueText = `${axleLoads.drive.load} / ${axleLoads.drive.max} kg`;
+        const drivePercentText = axleLoads.drive.percentageOfTotal ? 
+            ` (${axleLoads.drive.percentageOfTotal.toFixed(1)}%)` : '';
         document.querySelector('.axle-item:nth-child(3) .axle-value').textContent = 
-            `${axleLoads.rear.load} / ${axleLoads.rear.max} kg`;
+            driveValueText + drivePercentText;
+        
+        // Add warning class if below minimum
+        const driveItem = document.querySelector('.axle-item:nth-child(3)');
+        if (axleLoads.drive.warning) {
+            driveItem.classList.add('warning-min');
+            // Show warning tooltip or message
+            driveItem.title = axleLoads.drive.warning;
+        } else {
+            driveItem.classList.remove('warning-min');
+            driveItem.title = '';
+        }
+        
+        document.querySelector('.axle-item:nth-child(4) .axle-value').textContent = 
+            `${axleLoads.trailer.load} / ${axleLoads.trailer.max} kg`;
     }
     
     async exportToPNG() {
@@ -1692,8 +1731,9 @@ class UI {
         
         if (axleLoads) {
             report += `OBCIĄŻENIE OSI:\n`;
-            report += `- Oś przednia: ${axleLoads.front.load} / ${axleLoads.front.max} kg (${axleLoads.front.percentage.toFixed(1)}%)\n`;
-            report += `- Osie tylne: ${axleLoads.rear.load} / ${axleLoads.rear.max} kg (${axleLoads.rear.percentage.toFixed(1)}%)\n\n`;
+            report += `- Oś przednia (ciągnik): ${axleLoads.front.load} / ${axleLoads.front.max} kg (${axleLoads.front.percentage.toFixed(1)}%)\n`;
+            report += `- Osie napędowe (ciągnik): ${axleLoads.drive.load} / ${axleLoads.drive.max} kg (${axleLoads.drive.percentage.toFixed(1)}%)\n`;
+            report += `- Osie naczepy: ${axleLoads.trailer.load} / ${axleLoads.trailer.max} kg (${axleLoads.trailer.percentage.toFixed(1)}%)\n\n`;
         }
         
         report += `LISTA ŁADUNKÓW:\n`;
@@ -1740,5 +1780,110 @@ class UI {
             notification.style.animation = 'slideOut 0.3s ease';
             setTimeout(() => notification.remove(), 300);
         }, 3000);
+    }
+    
+    setupAxleSettingsModal() {
+        const modal = document.getElementById('axleSettingsModal');
+        const openBtn = document.getElementById('axleSettingsBtn');
+        const closeBtn = document.getElementById('closeAxleSettings');
+        const saveBtn = document.getElementById('saveAxleSettings');
+        const resetBtn = document.getElementById('resetAxleSettings');
+        
+        // Open modal
+        openBtn.addEventListener('click', () => {
+            this.loadAxleSettings();
+            modal.style.display = 'block';
+        });
+        
+        // Close modal
+        closeBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+        
+        // Close on outside click
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+        
+        // Save settings
+        saveBtn.addEventListener('click', () => {
+            this.saveAxleSettings();
+            modal.style.display = 'none';
+            this.showNotification('Ustawienia osi zapisane', 'success');
+        });
+        
+        // Reset to defaults
+        resetBtn.addEventListener('click', () => {
+            this.axleCalculator.axleConfig.resetToDefaults();
+            this.loadAxleSettings();
+            this.showNotification('Przywrócono domyślne ustawienia', 'info');
+        });
+    }
+    
+    loadAxleSettings() {
+        const config = this.axleCalculator.axleConfig;
+        
+        // Set radio buttons
+        document.querySelector(`input[name="tractorAxles"][value="${config.tractorAxles}"]`).checked = true;
+        document.querySelector(`input[name="trailerAxles"][value="${config.trailerAxles}"]`).checked = true;
+        
+        // Set distances
+        document.getElementById('distFrontToKingpin').value = config.distFrontToKingpin;
+        document.getElementById('distKingpinToTrailer').value = config.distKingpinToTrailer;
+        document.getElementById('distTrailerToEnd').value = config.distTrailerToEnd;
+        document.getElementById('distFrontAxleToKingpin').value = config.distFrontAxleToKingpin;
+        document.getElementById('distKingpinToDrive').value = config.distKingpinToDrive;
+        
+        // Set empty weights
+        document.getElementById('emptyFrontAxle').value = config.emptyFrontAxle;
+        document.getElementById('emptyDriveAxles').value = config.emptyDriveAxles;
+        document.getElementById('emptyTrailerAxles').value = config.emptyTrailerAxles;
+        
+        // Set max loads
+        document.getElementById('maxFrontAxle').value = config.maxFrontAxle;
+        document.getElementById('maxDriveAxles').value = config.maxDriveAxles;
+        document.getElementById('maxTrailerAxles').value = config.maxTrailerAxles;
+        
+        // Set minimum drive axle load
+        document.getElementById('minDriveAxleLoad').value = config.minDriveAxleLoad || 25;
+    }
+    
+    saveAxleSettings() {
+        const config = {
+            // Get axle counts
+            tractorAxles: parseInt(document.querySelector('input[name="tractorAxles"]:checked').value),
+            trailerAxles: parseInt(document.querySelector('input[name="trailerAxles"]:checked').value),
+            
+            // Get distances
+            distFrontToKingpin: parseFloat(document.getElementById('distFrontToKingpin').value),
+            distKingpinToTrailer: parseFloat(document.getElementById('distKingpinToTrailer').value),
+            distTrailerToEnd: parseFloat(document.getElementById('distTrailerToEnd').value),
+            distFrontAxleToKingpin: parseFloat(document.getElementById('distFrontAxleToKingpin').value),
+            distKingpinToDrive: parseFloat(document.getElementById('distKingpinToDrive').value),
+            
+            // Get empty weights
+            emptyFrontAxle: parseFloat(document.getElementById('emptyFrontAxle').value),
+            emptyDriveAxles: parseFloat(document.getElementById('emptyDriveAxles').value),
+            emptyTrailerAxles: parseFloat(document.getElementById('emptyTrailerAxles').value),
+            
+            // Get max loads
+            maxFrontAxle: parseFloat(document.getElementById('maxFrontAxle').value),
+            maxDriveAxles: parseFloat(document.getElementById('maxDriveAxles').value),
+            maxTrailerAxles: parseFloat(document.getElementById('maxTrailerAxles').value),
+            
+            // Get minimum drive axle load
+            minDriveAxleLoad: parseFloat(document.getElementById('minDriveAxleLoad').value)
+        };
+        
+        // Update axle calculator configuration
+        this.axleCalculator.updateAxleConfiguration(config);
+        
+        // Update axle indicators
+        this.updateAxleIndicators();
+        
+        // Update 3D visualization
+        this.scene3d.updateAxleVisualization(config);
     }
 }

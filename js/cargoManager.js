@@ -203,6 +203,9 @@ class CargoManager {
         
         this.scene3d.clearAllCargo();
         
+        // Get trailer height
+        const trailerHeight = this.containerDimensions.trailerHeight || 1.1;
+        
         // Group items by groupId (continuous additions of same type)
         const groups = {};
         this.cargoItems.forEach(item => {
@@ -350,7 +353,7 @@ class CargoManager {
                         
                         item.position = {
                             x: baseX + (itemLength / 2),
-                            y: baseY + (index * stack.sample.height) + (stack.sample.height / 2),
+                            y: trailerHeight + baseY + (index * stack.sample.height) + (stack.sample.height / 2),
                             z: baseZ + (itemWidth / 2)
                         };
                         
@@ -440,7 +443,7 @@ class CargoManager {
                     
                     item.position = {
                         x: baseX + (itemLength / 2),
-                        y: baseY + (index * stack.sample.height) + (stack.sample.height / 2),
+                        y: trailerHeight + baseY + (index * stack.sample.height) + (stack.sample.height / 2),
                         z: baseZ + ((stack.sample.isRoll && stack.sample.fixedDiameter) ? 0 : itemWidth / 2)
                     };
                     
