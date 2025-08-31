@@ -27,6 +27,11 @@ class Scene3D {
         this.clickCount = 0;
         this.clickTimer = null;
         this.ghostMesh = null;
+        
+        // Performance optimization for axle updates
+        this.axleUpdatePending = false;
+        this.lastAxleUpdate = 0;
+        this.axleUpdateThrottle = 16; // Update every 16ms max (60 FPS)
         this.validPosition = false;
         this.canStackAtPosition = true;
         this.containerBounds = null;
@@ -65,8 +70,6 @@ class Scene3D {
         
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
-        this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.container.appendChild(this.renderer.domElement);
         
         this.raycaster = new THREE.Raycaster();
@@ -96,15 +99,6 @@ class Scene3D {
         
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.4);
         directionalLight.position.set(10, 20, 10);
-        directionalLight.castShadow = true;
-        directionalLight.shadow.camera.left = -20;
-        directionalLight.shadow.camera.right = 20;
-        directionalLight.shadow.camera.top = 20;
-        directionalLight.shadow.camera.bottom = -20;
-        directionalLight.shadow.camera.near = 0.1;
-        directionalLight.shadow.camera.far = 50;
-        directionalLight.shadow.mapSize.width = 2048;
-        directionalLight.shadow.mapSize.height = 2048;
         this.scene.add(directionalLight);
         
         const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.2);
@@ -123,7 +117,6 @@ class Scene3D {
         const plane = new THREE.Mesh(planeGeometry, planeMaterial);
         plane.rotation.x = -Math.PI / 2;
         plane.position.y = 0;
-        plane.receiveShadow = true;
         this.scene.add(plane);
     }
     
@@ -164,7 +157,6 @@ class Scene3D {
                 });
                 const floor = new THREE.Mesh(floorGeometry, floorMaterial);
                 floor.position.set(xOffset + section.length / 2, trailerHeight, 0);
-                floor.receiveShadow = true;
                 containerGroup.add(floor);
                 
                 // Add grid on the floor of each section - square grid
@@ -287,7 +279,6 @@ class Scene3D {
             });
             const floor = new THREE.Mesh(floorGeometry, floorMaterial);
             floor.position.y = trailerHeight;
-            floor.receiveShadow = true;
             containerGroup.add(floor);
             
             // Add grid on the floor - square grid
@@ -339,8 +330,6 @@ class Scene3D {
                 });
                 const groove = new THREE.Mesh(grooveGeometry, grooveMaterial);
                 groove.position.set(grooveXPosition, trailerHeight - dimensions.grooveDepth / 2, 0); // Position in middle of depth
-                groove.receiveShadow = true;
-                groove.castShadow = false;
                 containerGroup.add(groove);
                 
                 // Add visible border frame on floor level
@@ -463,13 +452,8 @@ class Scene3D {
         this.containerMesh = containerGroup;
         this.scene.add(this.containerMesh);
         
-        this.camera.position.set(
-            dimensions.length * 1.5,
-            trailerHeight + dimensions.height * 2,
-            dimensions.width * 1.5
-        );
-        this.controls.target.set(0, trailerHeight + dimensions.height / 2, 0);
-        this.controls.update();
+        // Set initial camera view to 3D
+        this.setView('3d');
         
         // Update container bounds for drag & drop and context menu operations
         this.updateContainerBounds(dimensions);
@@ -499,15 +483,15 @@ class Scene3D {
         this.truckVisualizationGroup = new THREE.Group();
         // Create wireframe material for truck parts
         const lineMaterial = new THREE.LineBasicMaterial({ 
-            color: 0x003d7a, // Dark blue color for outlines
+            color: CONFIG.colors.containerWireframe, // Same color as container edges
             linewidth: 2
         });
         
         // Create fill material for truck parts
         const fillMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00a6fb, // Vivid blue
-            transparent: true,
-            opacity: 0.95,
+            color: 0xfaf8f5, // Light creamy white
+            transparent: false,
+            opacity: 1.0,
             side: THREE.DoubleSide
         });
         
@@ -992,8 +976,6 @@ class Scene3D {
             cargoData.z || 0
         );
         
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
         mesh.userData = cargoData;
         
         // Add wireframe only if less than 100 items (performance)
@@ -1057,24 +1039,48 @@ class Scene3D {
         const container = this.containerMesh;
         if (!container) return;
         
+        // Use stored container dimensions
+        const dimensions = this.containerDimensions || {
+            length: 13.6,
+            width: 2.48,
+            height: 2.7
+        };
+        const trailerHeight = dimensions.trailerHeight || 1.2;
+        
         const bounds = new THREE.Box3().setFromObject(container);
-        const size = bounds.getSize(new THREE.Vector3());
         const center = bounds.getCenter(new THREE.Vector3());
+        const size = bounds.getSize(new THREE.Vector3());
         
         switch(viewType) {
             case 'top':
-                this.camera.position.set(center.x, size.y * 2, center.z);
-                break;
+                // View from top - show entire loading space with some margin
+                this.camera.position.set(0, dimensions.height * 7, 0);
+                this.controls.target.set(0, trailerHeight, 0);
+                this.controls.update();
+                return;
             case 'side':
-                this.camera.position.set(center.x, size.y / 2, size.z * 2);
-                break;
+                // View from side - show entire length with margin
+                this.camera.position.set(0, trailerHeight + dimensions.height / 2, dimensions.width * 6);
+                this.controls.target.set(0, trailerHeight + dimensions.height / 2, 0);
+                this.controls.update();
+                return;
             case 'front':
-                this.camera.position.set(size.x * 2, size.y / 2, center.z);
-                break;
+                // View from front/back - show entire width with margin
+                this.camera.position.set(dimensions.length * 1.2, trailerHeight + dimensions.height / 2, 0);
+                this.controls.target.set(0, trailerHeight + dimensions.height / 2, 0);
+                this.controls.update();
+                return;
             case '3d':
             default:
-                this.camera.position.set(size.x * 1.5, size.y * 2, size.z * 1.5);
-                break;
+                // Use the same calculation as before in createContainer
+                this.camera.position.set(
+                    dimensions.length * 0.4,
+                    trailerHeight + dimensions.height * 2,
+                    dimensions.width * 5.5
+                );
+                this.controls.target.set(0, trailerHeight + dimensions.height / 2, 0);
+                this.controls.update();
+                return; // Exit early as we set target differently for 3D view
         }
         
         this.controls.target.copy(center);
@@ -1879,6 +1885,26 @@ class Scene3D {
         }
     }
     
+    updateAxleLoads() {
+        // Update timestamp
+        this.lastAxleUpdate = Date.now();
+        
+        // Temporarily update cargoManager positions for axle calculation
+        const tempUpdatedCargo = this.draggedObjects.map(obj => ({
+            ...obj.userData,
+            position: {
+                x: obj.position.x,
+                y: obj.position.y,
+                z: obj.position.z
+            }
+        }));
+        
+        // Call the update callback
+        if (this.onAxleUpdateNeeded) {
+            this.onAxleUpdateNeeded(tempUpdatedCargo);
+        }
+    }
+    
     handleDragging() {
         if (!this.dragPlane || this.draggedObjects.length === 0) return;
         
@@ -2020,6 +2046,24 @@ class Scene3D {
                         this.lastValidPosition = slidePosition.clone();
                     }
                     // If no slide position found, objects stay at last valid position (sticky effect)
+                }
+            }
+            
+            // Update axle loads dynamically during dragging with throttling
+            if (this.onAxleUpdateNeeded && !this.axleUpdatePending) {
+                const now = Date.now();
+                const timeSinceLastUpdate = now - this.lastAxleUpdate;
+                
+                if (timeSinceLastUpdate >= this.axleUpdateThrottle) {
+                    // Update immediately if enough time has passed
+                    this.updateAxleLoads();
+                } else {
+                    // Schedule update using requestAnimationFrame
+                    this.axleUpdatePending = true;
+                    requestAnimationFrame(() => {
+                        this.updateAxleLoads();
+                        this.axleUpdatePending = false;
+                    });
                 }
             }
         }

@@ -15,6 +15,15 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.updateAxleIndicators();
     };
     
+    // Connect dynamic axle update during dragging
+    scene3d.onAxleUpdateNeeded = (tempUpdatedCargo) => {
+        if (tempUpdatedCargo) {
+            // Temporarily update positions for dragged items
+            cargoManager.updateCargoPositions(tempUpdatedCargo);
+        }
+        ui.updateAxleIndicators();
+    };
+    
     // Connect cargo removal callback
     scene3d.onCargoRemoved = (removedCargo) => {
         cargoManager.removeCargoItem(removedCargo);

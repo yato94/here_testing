@@ -321,6 +321,33 @@ class UI {
                 });
             });
             
+            // Setup weight mode switch
+            const weightModeSwitch = card.querySelector('.weight-mode-switch');
+            const weightLabelText = card.querySelector('.weight-label-text');
+            
+            if (weightModeSwitch && weightLabelText) {
+                weightModeSwitch.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isActive = !weightModeSwitch.classList.contains('active');
+                    const mode = isActive ? 'total' : 'single';
+                    
+                    // Update all switches in all forms
+                    document.querySelectorAll('.weight-mode-switch').forEach(switchEl => {
+                        if (isActive) {
+                            switchEl.classList.add('active');
+                        } else {
+                            switchEl.classList.remove('active');
+                        }
+                        switchEl.dataset.mode = mode;
+                    });
+                    
+                    // Update all labels in all forms
+                    document.querySelectorAll('.weight-label-text').forEach(labelEl => {
+                        labelEl.textContent = isActive ? 'Waga wszystkich jednostek razem' : 'Waga jednej jednostki';
+                    });
+                });
+            }
+            
             // Setup weight kg/ton synchronization and max stack weight calculation
             const weightKgInput = card.querySelector('.unit-preset-weight-kg');
             const weightTInput = card.querySelector('.unit-preset-weight-t');
@@ -328,26 +355,93 @@ class UI {
             const maxWeightInput = card.querySelector('.unit-preset-max-weight');
             
             if (weightKgInput && weightTInput) {
+                // Prevent decimal input in kg field
+                weightKgInput.addEventListener('keydown', (e) => {
+                    // Allow backspace, delete, tab, escape, enter, arrows
+                    if ([8, 9, 27, 13, 37, 38, 39, 40, 46].indexOf(e.keyCode) !== -1 ||
+                        // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                        (e.keyCode === 65 && e.ctrlKey === true) ||
+                        (e.keyCode === 67 && e.ctrlKey === true) ||
+                        (e.keyCode === 86 && e.ctrlKey === true) ||
+                        (e.keyCode === 88 && e.ctrlKey === true)) {
+                        return;
+                    }
+                    // Block decimal point and comma
+                    if (e.key === '.' || e.key === ',') {
+                        e.preventDefault();
+                        return;
+                    }
+                    // Ensure it's a number
+                    if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                        e.preventDefault();
+                    }
+                });
+                
                 weightKgInput.addEventListener('input', (e) => {
-                    const kg = parseFloat(e.target.value) || 0;
-                    weightTInput.value = (kg / 1000).toFixed(3);
+                    // Remove any non-numeric characters
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    const kg = parseInt(value) || 0;
+                    
+                    if (e.target.value !== value) {
+                        e.target.value = value;
+                    }
+                    
+                    weightTInput.value = (kg / 1000).toFixed(2);
                     
                     // Auto-calculate max stack weight
                     if (stackInput && maxWeightInput) {
                         const stackCount = parseInt(stackInput.value) || 0;
-                        maxWeightInput.value = (kg * stackCount).toFixed(0);
+                        maxWeightInput.value = Math.round(kg * stackCount);
+                    }
+                });
+                
+                // Limit tons field to 2 decimal places
+                weightTInput.addEventListener('keydown', (e) => {
+                    const value = e.target.value;
+                    const cursorPos = e.target.selectionStart;
+                    
+                    // Allow control keys
+                    if ([8, 9, 27, 13, 37, 38, 39, 40, 46].indexOf(e.keyCode) !== -1 ||
+                        (e.keyCode === 65 && e.ctrlKey === true) ||
+                        (e.keyCode === 67 && e.ctrlKey === true) ||
+                        (e.keyCode === 86 && e.ctrlKey === true) ||
+                        (e.keyCode === 88 && e.ctrlKey === true)) {
+                        return;
+                    }
+                    
+                    // Check if there's already a decimal point
+                    const decimalIndex = value.indexOf('.');
+                    if (decimalIndex !== -1) {
+                        const decimalsAfter = value.substring(decimalIndex + 1);
+                        // If we have 2 decimals and cursor is after decimal point, block input
+                        if (decimalsAfter.length >= 2 && cursorPos > decimalIndex && e.keyCode >= 48 && e.keyCode <= 57) {
+                            e.preventDefault();
+                            return;
+                        }
                     }
                 });
                 
                 weightTInput.addEventListener('input', (e) => {
-                    const tons = parseFloat(e.target.value) || 0;
-                    const kg = tons * 1000;
-                    weightKgInput.value = kg.toFixed(1);
+                    let value = e.target.value;
+                    
+                    // Limit to 2 decimal places
+                    const decimalIndex = value.indexOf('.');
+                    if (decimalIndex !== -1) {
+                        const decimals = value.substring(decimalIndex + 1);
+                        if (decimals.length > 2) {
+                            value = value.substring(0, decimalIndex + 3);
+                            e.target.value = value;
+                        }
+                    }
+                    
+                    const tons = parseFloat(value) || 0;
+                    const kg = Math.round(tons * 1000);
+                    weightKgInput.value = kg;
                     
                     // Auto-calculate max stack weight
                     if (stackInput && maxWeightInput) {
                         const stackCount = parseInt(stackInput.value) || 0;
-                        maxWeightInput.value = (kg * stackCount).toFixed(0);
+                        maxWeightInput.value = Math.round(kg * stackCount);
                     }
                 });
             }
@@ -356,8 +450,8 @@ class UI {
             if (stackInput && maxWeightInput && weightKgInput) {
                 stackInput.addEventListener('input', (e) => {
                     const stackCount = parseInt(e.target.value) || 0;
-                    const kg = parseFloat(weightKgInput.value) || 0;
-                    maxWeightInput.value = (kg * stackCount).toFixed(0);
+                    const kg = parseInt(weightKgInput.value) || 0;
+                    maxWeightInput.value = Math.round(kg * stackCount);
                 });
             }
             
@@ -404,7 +498,7 @@ class UI {
                     const amount = parseInt(btn.dataset.amount) || 1;
                     
                     // Get all parameters from the preset card
-                    const params = this.getPresetParameters(card);
+                    const params = this.getPresetParameters(card, amount);
                     
                     // Validate dimensions - for all types, not just custom-box
                     if (!params.dimensions || params.dimensions.length <= 0 || params.dimensions.width <= 0 || params.dimensions.height <= 0) {
@@ -457,7 +551,7 @@ class UI {
                     const amount = parseInt(customAddInput.value) || 1;
                     
                     // Get all parameters from the preset card
-                    const params = this.getPresetParameters(card);
+                    const params = this.getPresetParameters(card, amount);
                     
                     // Validate dimensions - for all types, not just custom-box
                     if (!params.dimensions || params.dimensions.length <= 0 || params.dimensions.width <= 0 || params.dimensions.height <= 0) {
@@ -533,12 +627,23 @@ class UI {
         this.setupLegacyCargoUnits();
     }
     
-    getPresetParameters(card) {
+    getPresetParameters(card, amount = 1) {
         const unitType = card.dataset.type;
         const nameInput = card.querySelector('.unit-preset-name');
         const weightInput = card.querySelector('.unit-preset-weight-kg');
         const stackInput = card.querySelector('.unit-preset-stack');
         const maxWeightInput = card.querySelector('.unit-preset-max-weight');
+        
+        // Check weight mode switch
+        const weightModeSwitch = card.querySelector('.weight-mode-switch');
+        const isWeightTotal = weightModeSwitch && weightModeSwitch.classList.contains('active');
+        
+        // Calculate weight per unit based on mode
+        let weightPerUnit = parseFloat(weightInput?.value || 100);
+        if (isWeightTotal && amount > 1) {
+            // If weight mode is "total", divide by amount to get weight per unit
+            weightPerUnit = weightPerUnit / amount;
+        }
         
         // Handle Roll type with diameter and height
         if (unitType === 'roll') {
@@ -571,7 +676,7 @@ class UI {
             
             return {
                 name: nameInput ? nameInput.value : 'Roll',
-                weight: parseFloat(weightInput?.value || 500),
+                weight: weightPerUnit,
                 maxStack: parseInt(stackInput?.value || 0),
                 maxStackWeight: parseFloat(maxWeightInput?.value || 0),
                 loadingMethods: loadingMethods.length > 0 ? loadingMethods : ['rear', 'side', 'top'],
@@ -613,12 +718,15 @@ class UI {
         
         return {
             name: nameInput ? nameInput.value : CONFIG.cargoUnits[unitType]?.name || 'Custom',
-            weight: parseFloat(weightInput?.value || 100),
+            weight: weightPerUnit,
             maxStack: parseInt(stackInput?.value || 3),
             maxStackWeight: parseFloat(maxWeightInput?.value || 2000),
             loadingMethods: loadingMethods.length > 0 ? loadingMethods : ['rear', 'side', 'top'],
             unloadingMethods: unloadingMethods.length > 0 ? unloadingMethods : ['rear', 'side', 'top'],
-            dimensions: dimensions  // Zawsze przekazuj wymiary z pól input
+            dimensions: dimensions,  // Zawsze przekazuj wymiary z pól input
+            // Pass through additional properties from config for special units like Steel Coil
+            isRoll: CONFIG.cargoUnits[unitType]?.isRoll,
+            fixedDiameter: CONFIG.cargoUnits[unitType]?.fixedDiameter
         };
     }
     
@@ -911,18 +1019,52 @@ class UI {
             // Calculate floor area (M²) and LDM for ground units only
             const trailerHeight = this.cargoManager.containerDimensions?.trailerHeight || 1.2;
             const groundItems = group.items.filter(item => {
-                // Check if item has position and is on ground level (trailer floor)
+                // Check if item has position and is on ground level (trailer floor or coil well)
                 // Item is on ground if its bottom is at trailer height
-                const expectedGroundY = trailerHeight + item.height/2;
+                // Steel Coils in coil well are 0.3m lower due to the groove
+                let expectedGroundY = trailerHeight + item.height/2;
+                
+                // Steel Coils in Coilmulde are placed in the groove which is 0.3m deep
+                if (item.type === 'steel-coil' && this.cargoManager.containerDimensions?.hasGroove) {
+                    expectedGroundY = trailerHeight - 0.3 + item.height/2;
+                }
+                
                 return item.position && Math.abs(item.position.y - expectedGroundY) < 0.1;
             });
-            const floorArea = groundItems.length * group.sample.length * group.sample.width;
+            // Calculate floor area - handle both regular items and cylinders (Steel Coil, Roll)
+            let floorArea;
+            
+            if (group.sample.type === 'steel-coil' || (group.sample.type === 'roll' && !group.sample.isHorizontal)) {
+                // For cylinders use circular area
+                // Steel Coil stores diameter as width, Roll has diameter property
+                const diameter = group.sample.diameter || group.sample.width || 1.8;
+                const radius = diameter / 2;
+                floorArea = groundItems.length * Math.PI * radius * radius;
+            } else if (group.sample.type === 'roll' && group.sample.isHorizontal) {
+                // Horizontal roll uses rectangular footprint
+                floorArea = groundItems.length * (group.sample.diameter || 0.8) * (group.sample.rollHeight || 1.2);
+            } else {
+                // Regular rectangular items
+                floorArea = groundItems.length * group.sample.length * group.sample.width;
+            }
             
             // Calculate LDM - Loading Meter
             const containerWidth = this.cargoManager.containerDimensions ? 
                 Math.floor(this.cargoManager.containerDimensions.width * 10) / 10 : 2.4; // Default 2.4m if no container
             const ldm = groundItems.reduce((sum, item) => {
-                return sum + (item.length * item.width) / containerWidth;
+                if (item.type === 'steel-coil' || (item.type === 'roll' && !item.isHorizontal)) {
+                    // For cylinders, use circular area (π × r²) divided by container width
+                    // Steel Coil stores diameter as width, Roll has diameter property
+                    const diameter = item.diameter || item.width || 1.8;
+                    const radius = diameter / 2;
+                    return sum + (Math.PI * radius * radius) / containerWidth;
+                } else if (item.type === 'roll' && item.isHorizontal) {
+                    // Horizontal roll
+                    return sum + ((item.diameter || 0.8) * (item.rollHeight || 1.2)) / containerWidth;
+                } else {
+                    // Regular items
+                    return sum + (item.length * item.width) / containerWidth;
+                }
             }, 0);
             
             // Create color indicator
@@ -1184,9 +1326,11 @@ class UI {
             this.cargoManager.totalWeight += weightDifference;
         }
         
-        // Check stacking limits and unstack if needed
+        // Check stacking limits and rearrange if needed
         if (needsStackingCheck) {
-            this.checkAndFixStacking();
+            // Clear all cargo meshes and re-arrange completely
+            this.scene3d.clearAllCargo();
+            this.cargoManager.autoArrange();
         }
         
         // Update statistics and visualization
@@ -1424,8 +1568,9 @@ class UI {
                 itemsToMove.forEach((item, index) => {
                     // Try to place next to the stack
                     const baseItem = stack[0];
+                    const trailerHeight = this.cargoManager.containerDimensions?.trailerHeight || 1.2;
                     const newX = baseItem.position.x + baseItem.length + item.length / 2 + 0.1;
-                    const newY = item.height / 2;
+                    const newY = item.height / 2 + trailerHeight; // Floor level at trailer height
                     const newZ = baseItem.position.z;
                     
                     // Check if new position is valid
