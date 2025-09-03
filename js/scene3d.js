@@ -922,23 +922,38 @@ class Scene3D {
                 geometry.center();
                 geometry.rotateY(Math.PI / 2);  // Rotate to lie along X axis
                 
-            } else if (cargoData.isRoll && cargoData.isVerticalRoll) {
-                // Roll - vertical cylinder by default
-                const radius = cargoData.width / 2; // width = diameter
-                const height = cargoData.height;
-                
-                geometry = new THREE.CylinderGeometry(
-                    radius,    // top radius
-                    radius,    // bottom radius
-                    height,    // height
-                    32,        // radial segments
-                    1,         // height segments
-                    false      // open ended
-                );
-                
-                // Check if roll is rotated (lying on side)
-                if (cargoData.rotated) {
-                    geometry.rotateZ(Math.PI / 2); // Rotate to lie horizontally
+            } else if (cargoData.isRoll && !cargoData.fixedDiameter) {
+                // Roll - can be vertical or horizontal
+                if (cargoData.isVerticalRoll) {
+                    // Vertical cylinder
+                    const radius = cargoData.width / 2; // width = diameter for vertical
+                    const height = cargoData.height;
+                    
+                    geometry = new THREE.CylinderGeometry(
+                        radius,    // top radius
+                        radius,    // bottom radius
+                        height,    // height
+                        32,        // radial segments
+                        1,         // height segments
+                        false      // open ended
+                    );
+                } else {
+                    // Horizontal cylinder - lying on its side
+                    // For horizontal: length is the cylinder length, width/height are diameter
+                    const radius = cargoData.width / 2; // width = diameter for horizontal
+                    const length = cargoData.length;
+                    
+                    geometry = new THREE.CylinderGeometry(
+                        radius,    // top radius
+                        radius,    // bottom radius
+                        length,    // length along the axis
+                        32,        // radial segments
+                        1,         // height segments
+                        false      // open ended
+                    );
+                    
+                    // Rotate to lie horizontally along X axis
+                    geometry.rotateZ(Math.PI / 2);
                 }
                 
             } else {
@@ -1300,7 +1315,7 @@ class Scene3D {
         }
         
         // Drop the objects - they're already in the correct position
-        // Update their userData positions
+        // Update their userData positions and isOutside flag
         this.draggedObjects.forEach(obj => {
             // Update userData position
             if (obj.userData) {
@@ -1309,6 +1324,8 @@ class Scene3D {
                     y: obj.position.y,
                     z: obj.position.z
                 };
+                // Update isOutside flag based on current position
+                obj.userData.isOutside = this.isPositionOutsideContainer(obj.position);
             }
         });
         
@@ -1391,10 +1408,17 @@ class Scene3D {
             font-size: 12px;
             color: #666;
         `;
+        // Check if it's a Roll and add orientation info
+        let orientationInfo = '';
+        if (cargoData.isRoll && !cargoData.fixedDiameter) {
+            orientationInfo = `Orientacja: ${cargoData.isVerticalRoll ? '⬆ Pionowo' : '➡ Poziomo'}<br>`;
+        }
+        
         detailsSection.innerHTML = `
             <strong style="color: #333;">${cargoData.name || 'Jednostka'}</strong><br>
             Wymiary: ${(cargoData.length*100).toFixed(0)}×${(cargoData.width*100).toFixed(0)}×${(cargoData.height*100).toFixed(0)} cm<br>
             Waga: ${cargoData.weight} kg<br>
+            ${orientationInfo}
             Piętrowanie: ${cargoData.maxStack || 0} szt.<br>
             Załadunek: ${this.formatMethods(cargoData.loadingMethods)}<br>
             Rozładunek: ${this.formatMethods(cargoData.unloadingMethods)}
@@ -1402,14 +1426,16 @@ class Scene3D {
         menu.appendChild(detailsSection);
         
         // Menu items
-        const menuItems = [
+        const menuItems = [];
+        
+        menuItems.push(
             { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
             { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
             { text: '⟲ Obróć do góry (180°)', action: () => this.rotateUnit(mesh, 180) },
             { separator: true },
             { text: '📦 Przenieś poza przestrzeń', action: () => this.moveOutsideContainer(mesh) },
             { text: '🗑️ Usuń jednostkę', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
-        ];
+        );
         
         menuItems.forEach(item => {
             if (item.separator) {
@@ -1782,12 +1808,13 @@ class Scene3D {
                 unit.position.z = newZ;
                 unit.position.y = unit.userData.height / 2 + index * unit.userData.height; // Stack them vertically
                 
-                // Update userData position
+                // Update userData position and mark as outside
                 unit.userData.position = {
                     x: unit.position.x,
                     y: unit.position.y,
                     z: unit.position.z
                 };
+                unit.userData.isOutside = true; // Mark unit as outside the container
             });
             
             // Make units below fall to ground or onto other units
@@ -2252,6 +2279,120 @@ class Scene3D {
     }
     
     
+    findPyramidStackingPosition(position, halfHeight, trailerHeight, isOutside) {
+        const draggedData = this.draggedObjects[0].userData;
+        
+        // Only for vertical rolls
+        if (!draggedData.isVerticalRoll) return null;
+        
+        const rollRadius = draggedData.width / 2;
+        
+        // Find all vertical rolls at ground level
+        const groundRolls = [];
+        for (let mesh of this.cargoMeshes) {
+            if (this.draggedObjects.includes(mesh)) continue;
+            
+            const targetData = mesh.userData;
+            if (!targetData.isVerticalRoll) continue;
+            
+            // Check if at ground level
+            const expectedGroundY = isOutside ? targetData.height / 2 : (trailerHeight + targetData.height / 2);
+            if (Math.abs(mesh.position.y - expectedGroundY) < 0.1) {
+                groundRolls.push(mesh);
+            }
+        }
+        
+        // Try to find two adjacent rolls to stack between
+        for (let i = 0; i < groundRolls.length; i++) {
+            for (let j = i + 1; j < groundRolls.length; j++) {
+                const roll1 = groundRolls[i];
+                const roll2 = groundRolls[j];
+                
+                // Calculate distance between rolls
+                const distance = Math.sqrt(
+                    Math.pow(roll1.position.x - roll2.position.x, 2) +
+                    Math.pow(roll1.position.z - roll2.position.z, 2)
+                );
+                
+                // Check if rolls are adjacent (touching or nearly touching)
+                const roll1Radius = roll1.userData.width / 2;
+                const roll2Radius = roll2.userData.width / 2;
+                const expectedDistance = roll1Radius + roll2Radius + rollRadius * 2;
+                
+                if (Math.abs(distance - (roll1Radius + roll2Radius)) < rollRadius * 2.2) {
+                    // Calculate pyramid position (between the two rolls)
+                    const midX = (roll1.position.x + roll2.position.x) / 2;
+                    const midZ = (roll1.position.z + roll2.position.z) / 2;
+                    
+                    // Check if cursor is near this pyramid position
+                    const cursorDistance = Math.sqrt(
+                        Math.pow(position.x - midX, 2) +
+                        Math.pow(position.z - midZ, 2)
+                    );
+                    
+                    if (cursorDistance < rollRadius * 1.5) {
+                        // Calculate stacking height
+                        const baseHeight = Math.max(roll1.position.y, roll2.position.y);
+                        const stackHeight = Math.sqrt(Math.pow(distance/2, 2) - Math.pow((distance - rollRadius*2)/2, 2)) * 0.8;
+                        
+                        return new THREE.Vector3(
+                            midX,
+                            baseHeight + stackHeight,
+                            midZ
+                        );
+                    }
+                }
+            }
+        }
+        
+        // Also check stacking between roll and wall
+        if (this.containerBounds && !isOutside) {
+            for (let roll of groundRolls) {
+                const rollRadius = roll.userData.width / 2;
+                
+                // Check distance to walls
+                const distToLeftWall = roll.position.x - this.containerBounds.minX;
+                const distToRightWall = this.containerBounds.maxX - roll.position.x;
+                const distToFrontWall = roll.position.z - this.containerBounds.minZ;
+                const distToBackWall = this.containerBounds.maxZ - roll.position.z;
+                
+                // Check if roll is adjacent to a wall
+                let wallPosition = null;
+                let isNearWall = false;
+                
+                if (distToLeftWall < rollRadius * 1.5) {
+                    wallPosition = new THREE.Vector3(
+                        this.containerBounds.minX + rollRadius,
+                        roll.position.y,
+                        roll.position.z
+                    );
+                    isNearWall = true;
+                } else if (distToRightWall < rollRadius * 1.5) {
+                    wallPosition = new THREE.Vector3(
+                        this.containerBounds.maxX - rollRadius,
+                        roll.position.y,
+                        roll.position.z
+                    );
+                    isNearWall = true;
+                }
+                
+                if (isNearWall && wallPosition) {
+                    // Check if cursor is near this position
+                    const cursorDistance = Math.sqrt(
+                        Math.pow(position.x - wallPosition.x, 2) +
+                        Math.pow(position.z - wallPosition.z, 2)
+                    );
+                    
+                    if (cursorDistance < rollRadius * 1.5) {
+                        return wallPosition;
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+    
     calculateDropPosition(position) {
         const draggedData = this.draggedObjects[0].userData;
         const halfHeight = draggedData.height / 2;
@@ -2298,6 +2439,14 @@ class Scene3D {
         // Different thresholds for different unit types
         const snapThreshold = draggedData.isVerticalRoll ? 0.1 : 1.0; // Rolls: 10cm, others: 1m
         
+        
+        // Special handling for vertical rolls - they can stack in pyramid formation
+        if (draggedData.isVerticalRoll) {
+            const pyramidPosition = this.findPyramidStackingPosition(position, halfHeight, trailerHeight, isOutside);
+            if (pyramidPosition) {
+                return pyramidPosition;
+            }
+        }
         
         // Check all cargo meshes for stacking or side snapping
         for (let mesh of this.cargoMeshes) {
@@ -2676,6 +2825,30 @@ class Scene3D {
         
         if (!targetData || !draggedData) return false;
         
+        // Special handling for vertical rolls - they can stack in pyramid formation
+        if (draggedData.isVerticalRoll && targetData.isVerticalRoll) {
+            // Vertical rolls can stack on other vertical rolls in special patterns
+            // This is handled separately in findBestStackingPosition
+            return true;
+        }
+        
+        // Horizontal rolls can only stack directly on top of each other
+        if (draggedData.isHorizontalRoll && targetData.isHorizontalRoll) {
+            // Check if they have same dimensions for stable stacking
+            if (Math.abs(draggedData.length - targetData.length) < 0.01 &&
+                Math.abs(draggedData.width - targetData.width) < 0.01) {
+                // Continue with normal stacking rules below
+            } else {
+                return false; // Different dimensions - can't stack
+            }
+        }
+        
+        // Don't allow mixing vertical and horizontal rolls
+        if ((draggedData.isVerticalRoll && targetData.isHorizontalRoll) ||
+            (draggedData.isHorizontalRoll && targetData.isVerticalRoll)) {
+            return false;
+        }
+        
         // Count how many units we're dragging (entire stack)
         const draggedStackSize = this.draggedObjects.length;
         
@@ -2774,184 +2947,196 @@ class Scene3D {
         // Create ruler group
         this.rulerGroup = new THREE.Group();
         
-        // Check if JUMBO and determine which section the cargo is in
+        const cargoEndX = cargoItem.position.x + cargoItem.userData.length / 2;
+        const cargoStartX = cargoItem.position.x - cargoItem.userData.length / 2;
+        
+        // For JUMBO, calculate distances relative to sections, not total space
         if (this.containerBounds.isJumbo && this.containerBounds.sections) {
             const gap = 0.5; // 50cm gap between sections
-            const section1End = this.containerBounds.min.x + this.containerBounds.sections[0].length;
+            const section1Start = this.containerBounds.min.x;
+            const section1End = section1Start + this.containerBounds.sections[0].length;
             const section2Start = section1End + gap;
+            const section2End = this.containerBounds.max.x;
             
-            // Check which section the cargo is in
-            const cargoStartX = cargoItem.position.x - cargoItem.userData.length / 2;
-            const cargoEndX = cargoItem.position.x + cargoItem.userData.length / 2;
-            
-            // Always show main ruler from start of container
-            const containerStartX = this.containerBounds.min.x;
-            const totalDistance = Math.abs(cargoEndX - containerStartX);
-            
-            if (cargoStartX >= section2Start) {
-                // Cargo is in second section
-                // Main ruler (black) - distance excluding gap
-                const mainDistance = totalDistance - gap;
-                this.createRulerLine(containerStartX, cargoEndX, mainDistance, false);
-                
-                // Additional ruler (blue) - from start of second section
-                const section2Distance = Math.abs(cargoEndX - section2Start);
-                this.createRulerLine(section2Start, cargoEndX, section2Distance, true);
-            } else {
-                // Cargo is in first section - only main ruler
-                this.createRulerLine(containerStartX, cargoEndX, totalDistance, false);
+            // Determine which section(s) the cargo is in
+            if (cargoEndX <= section1End) {
+                // Cargo is entirely in section 1
+                const distanceFromStart = Math.abs(cargoEndX - section1Start);
+                const distanceToEnd = Math.abs(section1End - cargoEndX);
+                this.createCombinedRuler(section1Start, cargoEndX, section1End, distanceFromStart, distanceToEnd);
+            } else if (cargoStartX >= section2Start) {
+                // Cargo is entirely in section 2
+                const distanceFromStart = Math.abs(cargoEndX - section2Start);
+                const distanceToEnd = Math.abs(section2End - cargoEndX);
+                this.createCombinedRuler(section2Start, cargoEndX, section2End, distanceFromStart, distanceToEnd);
             }
+            // If cargo spans the gap, don't show ruler (would be confusing)
         } else {
-            // Standard container - single ruler
-            const cargoEndX = cargoItem.position.x + cargoItem.userData.length / 2;
+            // Standard container
             const containerStartX = this.containerBounds.min.x;
-            const distance = Math.abs(cargoEndX - containerStartX);
-            this.createRulerLine(containerStartX, cargoEndX, distance, false);
+            const containerEndX = this.containerBounds.max.x;
+            
+            // Calculate distances
+            const distanceFromStart = Math.abs(cargoEndX - containerStartX);
+            const distanceToEnd = Math.abs(containerEndX - cargoEndX);
+            
+            // Create a combined ruler bar with two colored sections
+            this.createCombinedRuler(containerStartX, cargoEndX, containerEndX, distanceFromStart, distanceToEnd);
         }
         
         this.scene.add(this.rulerGroup);
         this.rulerVisible = true;
     }
     
-    createRulerLine(startX, endX, distance, isSecondSection) {
+    createCombinedRuler(containerStartX, cargoEndX, containerEndX, distanceFromStart, distanceToEnd) {
         // Determine which Z edge (front or back) is closer to camera
         const containerCenterZ = (this.containerBounds.min.z + this.containerBounds.max.z) / 2;
         const rulerZ = this.camera.position.z > containerCenterZ 
-            ? this.containerBounds.max.z + (isSecondSection ? 0.9 : 0.2)  // Front edge, much bigger offset for second ruler
-            : this.containerBounds.min.z - (isSecondSection ? 0.9 : 0.2); // Back edge, much bigger offset for second ruler
+            ? this.containerBounds.max.z + 0.25  // Front edge
+            : this.containerBounds.min.z - 0.25; // Back edge
         
         // Get trailer height from container dimensions
         const trailerHeight = this.containerDimensions?.trailerHeight || 1.1;
-        const rulerY = trailerHeight + (isSecondSection ? 0.08 : 0.01); // Place at trailer floor height
+        const rulerY = trailerHeight + 0.02; // Slightly above trailer floor
         
-        const lineStart = new THREE.Vector3(startX, rulerY, rulerZ);
-        const lineEnd = new THREE.Vector3(endX, rulerY, rulerZ);
-        const labelPos = new THREE.Vector3(endX, trailerHeight + (isSecondSection ? -0.35 : -0.15), rulerZ);
+        // Create a thicker bar using a rectangle (plane) for better visibility
+        const barHeight = 0.16; // Height of the colored bar - doubled thickness
         
-        // Create main line - use different color for second section in JUMBO
-        const lineColor = isSecondSection ? 0x0066cc : 0x000000; // Blue for second section
-        const lineGeometry = new THREE.BufferGeometry().setFromPoints([lineStart, lineEnd]);
-        const lineMaterial = new THREE.LineBasicMaterial({ 
-            color: lineColor,
+        // Blue section - from start to cargo end
+        if (distanceFromStart > 0.01) {
+            const blueGeometry = new THREE.PlaneGeometry(distanceFromStart, barHeight);
+            const blueMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x2196F3, // Blue
+                side: THREE.DoubleSide,
+                opacity: 0.85,
+                transparent: true
+            });
+            const blueMesh = new THREE.Mesh(blueGeometry, blueMaterial);
+            blueMesh.position.set(
+                containerStartX + distanceFromStart / 2,
+                rulerY,
+                rulerZ
+            );
+            blueMesh.rotation.x = -Math.PI / 2; // Rotate to be horizontal
+            this.rulerGroup.add(blueMesh);
+            
+            // White label for blue section
+            this.createLabel(
+                containerStartX + distanceFromStart / 2,
+                rulerY,
+                rulerZ,
+                `${distanceFromStart.toFixed(2)} m`,
+                '#FFFFFF'
+            );
+        }
+        
+        // Green section - from cargo end to container end
+        if (distanceToEnd > 0.01) {
+            const greenGeometry = new THREE.PlaneGeometry(distanceToEnd, barHeight);
+            const greenMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x4CAF50, // Green
+                side: THREE.DoubleSide,
+                opacity: 0.85,
+                transparent: true
+            });
+            const greenMesh = new THREE.Mesh(greenGeometry, greenMaterial);
+            greenMesh.position.set(
+                cargoEndX + distanceToEnd / 2,
+                rulerY,
+                rulerZ
+            );
+            greenMesh.rotation.x = -Math.PI / 2; // Rotate to be horizontal
+            this.rulerGroup.add(greenMesh);
+            
+            // White label for green section
+            this.createLabel(
+                cargoEndX + distanceToEnd / 2,
+                rulerY,
+                rulerZ,
+                `${distanceToEnd.toFixed(2)} m`,
+                '#FFFFFF'
+            );
+        }
+        
+        // Add end caps for the entire bar
+        const capMaterial = new THREE.LineBasicMaterial({ 
+            color: 0xFFFFFF,
             linewidth: 2,
             opacity: 0.9,
             transparent: true
         });
-        const line = new THREE.Line(lineGeometry, lineMaterial);
-        this.rulerGroup.add(line);
         
-        // Create small end caps
-        const capSize = 0.05;
+        const capSize = barHeight / 2 + 0.02;
+        
+        // Start cap
         const startCapGeometry = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(lineStart.x, rulerY - capSize, lineStart.z),
-            new THREE.Vector3(lineStart.x, rulerY + capSize, lineStart.z)
+            new THREE.Vector3(containerStartX, rulerY - capSize, rulerZ),
+            new THREE.Vector3(containerStartX, rulerY + capSize, rulerZ)
         ]);
-        const startCap = new THREE.Line(startCapGeometry, lineMaterial);
+        const startCap = new THREE.Line(startCapGeometry, capMaterial);
         this.rulerGroup.add(startCap);
         
+        // Middle divider (at cargo position)
+        if (distanceFromStart > 0.01 && distanceToEnd > 0.01) {
+            const middleCapGeometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(cargoEndX, rulerY - capSize, rulerZ),
+                new THREE.Vector3(cargoEndX, rulerY + capSize, rulerZ)
+            ]);
+            const middleCap = new THREE.Line(middleCapGeometry, capMaterial);
+            this.rulerGroup.add(middleCap);
+        }
+        
+        // End cap
         const endCapGeometry = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(lineEnd.x, rulerY - capSize, lineEnd.z),
-            new THREE.Vector3(lineEnd.x, rulerY + capSize, lineEnd.z)
+            new THREE.Vector3(containerEndX, rulerY - capSize, rulerZ),
+            new THREE.Vector3(containerEndX, rulerY + capSize, rulerZ)
         ]);
-        const endCap = new THREE.Line(endCapGeometry, lineMaterial);
+        const endCap = new THREE.Line(endCapGeometry, capMaterial);
         this.rulerGroup.add(endCap);
-        
-        // Create subtle arrow at end
-        const arrowSize = 0.08;
-        const arrowPoints = [
-            new THREE.Vector3(lineEnd.x - arrowSize, rulerY + arrowSize/2, lineEnd.z),
-            new THREE.Vector3(lineEnd.x, rulerY, lineEnd.z),
-            new THREE.Vector3(lineEnd.x - arrowSize, rulerY - arrowSize/2, lineEnd.z)
-        ];
-        const arrowGeometry = new THREE.BufferGeometry().setFromPoints(arrowPoints);
-        const arrowMaterial = new THREE.LineBasicMaterial({ 
-            color: lineColor,
-            linewidth: 2
-        });
-        const arrow = new THREE.Line(arrowGeometry, arrowMaterial);
-        this.rulerGroup.add(arrow);
-        
-        // Create minimal text label with better quality
+    }
+    
+    createLabel(x, y, z, text, color) {
         const canvas = document.createElement('canvas');
-        // Higher resolution for better quality
         canvas.width = 256;
         canvas.height = 64;
         const context = canvas.getContext('2d');
         
-        // Enable better rendering quality
         context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = 'high';
         
-        // Clear canvas
         context.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Add subtle white shadow for better readability on dark background
-        context.shadowColor = 'rgba(255, 255, 255, 0.9)';
-        context.shadowBlur = 4;
+        // Add dark shadow for better contrast
+        context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        context.shadowBlur = 6;
         context.shadowOffsetX = 0;
         context.shadowOffsetY = 0;
         
-        // Draw text with better font - use matching color
-        context.fillStyle = isSecondSection ? '#0066cc' : '#000000';
-        context.font = 'bold 28px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+        // Draw text in white
+        context.fillStyle = color;
+        context.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
         context.textAlign = 'center';
         context.textBaseline = 'middle';
-        context.fillText(`${distance.toFixed(2)} m`, canvas.width / 2, canvas.height / 2);
+        context.fillText(text, canvas.width / 2, canvas.height / 2);
         
         const texture = new THREE.CanvasTexture(canvas);
         texture.needsUpdate = true;
-        // Better texture filtering for quality
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
         
         const spriteMaterial = new THREE.SpriteMaterial({ 
             map: texture,
             sizeAttenuation: false,
-            opacity: 0.95,
+            opacity: 1,
             transparent: true,
             depthTest: false  // Always render on top
         });
         const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(0.2, 0.05, 1); // Smaller and more compact
-        sprite.position.copy(labelPos); // Below the arrow end
+        sprite.scale.set(0.18, 0.045, 1);
+        sprite.position.set(x, y + 0.001, z); // Slightly above the bar
         this.rulerGroup.add(sprite);
-        
-        // Add subtle tick marks for every meter
-        const tickColor = isSecondSection ? 0x6699ff : 0x333333; // Lighter blue for second section
-        const tickMaterial = new THREE.LineBasicMaterial({ 
-            color: tickColor,
-            linewidth: 1,
-            opacity: 0.6,
-            transparent: true
-        });
-        
-        const fullMeters = Math.floor(distance);
-        for (let i = 1; i <= fullMeters; i++) {
-            const tickSize = 0.03;
-            // Calculate tick position
-            let tickX;
-            if (isSecondSection) {
-                // For second section, place ticks accounting for the gap
-                if (i <= 7.7) {  // Within first section length
-                    tickX = startX + i;
-                } else {
-                    // Skip gap area and continue in second section
-                    tickX = startX + i + 0.5;
-                }
-            } else {
-                tickX = startX + i;
-            }
-            
-            if (tickX < endX - 0.05) {
-                const tickGeometry = new THREE.BufferGeometry().setFromPoints([
-                    new THREE.Vector3(tickX, rulerY - tickSize, rulerZ),
-                    new THREE.Vector3(tickX, rulerY + tickSize, rulerZ)
-                ]);
-                const tick = new THREE.Line(tickGeometry, tickMaterial);
-                this.rulerGroup.add(tick);
-            }
-        }
     }
+    
     
     showRulerForCargo(cargoMesh) {
         if (!cargoMesh || !cargoMesh.userData) return;

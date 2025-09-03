@@ -83,8 +83,58 @@ class BinPacking3D {
         }
     }
     
-    packItems(items) {
-        this.reset();
+    setOccupiedSpaces(occupiedSpaces) {
+        if (!occupiedSpaces || occupiedSpaces.length === 0) {
+            return;
+        }
+        
+        // Mark spaces as occupied
+        occupiedSpaces.forEach(occupied => {
+            // Add to used space
+            this.usedSpace.push({
+                x: occupied.x,
+                y: occupied.y,  
+                z: occupied.z,
+                width: occupied.width,
+                depth: occupied.depth,
+                height: occupied.height
+            });
+            
+            // Process each free space and split it around the occupied space
+            const newFreeSpaces = [];
+            this.freeSpaces.forEach(space => {
+                // Create position and item objects for compatibility with spacesOverlap
+                const position = {
+                    x: occupied.x,
+                    y: occupied.y,
+                    z: occupied.z
+                };
+                const item = {
+                    width: occupied.width,
+                    depth: occupied.depth,
+                    height: occupied.height
+                };
+                
+                // Check if this free space overlaps with the occupied space
+                if (this.spacesOverlap(space, position, item)) {
+                    // Split the free space around the occupied area
+                    const subspaces = this.splitSpace(space, position, item, 0);
+                    newFreeSpaces.push(...subspaces);
+                } else {
+                    // Keep the free space as is
+                    newFreeSpaces.push(space);
+                }
+            });
+            
+            // Update free spaces
+            this.freeSpaces = this.cleanupFreeSpaces(newFreeSpaces);
+        });
+    }
+    
+    packItems(items, skipReset = false) {
+        if (!skipReset) {
+            this.reset();
+        }
         const packedItems = [];
         const unpackedItems = [];
         
@@ -344,6 +394,12 @@ class BinPacking3D {
     }
     
     spacesOverlap(space, position, item) {
+        // Ensure item has required properties
+        if (!item || item.width === undefined || item.depth === undefined || item.height === undefined) {
+            console.error('Item missing required dimensions:', item);
+            return false;
+        }
+        
         return !(space.x + space.width <= position.x ||
                 position.x + item.width <= space.x ||
                 space.y + space.height <= position.y ||

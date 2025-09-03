@@ -73,6 +73,20 @@ class UI {
         const customSelectTrigger = customSelect.querySelector('.custom-select-trigger');
         const customOptions = customSelect.querySelector('.custom-options');
         const customDimensions = document.getElementById('customDimensions');
+        const maxLoadInput = document.getElementById('maxLoadInput');
+        
+        // Setup max load input handler
+        maxLoadInput.addEventListener('change', () => {
+            const maxLoadTons = parseFloat(maxLoadInput.value) || 24;
+            const maxLoadKg = Math.round(maxLoadTons * 1000);
+            this.cargoManager.updateMaxLoad(maxLoadKg);
+            this.updateStatistics();
+        });
+        
+        // Auto-select all text on focus
+        maxLoadInput.addEventListener('focus', () => {
+            maxLoadInput.select();
+        });
         
         // Setup custom dropdown
         customSelectTrigger.addEventListener('click', (e) => {
@@ -205,7 +219,7 @@ class UI {
         document.getElementById('dimensionsInfo').textContent = `${vehicle.length} × ${vehicle.width} × ${vehicle.height} m`;
         const volume = (vehicle.length * vehicle.width * vehicle.height).toFixed(1);
         document.getElementById('volumeInfo').textContent = `${volume} m³`;
-        document.getElementById('maxLoad').textContent = `${vehicle.maxLoad / 1000} ton`;
+        document.getElementById('maxLoadInput').value = (vehicle.maxLoad / 1000).toFixed(2);
         
         this.updateAxleIndicators();
         
@@ -246,7 +260,7 @@ class UI {
         document.getElementById('dimensionsInfo').textContent = `${length} × ${width} × ${height} m`;
         const volume = (length * width * height).toFixed(1);
         document.getElementById('volumeInfo').textContent = `${volume} m³`;
-        document.getElementById('maxLoad').textContent = `${customVehicle.maxLoad / 1000} ton`;
+        document.getElementById('maxLoadInput').value = (customVehicle.maxLoad / 1000).toFixed(2);
         
         this.updateAxleIndicators();
         
@@ -320,6 +334,32 @@ class UI {
                     e.target.select();
                 });
             });
+            
+            // Setup orientation switch for Roll
+            if (unitType === 'roll') {
+                const orientationToggleBtn = card.querySelector('.orientation-toggle-btn');
+                const orientationSwitch = card.querySelector('.orientation-switch');
+                
+                if (orientationToggleBtn) {
+                    orientationToggleBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        
+                        // Toggle orientation
+                        const currentOrientation = orientationToggleBtn.dataset.orientation;
+                        const newOrientation = currentOrientation === 'vertical' ? 'horizontal' : 'vertical';
+                        
+                        // Update button
+                        orientationToggleBtn.dataset.orientation = newOrientation;
+                        orientationToggleBtn.textContent = newOrientation === 'vertical' ? '⬆ Pionowo' : '➡ Poziomo';
+                        
+                        // Update hidden switch data attribute
+                        if (orientationSwitch) {
+                            orientationSwitch.dataset.orientation = newOrientation;
+                        }
+                    });
+                }
+            }
             
             // Setup weight mode switch
             const weightModeSwitch = card.querySelector('.weight-mode-switch');
@@ -508,21 +548,36 @@ class UI {
                     
                     // Add specified amount of units
                     let addedCount = 0;
+                    let newGroupId = null;
                     for (let i = 0; i < amount; i++) {
                         const cargo = this.addCargoUnitWithParams(unitType, params);
                         if (cargo) {
                             addedCount++;
+                            if (!newGroupId && cargo.groupId) {
+                                newGroupId = cargo.groupId;
+                            }
                             this.unitCounts[unitType] = (this.unitCounts[unitType] || 0) + 1;
                         }
                     }
                     
                     if (addedCount > 0) {
-                        // Always try to arrange to check if items fit
-                        const result = this.cargoManager.autoArrange();
+                        // Auto-arrange only the new group if total items <= 50 for performance
+                        const result = (this.cargoManager.cargoItems.length <= 50 && newGroupId) 
+                            ? this.cargoManager.autoArrangeGroup(newGroupId)
+                            : this.cargoManager.autoArrange();
                         
-                        if (result && !result.success && result.unpackedCount > 0) {
-                            // Some items didn't fit and were removed
-                            this.showNotification(`${result.unpackedCount} jednostek nie zmieściło się i zostało usuniętych`, 'error');
+                        if (result && !result.success) {
+                            // Some items didn't fit or exceeded weight limit
+                            const messages = [];
+                            if (result.unpackedCount > 0) {
+                                messages.push(`${result.unpackedCount} jednostek nie zmieściło się w przestrzeni`);
+                            }
+                            if (result.exceedingWeightCount > 0) {
+                                messages.push(`${result.exceedingWeightCount} jednostek przekroczyło limit wagowy`);
+                            }
+                            if (messages.length > 0) {
+                                this.showNotification(`${messages.join(' i ')} - umieszczono poza przestrzenią`, 'warning');
+                            }
                             
                             // Update unit counts after removal
                             this.unitCounts = {};
@@ -561,21 +616,36 @@ class UI {
                     
                     // Add specified amount of units
                     let addedCount = 0;
+                    let newGroupId = null;
                     for (let i = 0; i < amount; i++) {
                         const cargo = this.addCargoUnitWithParams(unitType, params);
                         if (cargo) {
                             addedCount++;
+                            if (!newGroupId && cargo.groupId) {
+                                newGroupId = cargo.groupId;
+                            }
                             this.unitCounts[unitType] = (this.unitCounts[unitType] || 0) + 1;
                         }
                     }
                     
                     if (addedCount > 0) {
-                        // Always try to arrange to check if items fit
-                        const result = this.cargoManager.autoArrange();
+                        // Auto-arrange only the new group if total items <= 50 for performance
+                        const result = (this.cargoManager.cargoItems.length <= 50 && newGroupId) 
+                            ? this.cargoManager.autoArrangeGroup(newGroupId)
+                            : this.cargoManager.autoArrange();
                         
-                        if (result && !result.success && result.unpackedCount > 0) {
-                            // Some items didn't fit and were removed
-                            this.showNotification(`${result.unpackedCount} jednostek nie zmieściło się i zostało usuniętych`, 'error');
+                        if (result && !result.success) {
+                            // Some items didn't fit or exceeded weight limit
+                            const messages = [];
+                            if (result.unpackedCount > 0) {
+                                messages.push(`${result.unpackedCount} jednostek nie zmieściło się w przestrzeni`);
+                            }
+                            if (result.exceedingWeightCount > 0) {
+                                messages.push(`${result.exceedingWeightCount} jednostek przekroczyło limit wagowy`);
+                            }
+                            if (messages.length > 0) {
+                                this.showNotification(`${messages.join(' i ')} - umieszczono poza przestrzenią`, 'warning');
+                            }
                             
                             // Update unit counts after removal
                             this.unitCounts = {};
@@ -651,16 +721,30 @@ class UI {
             const diameterInput = card.querySelector('.unit-preset-length[data-dimension="diameter"], .unit-preset-diameter');
             const rollHeightInput = card.querySelector('.unit-preset-width[data-dimension="height"], .unit-preset-roll-height');
             
+            // Get orientation
+            const orientationSwitch = card.querySelector('.orientation-switch');
+            const isVertical = !orientationSwitch || orientationSwitch.dataset.orientation === 'vertical';
+            
             let dimensions = null;
             if (diameterInput && rollHeightInput) {
                 const diameter = parseFloat(diameterInput.value);
                 const height = parseFloat(rollHeightInput.value);
                 if (diameter > 0 && height > 0) {
-                    dimensions = {
-                        length: diameter / 100,  // Store diameter as length
-                        width: diameter / 100,   // Store diameter as width
-                        height: height / 100     // Store height
-                    };
+                    if (isVertical) {
+                        // Vertical orientation - diameter as base, height as height
+                        dimensions = {
+                            length: diameter / 100,  // Store diameter as length
+                            width: diameter / 100,   // Store diameter as width
+                            height: height / 100     // Store height
+                        };
+                    } else {
+                        // Horizontal orientation - height as length, diameter as width/height
+                        dimensions = {
+                            length: height / 100,    // Length along X axis
+                            width: diameter / 100,   // Width (diameter)
+                            height: diameter / 100   // Height (diameter)
+                        };
+                    }
                 }
             }
             
@@ -682,7 +766,8 @@ class UI {
                 loadingMethods: loadingMethods.length > 0 ? loadingMethods : ['rear', 'side', 'top'],
                 unloadingMethods: unloadingMethods.length > 0 ? unloadingMethods : ['rear', 'side', 'top'],
                 dimensions: dimensions,
-                isVerticalRoll: true  // Flag for vertical orientation
+                isVerticalRoll: isVertical,  // Flag for orientation
+                isHorizontalRoll: !isVertical  // Flag for horizontal orientation
             };
         }
         
@@ -736,7 +821,12 @@ class UI {
         if (params.dimensions) {
             dimensionKey = `_${params.dimensions.length}_${params.dimensions.width}_${params.dimensions.height}`;
         }
-        const groupKey = `${unitType}_${params.name}_${params.weight}_${params.maxStack}_${params.maxStackWeight}_${params.loadingMethods.join(',')}_${params.unloadingMethods.join(',')}${dimensionKey}`;
+        // Add orientation to groupKey for rolls
+        let orientationKey = '';
+        if (unitType === 'roll' && params.isVerticalRoll !== undefined) {
+            orientationKey = `_${params.isVerticalRoll ? 'vertical' : 'horizontal'}`;
+        }
+        const groupKey = `${unitType}_${params.name}_${params.weight}_${params.maxStack}_${params.maxStackWeight}_${params.loadingMethods.join(',')}_${params.unloadingMethods.join(',')}${dimensionKey}${orientationKey}`;
         
         // Pass all parameters including name to the cargo manager
         const cargo = this.cargoManager.addCargoUnit(unitType, {
@@ -902,7 +992,16 @@ class UI {
         if (result.success) {
             this.showNotification('Ładunek rozmieszczony automatycznie', 'success');
         } else {
-            this.showNotification(`Uwaga! ${result.unpackedCount} jednostek nie zmieściło się i zostało usuniętych`, 'warning');
+            const messages = [];
+            if (result.unpackedCount > 0) {
+                messages.push(`${result.unpackedCount} jednostek nie zmieściło się`);
+            }
+            if (result.exceedingWeightCount > 0) {
+                messages.push(`${result.exceedingWeightCount} jednostek przekroczyło limit wagowy`);
+            }
+            if (messages.length > 0) {
+                this.showNotification(`Uwaga! ${messages.join(' i ')} - umieszczono poza przestrzenią ładunkową`, 'warning');
+            }
             // Update unit counts after removal
             this.unitCounts = {};
             this.cargoManager.cargoItems.forEach(item => {
@@ -1012,13 +1111,22 @@ class UI {
             element.dataset.groupId = group.groupId;
             element.dataset.groupIndex = index;
             
-            const totalWeight = group.items.reduce((sum, item) => sum + item.weight, 0);
-            const unitVolume = group.sample.length * group.sample.width * group.sample.height;
-            const totalVolume = unitVolume * group.items.length;
+            // Count items inside and outside the container
+            const itemsInside = group.items.filter(item => !item.isOutside).length;
+            const itemsOutside = group.items.filter(item => item.isOutside).length;
             
-            // Calculate floor area (M²) and LDM for ground units only
+            // Calculate metrics only for items inside the container
+            const itemsInsideList = group.items.filter(item => !item.isOutside);
+            const totalWeight = itemsInsideList.reduce((sum, item) => sum + item.weight, 0);
+            const unitVolume = group.sample.length * group.sample.width * group.sample.height;
+            const totalVolume = unitVolume * itemsInsideList.length;
+            
+            // Calculate floor area (M²) and LDM for ground units only (inside container)
             const trailerHeight = this.cargoManager.containerDimensions?.trailerHeight || 1.2;
             const groundItems = group.items.filter(item => {
+                // Skip items outside container
+                if (item.isOutside) return false;
+                
                 // Check if item has position and is on ground level (trailer floor or coil well)
                 // Item is on ground if its bottom is at trailer height
                 // Steel Coils in coil well are 0.3m lower due to the groove
@@ -1075,7 +1183,7 @@ class UI {
                     <div class="unit-box-header">
                         <span class="unit-order-number">${index + 1}</span>
                         <span class="unit-color-dot" ${colorStyle}></span>
-                        <span class="unit-quantity-badge">× ${group.items.length}</span>
+                        <span class="unit-quantity-badge">× ${itemsInside}${itemsOutside > 0 ? ` <span style="color: #ef4444; font-size: 0.9em;">(+${itemsOutside} poza)</span>` : ''}</span>
                         <span class="unit-title">${group.sample.name}</span>
                         <div class="unit-quantity-controls">
                             <button class="unit-btn-remove" data-group-id="${group.groupId}" title="Usuń jednostkę">−</button>
@@ -1092,7 +1200,13 @@ class UI {
                             <div class="unit-item">
                                 <div class="unit-item-label">Wymiary</div>
                                 <div class="unit-item-value">${(group.sample.length * 100).toFixed(0)}×${(group.sample.width * 100).toFixed(0)}×${(group.sample.height * 100).toFixed(0)} cm</div>
-                                <div class="unit-item-sublabel">(dł. / szer. / wys.)</div>
+                                <div class="unit-item-sublabel">
+                                    ${group.sample.type === 'roll' && !group.sample.fixedDiameter ? 
+                                        `<button class="orientation-toggle-btn" data-group-id="${group.groupId}" style="background: none; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 11px;">
+                                            ${group.sample.isVerticalRoll ? '⬆ Pionowo' : '➡ Poziomo'}
+                                        </button>` : 
+                                        '(dł. / szer. / wys.)'}
+                                </div>
                             </div>
                             <div class="unit-item">
                                 <div class="unit-item-label">Waga jedn.</div>
@@ -1181,6 +1295,15 @@ class UI {
                 e.stopPropagation();
                 this.deleteEntireGroup(group.groupId);
             });
+            
+            // Handle orientation toggle button for Roll
+            const orientationBtn = element.querySelector('.orientation-toggle-btn');
+            if (orientationBtn) {
+                orientationBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleGroupOrientation(group.groupId);
+                });
+            }
             
             // Auto-select text on focus for all editable inputs
             [weightInput, stackInput, maxWeightInput].forEach(input => {
@@ -1369,12 +1492,10 @@ class UI {
         this.cargoManager.cargoItems.push(newItem);
         this.cargoManager.totalWeight += newItem.weight;
         
-        // Force complete re-arrangement
-        // Clear all cargo meshes first
-        this.scene3d.clearAllCargo();
-        
-        // Now auto-arrange all items including the new one
-        const result = this.cargoManager.autoArrange();
+        // Auto-arrange only this group if total items <= 50
+        const result = (this.cargoManager.cargoItems.length <= 50 && groupId) 
+            ? this.cargoManager.autoArrangeGroup(groupId)
+            : this.cargoManager.autoArrange();
         
         // Update all UI elements immediately
         this.updateLoadedUnitsList();
@@ -1407,6 +1528,12 @@ class UI {
         const itemToRemove = groupItems[groupItems.length - 1];
         const itemType = itemToRemove.type;
         
+        // Remove mesh from 3D scene
+        if (itemToRemove.mesh) {
+            this.scene3d.removeCargo(itemToRemove.mesh);
+            itemToRemove.mesh = null;
+        }
+        
         // Remove from cargoManager
         const index = this.cargoManager.cargoItems.indexOf(itemToRemove);
         if (index > -1) {
@@ -1415,12 +1542,7 @@ class UI {
             // Update total weight immediately
             this.cargoManager.totalWeight -= itemToRemove.weight;
             
-            // Force complete re-arrangement
-            // Clear all cargo meshes first
-            this.scene3d.clearAllCargo();
-            
-            // Now auto-arrange remaining items
-            const result = this.cargoManager.autoArrange();
+            // No auto-arrange when removing items - keep other items in place
             
             // Update all UI elements immediately
             this.updateLoadedUnitsList();
@@ -1448,6 +1570,53 @@ class UI {
                 }
             }
         }
+    }
+    
+    toggleGroupOrientation(groupId) {
+        // Find all items in the group and toggle their orientation
+        const groupItems = this.cargoManager.cargoItems.filter(item => item.groupId === groupId);
+        
+        if (groupItems.length === 0) return;
+        
+        // Toggle orientation for all rolls in the group
+        groupItems.forEach(item => {
+            if (item.type === 'roll' && !item.fixedDiameter) {
+                const wasVertical = item.isVerticalRoll;
+                item.isVerticalRoll = !wasVertical;
+                item.isHorizontalRoll = wasVertical;
+                
+                // Swap dimensions based on new orientation
+                if (wasVertical) {
+                    // Going from vertical to horizontal
+                    const originalDiameter = item.width;
+                    const originalHeight = item.height;
+                    
+                    item.length = originalHeight;
+                    item.width = originalDiameter;
+                    item.height = originalDiameter;
+                } else {
+                    // Going from horizontal to vertical
+                    const originalLength = item.length;
+                    const originalDiameter = item.width;
+                    
+                    item.length = originalDiameter;
+                    item.width = originalDiameter;
+                    item.height = originalLength;
+                }
+                
+                // Update groupKey
+                const loadingStr = (item.loadingMethods || ['rear', 'side', 'top']).join(',');
+                const unloadingStr = (item.unloadingMethods || ['rear', 'side', 'top']).join(',');
+                const orientationStr = item.isVerticalRoll ? 'vertical' : 'horizontal';
+                item.groupKey = `roll_${item.name}_${item.weight}_${item.maxStack}_${item.maxStackWeight}_${loadingStr}_${unloadingStr}_${item.length}_${item.width}_${item.height}_${orientationStr}`;
+            }
+        });
+        
+        // Rearrange all units
+        this.cargoManager.autoArrange();
+        this.updateLoadedUnitsList();
+        this.updateStatistics();
+        this.updateAxleIndicators();
     }
     
     deleteEntireGroup(groupId) {
@@ -1717,8 +1886,12 @@ class UI {
         if (statItems.length >= 4) {
             statItems[0].textContent = `${stats.volumeUsage.toFixed(1)}%`;
             statItems[1].textContent = `${stats.weightUsage.toFixed(1)}%`;
-            statItems[2].textContent = `${stats.totalWeight} kg`;
-            statItems[3].textContent = stats.totalItems;
+            // Show weight of items inside the container only
+            statItems[2].textContent = `${stats.insideWeight} kg`;
+            // Show total items with indication if some are outside
+            statItems[3].textContent = stats.outsideItems > 0 ? 
+                `${stats.placedItems} (+${stats.outsideItems} poza)` : 
+                stats.totalItems;
         }
         
         // Update center of gravity
@@ -1872,7 +2045,11 @@ class UI {
         report += `- Liczba jednostek: ${stats.totalItems}\n`;
         report += `- Całkowita waga: ${stats.totalWeight} kg\n`;
         report += `- Wykorzystanie przestrzeni: ${stats.volumeUsage.toFixed(1)}%\n`;
-        report += `- Wykorzystanie ładowności: ${stats.weightUsage.toFixed(1)}%\n\n`;
+        report += `- Wykorzystanie ładowności: ${stats.weightUsage.toFixed(1)}%\n`;
+        if (stats.outsideItems > 0) {
+            report += `- Jednostki poza przestrzenią: ${stats.outsideItems}\n`;
+        }
+        report += `\n`;
         
         if (axleLoads) {
             report += `OBCIĄŻENIE OSI:\n`;

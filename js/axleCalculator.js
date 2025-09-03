@@ -172,7 +172,8 @@ class AxleCalculator {
         
         // Calculate moments of cargo around the kingpin (which is at 0,0 in our coordinate system)
         this.cargoItems.forEach(item => {
-            if (item.position) {
+            // Skip items that are outside the container
+            if (item.position && !item.isOutside) {
                 // Position X is relative to container center, need to convert to position from kingpin
                 const cargoXFromKingPin = item.position.x + (this.vehicleConfig.length / 2) - kingPin;
                 totalCargoWeight += item.weight;

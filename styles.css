@@ -436,6 +436,35 @@ body {
     color: var(--text-primary);
 }
 
+.max-load-container {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.max-load-input {
+    width: 70px;
+    padding: 0.25rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: right;
+}
+
+.max-load-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.max-load-container .input-unit {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
 /* Cargo Units */
 .cargo-units {
     display: flex;

@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Connect drag & drop callback
     scene3d.onCargoMoved = (movedCargo) => {
         cargoManager.updateCargoPositions(movedCargo);
+        ui.updateLoadedUnitsList(); // Update list to show units outside
         ui.updateStatistics();
         ui.updateAxleIndicators();
     };

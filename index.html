@@ -104,7 +104,10 @@
                         </div>
                         <div class="info-item">
                             <span class="info-label">Max. ładowność:</span>
-                            <span id="maxLoad" class="info-value">24 ton</span>
+                            <div class="max-load-container">
+                                <input type="number" id="maxLoadInput" class="max-load-input" value="24.00" min="0.01" step="0.01">
+                                <span class="input-unit">t</span>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -166,12 +169,12 @@
                                         <label>Piętrowanie</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
-                                                <input type="number" class="unit-preset-stack" value="2" min="0" max="10">
+                                                <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
                                                 <span class="input-unit">szt</span>
                                             </div>
                                             <span class="field-separator">/</span>
                                             <div class="stack-input-group">
-                                                <input type="number" class="unit-preset-max-weight" value="1200" min="0">
+                                                <input type="number" class="unit-preset-max-weight" value="0" min="0">
                                                 <span class="input-unit">kg</span>
                                             </div>
                                         </div>
@@ -262,12 +265,12 @@
                                         <label>Piętrowanie</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
-                                                <input type="number" class="unit-preset-stack" value="2" min="0" max="10">
+                                                <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
                                             <span class="input-unit">szt</span>
                                         </div>
                                         <span class="field-separator">/</span>
                                         <div class="stack-input-group">
-                                            <input type="number" class="unit-preset-max-weight" value="1800" min="0">
+                                            <input type="number" class="unit-preset-max-weight" value="0" min="0">
                                                 <span class="input-unit">kg</span>
                                             </div>
                                         </div>
@@ -358,12 +361,12 @@
                                         <label>Piętrowanie</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
-                                                <input type="number" class="unit-preset-stack" value="2" min="0" max="10">
+                                                <input type="number" class="unit-preset-stack" value="3" min="0" max="10">
                                             <span class="input-unit">szt</span>
                                         </div>
                                         <span class="field-separator">/</span>
                                         <div class="stack-input-group">
-                                            <input type="number" class="unit-preset-max-weight" value="1900" min="0">
+                                            <input type="number" class="unit-preset-max-weight" value="2850" min="0">
                                                 <span class="input-unit">kg</span>
                                             </div>
                                         </div>
@@ -550,12 +553,12 @@
                                         <label>Piętrowanie</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
-                                                <input type="number" class="unit-preset-stack" value="2" min="0" max="10">
+                                                <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
                                             <span class="input-unit">szt</span>
                                         </div>
                                         <span class="field-separator">/</span>
                                         <div class="stack-input-group">
-                                            <input type="number" class="unit-preset-max-weight" value="2400" min="0">
+                                            <input type="number" class="unit-preset-max-weight" value="0" min="0">
                                                 <span class="input-unit">kg</span>
                                             </div>
                                         </div>
@@ -686,7 +689,7 @@
                                 <input type="text" class="unit-preset-name" value="Roll">
                             </div>
                             <div class="unit-preset-params">
-                                <div class="unit-preset-dimensions">
+                                <div class="unit-preset-dimensions" style="display: flex; gap: 10px; align-items: flex-end;">
                                     <div class="unit-preset-dim-field">
                                         <label>Średnica</label>
                                         <div class="dim-input-group">
@@ -701,8 +704,15 @@
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
+                                    <div class="unit-preset-dim-field" style="flex: 0 0 auto;">
+                                        <label>Orientacja</label>
+                                        <button class="orientation-toggle-btn" data-orientation="vertical" style="background: white; border: 1px solid #e5e7eb; border-radius: 4px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.875rem; height: auto; white-space: nowrap; font-weight: 400; color: #1f2937; line-height: 1.2;">
+                                            ⬆ Pionowo
+                                        </button>
+                                    </div>
                                     <!-- Hidden field for consistency -->
                                     <input type="hidden" class="unit-preset-height" value="120">
+                                    <div class="orientation-switch" data-orientation="vertical" style="display: none;"></div>
                                 </div>
                                 <div class="unit-preset-weight-field">
                                     <div class="weight-label-container">
@@ -822,12 +832,12 @@
                                         <label>Piętrowanie</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
-                                                <input type="number" class="unit-preset-stack" value="2" min="0" max="10">
+                                                <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
                                             <span class="input-unit">szt</span>
                                         </div>
                                         <span class="field-separator">/</span>
                                         <div class="stack-input-group">
-                                            <input type="number" class="unit-preset-max-weight" value="500" min="0">
+                                            <input type="number" class="unit-preset-max-weight" value="0" min="0">
                                                 <span class="input-unit">kg</span>
                                             </div>
                                         </div>

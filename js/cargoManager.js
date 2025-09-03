@@ -9,6 +9,10 @@ class CargoManager {
         this.colorIndex = 0; // Track color index for golden ratio
     }
     
+    updateMaxLoad(maxLoad) {
+        this.maxLoad = maxLoad;
+    }
+    
     setContainer(dimensions, maxLoad) {
         this.containerDimensions = dimensions;
         this.maxLoad = maxLoad;
@@ -137,7 +141,8 @@ class CargoManager {
             groupKey: groupKey, // Store groupKey for future comparisons
             color: itemColor, // Use grayscale for steel coils, group color for others
             isRoll: isRoll, // Add isRoll property
-            isVerticalRoll: customParams.isVerticalRoll || unitConfig.isVerticalRoll || false, // Add vertical roll flag
+            isVerticalRoll: customParams.isVerticalRoll !== undefined ? customParams.isVerticalRoll : (unitConfig.isVerticalRoll || false), // Add vertical roll flag
+            isHorizontalRoll: customParams.isHorizontalRoll || false, // Add horizontal roll flag
             diameter: isRoll ? dimensions.width : undefined, // Add diameter for rolls (same as width)
             fixedDiameter: unitConfig.fixedDiameter || false, // Add fixed diameter flag for steel coils
             position: null,
@@ -176,15 +181,10 @@ class CargoManager {
             this.totalWeight -= cargo.weight;
             this.cargoItems.splice(index, 1);
             
-            // Re-validate and reposition remaining items if needed
-            if (this.cargoItems.length > 0 && this.cargoItems.length <= 50) {
-                setTimeout(() => {
-                    this.autoArrange();
-                    // Update UI after rearranging
-                    if (this.onCargoRearranged) {
-                        this.onCargoRearranged();
-                    }
-                }, 100);
+            // No auto-arrange when removing items - keep other items in place
+            // Just update UI
+            if (this.onCargoRearranged) {
+                this.onCargoRearranged();
             }
         }
     }
@@ -194,6 +194,117 @@ class CargoManager {
         this.cargoItems = [];
         this.totalWeight = 0;
         this.colorIndex = 0; // Reset color index
+    }
+    
+    autoArrangeGroup(groupId) {
+        // Arrange only specific group, keeping other groups in place
+        if (!this.containerDimensions || this.cargoItems.length === 0) {
+            return false;
+        }
+        
+        // Get items from the specific group
+        const groupItems = this.cargoItems.filter(item => item.groupId === groupId);
+        if (groupItems.length === 0) {
+            return false;
+        }
+        
+        // Calculate current weight of items already in container (not outside)
+        let currentWeight = 0;
+        this.cargoItems.forEach(item => {
+            if (item.groupId !== groupId && !item.isOutside) {
+                currentWeight += item.weight;
+            }
+        });
+        
+        // Check if new group would exceed weight limit
+        const groupWeight = groupItems.reduce((sum, item) => sum + item.weight, 0);
+        
+        // Separate items that fit within weight limit
+        const itemsWithinLimit = [];
+        const itemsExceedingLimit = [];
+        
+        groupItems.forEach(item => {
+            if (currentWeight + item.weight <= this.maxLoad) {
+                itemsWithinLimit.push(item);
+                currentWeight += item.weight;
+            } else {
+                itemsExceedingLimit.push(item);
+            }
+        });
+        
+        // Get items from other groups that are already placed
+        const otherGroupItems = this.cargoItems.filter(item => item.groupId !== groupId && item.mesh && item.position);
+        
+        // Clear only the group items from the scene
+        groupItems.forEach(item => {
+            if (item.mesh) {
+                this.scene3d.removeCargo(item.mesh);
+                item.mesh = null;
+                item.position = null;
+            }
+        });
+        
+        // Create occupied spaces from other group items
+        const occupiedSpaces = otherGroupItems.map(item => {
+            // Some items might have been rotated, need to get actual dimensions from mesh or use original
+            const itemLength = item.mesh && item.mesh.userData.length ? item.mesh.userData.length : item.length;
+            const itemWidth = item.mesh && item.mesh.userData.width ? item.mesh.userData.width : item.width;
+            const itemHeight = item.mesh && item.mesh.userData.height ? item.mesh.userData.height : item.height;
+            
+            // Convert from scene coordinates (center at 0,0,0) to bin packing coordinates (origin at corner)
+            // Scene: x ranges from -length/2 to +length/2
+            // Bin packing: x ranges from 0 to length
+            const binX = item.position.x + (this.containerDimensions.length / 2) - (itemLength / 2);
+            const binY = item.position.y - this.containerDimensions.trailerHeight - (itemHeight / 2);
+            const binZ = item.position.z + (this.containerDimensions.width / 2) - (itemWidth / 2);
+            
+            return {
+                x: binX,
+                y: binY,
+                z: binZ,
+                width: itemLength,
+                depth: itemWidth,
+                height: itemHeight
+            };
+        });
+        
+        // Arrange only items within weight limit
+        let result = { success: true, unpackedCount: 0 };
+        if (itemsWithinLimit.length > 0) {
+            result = this._arrangeGroupItems(itemsWithinLimit, occupiedSpaces);
+        }
+        
+        // Place items exceeding weight limit outside
+        if (itemsExceedingLimit.length > 0) {
+            const trailerHeight = this.containerDimensions.trailerHeight || 1.2;
+            itemsExceedingLimit.forEach((item, index) => {
+                // Temporarily place at origin inside container
+                item.position = {
+                    x: 0,
+                    y: trailerHeight + item.height / 2 + index * item.height,
+                    z: 0
+                };
+                
+                const meshData = {
+                    ...item,
+                    x: item.position.x,
+                    y: item.position.y,
+                    z: item.position.z
+                };
+                
+                item.mesh = this.scene3d.addCargo(meshData);
+                this.scene3d.moveOutsideContainer(item.mesh);
+                item.isOutside = true;
+            });
+            
+            result.exceedingWeightCount = itemsExceedingLimit.length;
+            if (result.success && itemsExceedingLimit.length > 0) {
+                result.success = false;
+            }
+        }
+        
+        // Arrange only the new group using remaining space
+        return result;
     }
     
     autoArrange() {
@@ -305,8 +416,23 @@ class CargoManager {
             }
         });
         
+        // Check weight limit and separate items that exceed it
+        let currentTotalWeight = 0;
+        const itemsWithinLimit = [];
+        const itemsExceedingLimit = [];
+        
+        stacks.forEach(stack => {
+            const stackWeight = stack.sample.weight * stack.stackHeight;
+            if (currentTotalWeight + stackWeight <= this.maxLoad) {
+                itemsWithinLimit.push(stack);
+                currentTotalWeight += stackWeight;
+            } else {
+                itemsExceedingLimit.push(stack);
+            }
+        });
+        
         // Prepare items for packing (treating each stack as single unit)
-        const itemsToPlace = stacks;
+        const itemsToPlace = itemsWithinLimit;
         
         // Handle JUMBO with sections
         if (this.packers && this.sections) {
@@ -379,14 +505,36 @@ class CargoManager {
             // Check for unpacked items in JUMBO
             if (remainingItems.length > 0) {
                 let totalUnpacked = 0;
+                
+                // First place all items inside container temporarily to create meshes
                 remainingItems.forEach(unpackedStack => {
                     totalUnpacked += unpackedStack.userData.items.length;
-                    // Remove unpacked items from cargoItems and update total weight
-                    unpackedStack.userData.items.forEach(item => {
-                        const index = this.cargoItems.indexOf(item);
-                        if (index > -1) {
-                            this.totalWeight -= item.weight;
-                            this.cargoItems.splice(index, 1);
+                    
+                    unpackedStack.userData.items.forEach((item, index) => {
+                        // Temporarily place at origin inside container
+                        item.position = {
+                            x: 0,
+                            y: trailerHeight + item.height / 2 + index * item.height,
+                            z: 0
+                        };
+                        
+                        const meshData = {
+                            ...item,
+                            x: item.position.x,
+                            y: item.position.y,
+                            z: item.position.z
+                        };
+                        
+                        item.mesh = this.scene3d.addCargo(meshData);
+                    });
+                });
+                
+                // Now move all unpacked items outside using the existing moveOutsideContainer method
+                remainingItems.forEach(unpackedStack => {
+                    unpackedStack.userData.items.forEach((item) => {
+                        if (item.mesh) {
+                            this.scene3d.moveOutsideContainer(item.mesh);
+                            item.isOutside = true;
                         }
                     });
                 });
@@ -463,23 +611,275 @@ class CargoManager {
             
             // Return info about unpacked items
             if (totalUnpacked > 0) {
-                // Remove unpacked items from cargoItems and update total weight
+                // First place all items inside container temporarily to create meshes
                 result.unpacked.forEach(unpackedStack => {
-                    unpackedStack.userData.items.forEach(item => {
-                        const index = this.cargoItems.indexOf(item);
-                        if (index > -1) {
-                            this.totalWeight -= item.weight;
-                            this.cargoItems.splice(index, 1);
+                    unpackedStack.userData.items.forEach((item, index) => {
+                        // Temporarily place at origin inside container
+                        item.position = {
+                            x: 0,
+                            y: trailerHeight + item.height / 2 + index * item.height,
+                            z: 0
+                        };
+                        
+                        const meshData = {
+                            ...item,
+                            x: item.position.x,
+                            y: item.position.y,
+                            z: item.position.z
+                        };
+                        
+                        item.mesh = this.scene3d.addCargo(meshData);
+                    });
+                });
+                
+                // Now move all unpacked items outside using the existing moveOutsideContainer method
+                result.unpacked.forEach(unpackedStack => {
+                    unpackedStack.userData.items.forEach((item) => {
+                        if (item.mesh) {
+                            this.scene3d.moveOutsideContainer(item.mesh);
+                            item.isOutside = true;
                         }
                     });
                 });
                 
+                // Handle items exceeding weight limit
+                itemsExceedingLimit.forEach(stack => {
+                    stack.items.forEach((item, index) => {
+                        // Temporarily place at origin inside container
+                        item.position = {
+                            x: 0,
+                            y: trailerHeight + item.height / 2 + index * item.height,
+                            z: 0
+                        };
+                        
+                        const meshData = {
+                            ...item,
+                            x: item.position.x,
+                            y: item.position.y,
+                            z: item.position.z
+                        };
+                        
+                        item.mesh = this.scene3d.addCargo(meshData);
+                        this.scene3d.moveOutsideContainer(item.mesh);
+                        item.isOutside = true;
+                    });
+                });
+                
+                const totalExceeded = itemsExceedingLimit.reduce((sum, stack) => sum + stack.items.length, 0);
                 this.updateCenterOfGravity();
-                return { success: false, unpackedCount: totalUnpacked };
+                return { success: false, unpackedCount: totalUnpacked, exceedingWeightCount: totalExceeded };
             }
         }
         
+        // Handle items exceeding weight limit - place them outside
+        itemsExceedingLimit.forEach(stack => {
+            stack.items.forEach((item, index) => {
+                // Temporarily place at origin inside container
+                item.position = {
+                    x: 0,
+                    y: trailerHeight + item.height / 2 + index * item.height,
+                    z: 0
+                };
+                
+                const meshData = {
+                    ...item,
+                    x: item.position.x,
+                    y: item.position.y,
+                    z: item.position.z
+                };
+                
+                item.mesh = this.scene3d.addCargo(meshData);
+                this.scene3d.moveOutsideContainer(item.mesh);
+                item.isOutside = true;
+            });
+        });
+        
+        const totalExceeded = itemsExceedingLimit.reduce((sum, stack) => sum + stack.items.length, 0);
         this.updateCenterOfGravity();
+        
+        if (totalExceeded > 0) {
+            return { success: true, unpackedCount: 0, exceedingWeightCount: totalExceeded };
+        }
+        return { success: true, unpackedCount: 0 };
+    }
+    
+    _arrangeGroupItems(groupItems, occupiedSpaces = []) {
+        if (groupItems.length === 0) {
+            return false;
+        }
+        
+        const trailerHeight = this.containerDimensions.trailerHeight || 1.1;
+        
+        // Create stack from group items
+        const firstItem = groupItems[0];
+        
+        // Ensure all items have dimensions
+        if (!firstItem.length || !firstItem.width || !firstItem.height) {
+            console.error('Group items missing dimensions:', firstItem);
+            return false;
+        }
+        
+        const maxStack = firstItem.maxStack !== undefined ? firstItem.maxStack : 1;
+        const maxStackWeight = firstItem.maxStackWeight !== undefined ? firstItem.maxStackWeight : Infinity;
+        const maxTotalHeight = 1 + maxStack;
+        const containerHeight = this.containerDimensions.height;
+        const unitHeight = firstItem.height;
+        const unitWeight = firstItem.weight;
+        
+        const stacks = [];
+        
+        // If maxStack is 0, only single units
+        if (maxStack === 0) {
+            groupItems.forEach(item => {
+                stacks.push({
+                    items: [item],
+                    sample: firstItem,
+                    stackHeight: 1
+                });
+            });
+        } else {
+            // Normal stacking logic
+            let currentStack = [];
+            let weightAboveBottom = 0;
+            
+            groupItems.forEach(item => {
+                const potentialStackHeight = (currentStack.length + 1) * unitHeight;
+                const potentialWeightAbove = currentStack.length > 0 ? weightAboveBottom + unitWeight : 0;
+                const canAddToStack = currentStack.length < maxTotalHeight && 
+                                     potentialStackHeight <= containerHeight &&
+                                     potentialWeightAbove <= maxStackWeight;
+                
+                if (canAddToStack) {
+                    currentStack.push(item);
+                    if (currentStack.length > 1) {
+                        weightAboveBottom += unitWeight;
+                    }
+                } else {
+                    if (currentStack.length > 0) {
+                        stacks.push({
+                            items: currentStack,
+                            sample: firstItem,
+                            stackHeight: currentStack.length
+                        });
+                    }
+                    currentStack = [item];
+                    weightAboveBottom = 0;
+                }
+            });
+            
+            if (currentStack.length > 0) {
+                stacks.push({
+                    items: currentStack,
+                    sample: firstItem,
+                    stackHeight: currentStack.length
+                });
+            }
+        }
+        
+        // Create a temporary packer with occupied spaces
+        const tempPacker = new BinPacking3D(
+            this.containerDimensions.length,
+            this.containerDimensions.width,
+            this.containerDimensions.height,
+            this.containerDimensions
+        );
+        
+        // Mark occupied spaces BEFORE packing
+        tempPacker.setOccupiedSpaces(occupiedSpaces);
+        
+        // Pack the new group items
+        const itemsForPacking = stacks.map(stack => ({
+            width: stack.sample.length,
+            depth: stack.sample.width,
+            height: stack.sample.height * stack.stackHeight,
+            weight: stack.sample.weight * stack.stackHeight,
+            userData: stack,
+            maxStack: stack.sample.maxStack,
+            maxStackWeight: stack.sample.maxStackWeight,
+            isRoll: stack.sample.isRoll,
+            isVerticalRoll: stack.sample.isVerticalRoll,
+            diameter: stack.sample.diameter,
+            fixedDiameter: stack.sample.fixedDiameter
+        }));
+        
+        const result = tempPacker.packItems(itemsForPacking, true); // Skip reset to preserve occupied spaces
+        
+        // Place packed items
+        result.packed.forEach(packedItem => {
+            const stack = packedItem.userData;
+            const baseX = packedItem.position.x - (this.containerDimensions.length / 2);
+            const baseY = packedItem.position.y;
+            const baseZ = (stack.sample.isRoll && stack.sample.fixedDiameter) ? packedItem.position.z : 
+                        packedItem.position.z - (this.containerDimensions.width / 2);
+            
+            stack.items.forEach((item, index) => {
+                const itemLength = packedItem.rotated ? stack.sample.width : stack.sample.length;
+                const itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
+                
+                item.position = {
+                    x: baseX + (itemLength / 2),
+                    y: trailerHeight + baseY + (index * stack.sample.height) + (stack.sample.height / 2),
+                    z: baseZ + ((stack.sample.isRoll && stack.sample.fixedDiameter) ? 0 : itemWidth / 2)
+                };
+                
+                const meshData = {
+                    ...item,
+                    x: item.position.x,
+                    y: item.position.y,
+                    z: item.position.z,
+                    length: itemLength,
+                    width: itemWidth,
+                    height: stack.sample.height
+                };
+                
+                item.mesh = this.scene3d.addCargo(meshData);
+            });
+        });
+        
+        // Place unpacked items outside instead of removing
+        let totalUnpacked = 0;
+        if (result.unpacked.length > 0) {
+            const trailerHeight = this.containerDimensions.trailerHeight || 1.2;
+            
+            result.unpacked.forEach(unpackedStack => {
+                totalUnpacked += unpackedStack.userData.items.length;
+                
+                // First create meshes for all items
+                unpackedStack.userData.items.forEach((item, index) => {
+                    // Temporarily place at origin inside container
+                    item.position = {
+                        x: 0,
+                        y: trailerHeight + item.height / 2 + index * item.height,
+                        z: 0
+                    };
+                    
+                    const meshData = {
+                        ...item,
+                        x: item.position.x,
+                        y: item.position.y,
+                        z: item.position.z
+                    };
+                    
+                    item.mesh = this.scene3d.addCargo(meshData);
+                });
+            });
+            
+            // Now move all unpacked items outside using the existing moveOutsideContainer method
+            result.unpacked.forEach(unpackedStack => {
+                unpackedStack.userData.items.forEach((item) => {
+                    if (item.mesh) {
+                        this.scene3d.moveOutsideContainer(item.mesh);
+                        item.isOutside = true;
+                    }
+                });
+            });
+        }
+        
+        this.updateCenterOfGravity();
+        
+        if (totalUnpacked > 0) {
+            return { success: false, unpackedCount: totalUnpacked };
+        }
         return { success: true, unpackedCount: 0 };
     }
     
@@ -512,7 +912,8 @@ class CargoManager {
         let totalWeight = 0;
         
         this.cargoItems.forEach(item => {
-            if (item.position) {
+            // Only include items inside the container for center of gravity
+            if (item.position && !item.isOutside) {
                 totalWeightedX += item.position.x * item.weight;
                 totalWeightedY += item.position.y * item.weight;
                 totalWeightedZ += item.position.z * item.weight;
@@ -536,11 +937,15 @@ class CargoManager {
     }
     
     getStatistics() {
-        const placedItems = this.cargoItems.filter(item => item.position !== null);
+        // Separate items inside and outside the container
+        const placedItems = this.cargoItems.filter(item => item.position !== null && !item.isOutside);
+        const outsideItems = this.cargoItems.filter(item => item.position !== null && item.isOutside);
         
         let usedVolume = 0;
+        let insideWeight = 0;
         placedItems.forEach(item => {
             usedVolume += item.length * item.width * item.height;
+            insideWeight += item.weight;
         });
         
         const containerVolume = this.containerDimensions ? 
@@ -549,9 +954,11 @@ class CargoManager {
         return {
             totalItems: this.cargoItems.length,
             placedItems: placedItems.length,
+            outsideItems: outsideItems.length,
             totalWeight: this.totalWeight,
+            insideWeight: insideWeight,
             maxLoad: this.maxLoad,
-            weightUsage: (this.totalWeight / this.maxLoad) * 100,
+            weightUsage: (insideWeight / this.maxLoad) * 100,
             volumeUsage: (usedVolume / containerVolume) * 100,
             centerOfGravity: this.calculateCenterOfGravity()
         };
@@ -599,11 +1006,17 @@ class CargoManager {
     }
     
     updateCargoPositions(movedCargo) {
-        // Update positions of moved cargo items
+        // Update positions and isOutside flag of moved cargo items
         movedCargo.forEach(cargoData => {
             const item = this.cargoItems.find(c => c.id === cargoData.id);
-            if (item && cargoData.position) {
-                item.position = cargoData.position;
+            if (item) {
+                if (cargoData.position) {
+                    item.position = cargoData.position;
+                }
+                // Update isOutside flag if it exists in cargoData
+                if (cargoData.isOutside !== undefined) {
+                    item.isOutside = cargoData.isOutside;
+                }
             }
         });
         
