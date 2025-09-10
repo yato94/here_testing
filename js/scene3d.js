@@ -27,6 +27,14 @@ class Scene3D {
         this.clickCount = 0;
         this.clickTimer = null;
         this.ghostMesh = null;
+        this.ignoreNextClick = false;
+        
+        // Track mouse movement for distinguishing click vs drag
+        this.mouseDownPosition = { x: 0, y: 0 };
+        this.mouseUpPosition = { x: 0, y: 0 };
+        this.mouseHasMoved = false;
+        this.totalMouseMovement = 0;
+        this.lastCameraMovementTime = 0;
         
         // Performance optimization for axle updates
         this.axleUpdatePending = false;
@@ -1111,6 +1119,10 @@ class Scene3D {
         this.renderer.domElement.addEventListener('mouseup', (e) => this.onMouseUp(e));
         this.renderer.domElement.addEventListener('click', (e) => this.onMouseClick(e));
         this.renderer.domElement.addEventListener('contextmenu', (e) => this.onContextMenu(e));
+        
+        // Create bound versions of handlers for document-level listeners
+        this.documentMouseUpHandler = (e) => this.onDocumentMouseUp(e);
+        this.documentContextMenuHandler = (e) => this.onDocumentContextMenu(e);
     }
     
     onWindowResize() {
@@ -1124,6 +1136,21 @@ class Scene3D {
         this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         
+        // Check if mouse has moved significantly from mouse down position
+        if (this.mouseDownPosition) {
+            const dx = Math.abs(event.clientX - this.mouseDownPosition.x);
+            const dy = Math.abs(event.clientY - this.mouseDownPosition.y);
+            if (dx > 2 || dy > 2) {
+                this.mouseHasMoved = true;
+                
+                // Start actual dragging if we have a potential drag target
+                if (this.potentialDragTarget && !this.isDragging) {
+                    this.isDragging = true;
+                    document.body.style.cursor = 'grabbing';
+                }
+            }
+        }
+        
         if (this.isDragging && this.draggedObjects.length > 0) {
             // Handle dragging
             this.handleDragging();
@@ -1134,14 +1161,31 @@ class Scene3D {
             
             // Clear previous hover
             if (this.hoveredObject) {
-                this.hoveredObject.material.emissive = new THREE.Color(0x000000);
+                // Only clear emissive if the object is not part of selected group
+                if (!this.selectedGroupId || 
+                    !this.hoveredObject.userData || 
+                    this.hoveredObject.userData.groupId !== this.selectedGroupId) {
+                    this.hoveredObject.material.emissive = new THREE.Color(0x000000);
+                } else {
+                    // Keep group highlight
+                    this.hoveredObject.material.emissive = new THREE.Color(0x444444);
+                }
             }
             
             if (intersects.length > 0) {
                 // Hovering over cargo - disable OrbitControls
                 this.controls.enabled = false;
                 this.hoveredObject = intersects[0].object;
-                this.hoveredObject.material.emissive = new THREE.Color(0x444444);
+                // Apply hover highlight (which might be stronger for selected group items)
+                if (this.selectedGroupId && 
+                    this.hoveredObject.userData && 
+                    this.hoveredObject.userData.groupId === this.selectedGroupId) {
+                    // Item is part of selected group - maybe use slightly stronger highlight
+                    this.hoveredObject.material.emissive = new THREE.Color(0x666666);
+                } else {
+                    // Normal hover highlight
+                    this.hoveredObject.material.emissive = new THREE.Color(0x444444);
+                }
                 // Show grab cursor
                 document.body.style.cursor = 'grab';
                 // Show ruler for hovered cargo only if inside container
@@ -1155,6 +1199,18 @@ class Scene3D {
                 document.body.style.cursor = 'default';
                 // Hide ruler when not hovering
                 this.hideRuler();
+                
+                // Restore group highlight if any group is selected
+                if (this.selectedGroupId) {
+                    this.cargoMeshes.forEach(mesh => {
+                        if (mesh.userData && mesh.userData.groupId === this.selectedGroupId) {
+                            // Check if unit is inside container for highlighting
+                            if (!this.isPositionOutsideContainer(mesh.position)) {
+                                mesh.material.emissive = new THREE.Color(0x444444);
+                            }
+                        }
+                    });
+                }
             }
         } else {
             // No cargo - ensure OrbitControls is enabled
@@ -1165,32 +1221,82 @@ class Scene3D {
     }
     
     onMouseClick(event) {
-        // Ignore clicks during dragging
-        if (this.isDragging) return;
+        // Ignore clicks during dragging, after dragging
+        if (this.isDragging || this.ignoreNextClick) {
+            return;
+        }
+        
+        // Check if mouse moved significantly (camera rotation)
+        // Use totalMouseMovement which was calculated in mouseUp
+        if (this.totalMouseMovement > 2) {
+            // Clear any pending click timer
+            if (this.clickTimer) {
+                clearTimeout(this.clickTimer);
+                this.clickTimer = null;
+                this.clickCount = 0;
+            }
+            return;
+        }
         
         // Handle multi-click selection
         this.clickCount++;
         
+        // Clear existing timer
         if (this.clickTimer) {
             clearTimeout(this.clickTimer);
         }
         
-        this.clickTimer = setTimeout(() => {
-            this.handleSelection(this.clickCount);
+        // For double-click, execute immediately
+        if (this.clickCount === 2) {
+            this.handleSelection(2);
             this.clickCount = 0;
-        }, 300);
+            this.clickTimer = null;
+        } else {
+            // For single click, wait to see if another click comes
+            this.clickTimer = setTimeout(() => {
+                if (this.clickCount === 1) {
+                    this.handleSelection(1);
+                }
+                this.clickCount = 0;
+                this.clickTimer = null;
+            }, 300);
+        }
     }
     
     handleSelection(clickCount) {
         this.raycaster.setFromCamera(this.mouse, this.camera);
         const intersects = this.raycaster.intersectObjects(this.cargoMeshes);
         
-        // No selection highlighting - just detect clicks
         if (intersects.length > 0) {
             const clickedMesh = intersects[0].object;
             const clickedPosition = clickedMesh.position.clone();
             
-            // Click handling without visual selection
+            // Handle group selection/deselection
+            if (clickedMesh.userData && clickedMesh.userData.groupId) {
+                const clickedGroupId = clickedMesh.userData.groupId;
+                
+                if (this.selectedGroupId === clickedGroupId) {
+                    // Clicked on unit from currently selected group
+                    if (clickCount === 2) {
+                        // Double click on same group - deselect
+                        if (this.onGroupDeselectionRequested) {
+                            this.onGroupDeselectionRequested();
+                        }
+                    }
+                    // Single click on same group - do nothing, keep selection
+                } else {
+                    // Clicked on unit from different group - deselect current group
+                    if (this.selectedGroupId && this.onGroupDeselectionRequested) {
+                        this.onGroupDeselectionRequested();
+                    }
+                }
+            }
+        } else {
+            // Clicked on empty space - DO NOT deselect group, keep current selection
+            // Group should only be deselected by:
+            // 1. Clicking on unit from different group
+            // 2. Double-clicking on unit from selected group
+            // 3. Clicking on different group in menu
         }
     }
     
@@ -1232,7 +1338,17 @@ class Scene3D {
     }
     
     onMouseDown(event) {
-        if (event.button !== 0) return; // Only left button
+        // Store mouse down position to detect dragging for any button
+        this.mouseDownPosition = { x: event.clientX, y: event.clientY };
+        this.mouseHasMoved = false;
+        this.totalMouseMovement = 0;
+        
+        // Add document-level listeners to catch mouse release outside canvas
+        // This ensures dragging ends properly even when mouse is released outside
+        document.addEventListener('mouseup', this.documentMouseUpHandler);
+        document.addEventListener('contextmenu', this.documentContextMenuHandler);
+        
+        if (event.button !== 0) return; // Only continue for left button
         
         // Update mouse position
         const rect = this.renderer.domElement.getBoundingClientRect();
@@ -1245,13 +1361,53 @@ class Scene3D {
         if (intersects.length > 0) {
             // We hit a cargo item - OrbitControls should be disabled from onMouseMove
             
-            // Start dragging
-            this.isDragging = true;
-            document.body.style.cursor = 'grabbing';
+            // Prepare for potential dragging (but don't set isDragging yet)
+            this.potentialDragTarget = intersects[0].object;
             
-            // Get the clicked object and all objects above it
+            // Get the clicked object and determine what to drag
             const clickedObject = intersects[0].object;
-            this.draggedObjects = this.getAllObjectsAbove(clickedObject);
+            
+            // Check if the clicked object belongs to a selected group
+            if (this.selectedGroupId && clickedObject.userData && 
+                clickedObject.userData.groupId === this.selectedGroupId &&
+                !this.isPositionOutsideContainer(clickedObject.position)) {
+                // Drag the entire selected group - but only units inside the container
+                const allGroupObjects = this.getGroupObjects(this.selectedGroupId);
+                const groupObjectsInside = allGroupObjects.filter(obj => 
+                    !this.isPositionOutsideContainer(obj.position)
+                );
+                
+                // Start with group objects and find ALL units stacked above them
+                const allUnitsToMove = new Set();
+                
+                // Add all group objects first
+                groupObjectsInside.forEach(obj => {
+                    allUnitsToMove.add(obj);
+                });
+                
+                // Now for each position where we have a group unit, 
+                // find ALL units stacked above (regardless of group)
+                const tolerance = 0.1;
+                groupObjectsInside.forEach(groupObj => {
+                    const groupPos = groupObj.position;
+                    
+                    // Find the entire stack at this position
+                    this.cargoMeshes.forEach(mesh => {
+                        // Check if mesh is in the same column and above the group object
+                        if (Math.abs(mesh.position.x - groupPos.x) < tolerance &&
+                            Math.abs(mesh.position.z - groupPos.z) < tolerance &&
+                            mesh.position.y > groupPos.y) {
+                            // Add any unit that is above the group unit
+                            allUnitsToMove.add(mesh);
+                        }
+                    });
+                });
+                
+                this.draggedObjects = Array.from(allUnitsToMove);
+            } else {
+                // Drag just this object and all objects above it (default behavior)
+                this.draggedObjects = this.getAllObjectsAbove(clickedObject);
+            }
             
             // Show ruler for the dragged object only if inside container
             if (!this.isPositionOutsideContainer(clickedObject.position)) {
@@ -1308,6 +1464,34 @@ class Scene3D {
     }
     
     onMouseUp(event) {
+        const wasDragging = this.isDragging;
+        
+        // Remove document-level listeners
+        document.removeEventListener('mouseup', this.documentMouseUpHandler);
+        document.removeEventListener('contextmenu', this.documentContextMenuHandler);
+        
+        // Store mouse up position for click event to check
+        this.mouseUpPosition = { x: event.clientX, y: event.clientY };
+        
+        // Calculate total movement
+        if (this.mouseDownPosition) {
+            const dx = Math.abs(event.clientX - this.mouseDownPosition.x);
+            const dy = Math.abs(event.clientY - this.mouseDownPosition.y);
+            this.totalMouseMovement = Math.sqrt(dx * dx + dy * dy);
+        }
+        
+        // Reset mouse tracking
+        this.mouseDownPosition = null;
+        this.potentialDragTarget = null;
+        
+        // Reset mouseHasMoved and totalMouseMovement after a longer delay 
+        // to ensure click event AND setTimeout in click can check it
+        // 350ms to be safe (click timeout is 300ms)
+        setTimeout(() => {
+            this.mouseHasMoved = false;
+            this.totalMouseMovement = 0;
+        }, 350);
+        
         if (!this.isDragging) {
             // Re-enable controls if we're not dragging
             this.controls.enabled = true;
@@ -1347,10 +1531,34 @@ class Scene3D {
         // Re-enable controls after dragging
         this.controls.enabled = true;
         document.body.style.cursor = 'default';
+        
+        // Set flag to ignore next click event if we were dragging
+        if (wasDragging) {
+            this.ignoreNextClick = true;
+            setTimeout(() => {
+                this.ignoreNextClick = false;
+            }, 100);
+        }
     }
     
     onContextMenu(event) {
         event.preventDefault(); // Prevent default browser context menu
+        
+        // Remove document-level listeners when context menu is triggered
+        document.removeEventListener('mouseup', this.documentMouseUpHandler);
+        document.removeEventListener('contextmenu', this.documentContextMenuHandler);
+        
+        // If dragging, end the drag operation
+        if (this.isDragging) {
+            this.endDragging();
+            return;
+        }
+        
+        // If mouse has moved (camera rotation), don't show context menu
+        if (this.mouseHasMoved) {
+            this.hideContextMenu();
+            return;
+        }
         
         // Update mouse position
         const rect = this.renderer.domElement.getBoundingClientRect();
@@ -1399,6 +1607,17 @@ class Scene3D {
         `;
         
         const cargoData = mesh.userData;
+        const isUnitOutside = this.isPositionOutsideContainer(mesh.position);
+        
+        // Check how many units from this group are inside the container
+        const groupUnitsInside = this.cargoMeshes.filter(m => 
+            m.userData && 
+            m.userData.groupId === cargoData.groupId && 
+            !this.isPositionOutsideContainer(m.position)
+        ).length;
+        
+        // Group is selected AND has more than 1 unit inside container
+        const isGroupSelected = this.selectedGroupId === cargoData.groupId && !isUnitOutside && groupUnitsInside > 1;
         
         // Add unit details section
         const detailsSection = document.createElement('div');
@@ -1407,14 +1626,28 @@ class Scene3D {
             border-bottom: 1px solid #eee;
             font-size: 12px;
             color: #666;
+            ${isGroupSelected ? 'background: #e8f5e8;' : ''}
         `;
+        
         // Check if it's a Roll and add orientation info
         let orientationInfo = '';
         if (cargoData.isRoll && !cargoData.fixedDiameter) {
             orientationInfo = `Orientacja: ${cargoData.isVerticalRoll ? '⬆ Pionowo' : '➡ Poziomo'}<br>`;
         }
         
+        // Get group info if selected and unit is inside
+        let groupInfo = '';
+        if (isGroupSelected) {
+            const groupMeshesInside = this.cargoMeshes.filter(m => 
+                m.userData && 
+                m.userData.groupId === cargoData.groupId && 
+                !this.isPositionOutsideContainer(m.position)
+            );
+            groupInfo = `<div style="color: #10b981; font-weight: bold; margin-bottom: 4px;">✓ ZAZNACZONA GRUPA (${groupMeshesInside.length} szt. w przestrzeni)</div>`;
+        }
+        
         detailsSection.innerHTML = `
+            ${groupInfo}
             <strong style="color: #333;">${cargoData.name || 'Jednostka'}</strong><br>
             Wymiary: ${(cargoData.length*100).toFixed(0)}×${(cargoData.width*100).toFixed(0)}×${(cargoData.height*100).toFixed(0)} cm<br>
             Waga: ${cargoData.weight} kg<br>
@@ -1428,14 +1661,46 @@ class Scene3D {
         // Menu items
         const menuItems = [];
         
-        menuItems.push(
-            { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
-            { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
-            { text: '⟲ Obróć do góry (180°)', action: () => this.rotateUnit(mesh, 180) },
-            { separator: true },
-            { text: '📦 Przenieś poza przestrzeń', action: () => this.moveOutsideContainer(mesh) },
-            { text: '🗑️ Usuń jednostkę', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
-        );
+        if (isUnitOutside) {
+            // Units outside container - only individual operations, no group operations
+            menuItems.push(
+                { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
+                { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                { text: '⟲ Obróć do góry (180°)', action: () => this.rotateUnit(mesh, 180) },
+                { separator: true },
+                { text: '🗑️ Usuń jednostkę', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
+            );
+        } else if (isGroupSelected) {
+            // Group operations - only for units inside container
+            menuItems.push(
+                { text: '↻ Obróć grupę w prawo (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
+                { text: '↺ Obróć grupę w lewo (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
+                { text: '⟲ Obróć grupę do góry (180°)', action: () => this.rotateGroup(cargoData.groupId, 180), style: 'font-weight: bold; color: #10b981;' },
+                { separator: true },
+                { text: '📦 Przenieś grupę poza przestrzeń', action: () => this.moveGroupOutsideContainer(cargoData.groupId), style: 'font-weight: bold; color: #10b981;' },
+                { text: '🗑️ Usuń całą grupę', action: () => this.removeGroup(cargoData.groupId), style: 'font-weight: bold; color: #dc3545;' },
+                { separator: true },
+                { text: '❌ Odznacz grupę', action: () => this.onGroupDeselectionRequested && this.onGroupDeselectionRequested() }
+            );
+        } else {
+            // Individual unit operations for units inside container
+            // Only show "Select group" if group has more than 1 unit inside container
+            if (groupUnitsInside > 1) {
+                menuItems.push(
+                    { text: '🎯 Zaznacz grupę', action: () => this.onGroupSelectionRequested && this.onGroupSelectionRequested(cargoData.groupId), style: 'font-weight: bold; color: #3b82f6;' },
+                    { separator: true }
+                );
+            }
+            
+            menuItems.push(
+                { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
+                { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                { text: '⟲ Obróć do góry (180°)', action: () => this.rotateUnit(mesh, 180) },
+                { separator: true },
+                { text: '📦 Przenieś poza przestrzeń', action: () => this.moveOutsideContainer(mesh) },
+                { text: '🗑️ Usuń jednostkę', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
+            );
+        }
         
         menuItems.forEach(item => {
             if (item.separator) {
@@ -2666,6 +2931,22 @@ class Scene3D {
     checkValidPosition(position) {
         if (!this.containerBounds || !this.draggedObjects[0]) return false;
         
+        // Check if we're dragging a group (including units stacked on the group)
+        // We're dragging a group if we have a selected group and the first dragged object belongs to it
+        const isDraggingGroup = this.selectedGroupId && 
+                                this.draggedObjects[0].userData &&
+                                this.draggedObjects[0].userData.groupId === this.selectedGroupId;
+        
+        if (isDraggingGroup) {
+            return this.checkValidGroupPosition(position);
+        }
+        
+        return this.checkValidSinglePosition(position);
+    }
+    
+    checkValidSinglePosition(position) {
+        if (!this.containerBounds || !this.draggedObjects[0]) return false;
+        
         // Special handling for steel coils in groove
         const firstItem = this.draggedObjects[0].userData;
         if (firstItem.fixedDiameter && this.containerBounds.hasGroove) {
@@ -3202,4 +3483,254 @@ class Scene3D {
         // Force render update
         this.renderer.render(this.scene, this.camera);
     }
+    
+    highlightGroup(groupId, itemsToHighlight = null) {
+        // Clear any existing highlights first
+        this.clearGroupHighlight();
+        
+        // If specific items are provided, create a set of their IDs for quick lookup
+        let itemIdsToHighlight = null;
+        if (itemsToHighlight && itemsToHighlight.length > 0) {
+            itemIdsToHighlight = new Set(itemsToHighlight.map(item => item.id));
+        }
+        
+        // Find all meshes belonging to this group and highlight them
+        this.cargoMeshes.forEach(mesh => {
+            if (mesh.userData && mesh.userData.groupId === groupId) {
+                // If specific items are provided, only highlight those
+                if (itemIdsToHighlight && !itemIdsToHighlight.has(mesh.userData.id)) {
+                    return; // Skip this mesh if it's not in the list to highlight
+                }
+                
+                // Apply emissive highlight (same as hover effect)
+                mesh.material.emissive = new THREE.Color(0x444444);
+            }
+        });
+        
+        this.selectedGroupId = groupId;
+    }
+    
+    clearGroupHighlight() {
+        // Clear emissive highlight from all meshes in the selected group
+        if (this.selectedGroupId) {
+            this.cargoMeshes.forEach(mesh => {
+                if (mesh.userData && mesh.userData.groupId === this.selectedGroupId) {
+                    // Reset emissive to black (no highlight)
+                    mesh.material.emissive = new THREE.Color(0x000000);
+                }
+            });
+        }
+        
+        this.selectedGroupId = null;
+    }
+    
+    
+    rotateGroup(groupId, angle) {
+        // This method should delegate to CargoManager to properly rotate and rearrange the group
+        // We need access to CargoManager through a callback
+        if (this.onGroupRotationRequested) {
+            this.onGroupRotationRequested(groupId, angle);
+        }
+    }
+    
+    moveGroupOutsideContainer(groupId) {
+        // Only move units that are currently inside the container
+        const groupMeshesInside = this.cargoMeshes.filter(mesh => 
+            mesh.userData && 
+            mesh.userData.groupId === groupId &&
+            !this.isPositionOutsideContainer(mesh.position)
+        );
+        
+        groupMeshesInside.forEach(mesh => {
+            this.moveOutsideContainer(mesh);
+        });
+        
+        // Deselect the group after moving it outside
+        if (this.selectedGroupId === groupId && this.onGroupDeselectionRequested) {
+            this.onGroupDeselectionRequested();
+        }
+    }
+    
+    removeGroup(groupId) {
+        const groupMeshes = this.cargoMeshes.filter(mesh => 
+            mesh.userData && mesh.userData.groupId === groupId
+        );
+        
+        // Remove all meshes in the group
+        groupMeshes.forEach(mesh => {
+            this.removeUnit(mesh);
+        });
+        
+        // Clear group selection if this group was selected
+        if (this.selectedGroupId === groupId) {
+            this.selectedGroupId = null;
+        }
+    }
+    
+    getGroupObjects(groupId) {
+        return this.cargoMeshes.filter(mesh => 
+            mesh.userData && mesh.userData.groupId === groupId
+        );
+    }
+    
+    calculateGroupBoundingBox(objects) {
+        if (!objects || objects.length === 0) return null;
+        
+        const box = new THREE.Box3();
+        objects.forEach(obj => {
+            box.expandByObject(obj);
+        });
+        
+        return box;
+    }
+    
+    checkValidGroupPosition(targetPosition) {
+        if (!this.draggedObjects || this.draggedObjects.length === 0) return false;
+        
+        // Use the first object as reference for calculating movement delta
+        const mainObject = this.draggedObjects[0];
+        const deltaX = targetPosition.x - mainObject.position.x;
+        const deltaZ = targetPosition.z - mainObject.position.z;
+        
+        // Check each dragged object individually for collisions and bounds
+        for (let draggedObj of this.draggedObjects) {
+            const newPos = draggedObj.position.clone();
+            newPos.x += deltaX;
+            newPos.z += deltaZ;
+            
+            // Check container bounds for this specific object
+            const halfLength = draggedObj.userData.length / 2;
+            const halfWidth = draggedObj.userData.width / 2;
+            
+            if (newPos.x - halfLength < this.containerBounds.min.x || 
+                newPos.x + halfLength > this.containerBounds.max.x ||
+                newPos.z - halfWidth < this.containerBounds.min.z || 
+                newPos.z + halfWidth > this.containerBounds.max.z) {
+                return false;
+            }
+            
+            // Check collisions with all other objects (not in the dragged group)
+            for (let mesh of this.cargoMeshes) {
+                if (this.draggedObjects.includes(mesh)) continue;
+                
+                if (this.objectsWouldCollide(newPos, draggedObj.userData, mesh.position, mesh.userData)) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    objectsWouldCollide(pos1, data1, pos2, data2) {
+        const tolerance = 0.01; // 1cm tolerance - pozwala na stykanie się, ale zapobiega nakładaniu
+        
+        // Calculate bounding boxes
+        const halfLength1 = data1.length / 2;
+        const halfWidth1 = data1.width / 2;
+        const halfHeight1 = data1.height / 2;
+        
+        const halfLength2 = data2.length / 2;
+        const halfWidth2 = data2.width / 2;
+        const halfHeight2 = data2.height / 2;
+        
+        // More precise overlap calculation
+        const minX1 = pos1.x - halfLength1;
+        const maxX1 = pos1.x + halfLength1;
+        const minX2 = pos2.x - halfLength2;
+        const maxX2 = pos2.x + halfLength2;
+        
+        const minY1 = pos1.y - halfHeight1;
+        const maxY1 = pos1.y + halfHeight1;
+        const minY2 = pos2.y - halfHeight2;
+        const maxY2 = pos2.y + halfHeight2;
+        
+        const minZ1 = pos1.z - halfWidth1;
+        const maxZ1 = pos1.z + halfWidth1;
+        const minZ2 = pos2.z - halfWidth2;
+        const maxZ2 = pos2.z + halfWidth2;
+        
+        // Check for actual overlap (not just touching) - tolerance applied to prevent overlap, not touching
+        const xOverlap = maxX1 > minX2 + tolerance && maxX2 > minX1 + tolerance;
+        const yOverlap = maxY1 > minY2 + tolerance && maxY2 > minY1 + tolerance;
+        const zOverlap = maxZ1 > minZ2 + tolerance && maxZ2 > minZ1 + tolerance;
+        
+        return xOverlap && yOverlap && zOverlap;
+    }
+    
+    // Document-level event handlers for catching events outside canvas
+    onDocumentMouseUp(event) {
+        // Only handle if we're actually dragging
+        if (this.isDragging) {
+            this.endDragging();
+        }
+        
+        // Clean up document listeners
+        document.removeEventListener('mouseup', this.documentMouseUpHandler);
+        document.removeEventListener('contextmenu', this.documentContextMenuHandler);
+        
+        // Reset mouse tracking
+        this.mouseDownPosition = null;
+        this.potentialDragTarget = null;
+        this.mouseHasMoved = false;
+        this.totalMouseMovement = 0;
+    }
+    
+    onDocumentContextMenu(event) {
+        // Prevent default context menu when dragging
+        if (this.isDragging) {
+            event.preventDefault();
+            this.endDragging();
+        }
+        
+        // Clean up document listeners
+        document.removeEventListener('mouseup', this.documentMouseUpHandler);
+        document.removeEventListener('contextmenu', this.documentContextMenuHandler);
+        
+        // Reset mouse tracking
+        this.mouseDownPosition = null;
+        this.potentialDragTarget = null;
+        this.mouseHasMoved = false;
+        this.totalMouseMovement = 0;
+    }
+    
+    // Helper method to end dragging operation
+    endDragging() {
+        if (!this.isDragging) return;
+        
+        // Drop the objects - they're already in the correct position
+        // Update their userData positions and isOutside flag
+        this.draggedObjects.forEach(obj => {
+            // Update userData position
+            if (obj.userData) {
+                obj.userData.position = {
+                    x: obj.position.x,
+                    y: obj.position.y,
+                    z: obj.position.z
+                };
+                // Update isOutside flag based on current position
+                obj.userData.isOutside = this.isPositionOutsideContainer(obj.position);
+            }
+        });
+        
+        // Notify cargo manager about position changes
+        if (this.onCargoMoved) {
+            this.onCargoMoved(this.draggedObjects.map(m => m.userData));
+        }
+        
+        // Clean up dragging state
+        this.isDragging = false;
+        this.draggedObjects = [];
+        this.originalPositions = [];
+        this.lastValidPosition = null;
+        this.dragPlane = null;
+        
+        // Hide ruler when done dragging
+        this.hideRuler();
+        
+        // Re-enable controls after dragging
+        this.controls.enabled = true;
+        document.body.style.cursor = 'default';
+    }
+    
 }

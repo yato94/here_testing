@@ -1845,6 +1845,34 @@ body {
     flex: 1;
 }
 
+.unit-title-input {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 2px 4px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    border-radius: 4px;
+    transition: all 0.2s;
+    font-family: inherit;
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+}
+
+.unit-title-input:hover {
+    background: rgba(255, 255, 255, 0.5);
+    border-color: #e0e6ed;
+}
+
+.unit-title-input:focus {
+    outline: none;
+    background: white;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    cursor: text;
+}
+
 .unit-box-content {
     flex: 1 1 auto;
     padding: 6px;
@@ -1921,6 +1949,102 @@ body {
     cursor: text;
 }
 
+/* Dimension display that looks like original but is editable */
+.dimension-display-editable {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    font-family: inherit;
+}
+
+.dimension-input-inline {
+    background: transparent;
+    border: 1px solid transparent;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    width: auto;
+    min-width: 30px;
+    max-width: 60px;
+    border-radius: 3px;
+    transition: all 0.2s;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: center;
+    padding: 1px 3px;
+    margin: -1px -3px;
+}
+
+.dimension-input-inline:hover {
+    background: white;
+    border-color: #e0e6ed;
+}
+
+.dimension-input-inline:focus {
+    outline: none;
+    background: white;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    cursor: text;
+}
+
+/* Compact dimension inputs that look exactly like the original static text */
+.dimension-input-compact {
+    background: transparent;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    width: 2ch; /* Start with 2 character width */
+    min-width: 2ch;
+    max-width: 4ch; /* Maximum 4 characters for length/width (1360) */
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+    outline: none;
+    -moz-appearance: textfield; /* Remove spinner in Firefox */
+    box-sizing: content-box;
+}
+
+/* Remove spinner arrows in Chrome, Safari, Edge */
+.dimension-input-compact::-webkit-outer-spin-button,
+.dimension-input-compact::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.dimension-input-compact:hover {
+    background: rgba(59, 130, 246, 0.05);
+    border-radius: 2px;
+}
+
+.dimension-input-compact:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 1px;
+    border-radius: 2px;
+    cursor: text;
+}
+
+/* Height inputs are smaller (max 300cm = 3 characters) */
+.edit-dimension-height {
+    max-width: 3ch;
+}
+
+/* Small dimension unit styling */
+.dimension-unit-small {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Auto-resizing input for max stack weight */
+.auto-resize-input {
+    min-width: 5ch;
+    width: auto;
+}
+
 /* Stacking inputs container */
 .stacking-inputs-container {
     display: flex;
@@ -1933,14 +2057,21 @@ body {
     border: 1px solid transparent;
     padding: 3px 5px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 400;
     color: #1e293b;
     border-radius: 4px;
     transition: all 0.2s;
     font-family: inherit;
     cursor: pointer;
-    width: 45px;
     text-align: center;
+}
+
+.stacking-input-small.edit-stack {
+    width: 35px;
+}
+
+.stacking-input-small.edit-max-weight {
+    width: 55px;
 }
 
 .stacking-input-small:hover {

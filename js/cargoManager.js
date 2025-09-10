@@ -7,6 +7,8 @@ class CargoManager {
         this.totalWeight = 0;
         this.maxLoad = 24000;
         this.colorIndex = 0; // Track color index for golden ratio
+        this.selectedGroupId = null; // Track selected group for group operations
+        this.onGroupSelectionChanged = null; // Callback for UI synchronization
     }
     
     updateMaxLoad(maxLoad) {
@@ -1022,5 +1024,128 @@ class CargoManager {
         
         // Update center of gravity after movement
         this.updateCenterOfGravity();
+    }
+    
+    selectGroup(groupId) {
+        if (this.selectedGroupId === groupId) {
+            return; // Already selected
+        }
+        
+        // Get all items in the group
+        const groupItems = this.cargoItems.filter(item => item.groupId === groupId);
+        
+        // Filter only items that are inside the container (not outside)
+        const itemsInsideContainer = groupItems.filter(item => !item.isOutside);
+        
+        // Only allow selection if group has more than 1 unit inside container
+        if (itemsInsideContainer.length <= 1) {
+            return; // Cannot select groups with only 1 unit inside
+        }
+        
+        this.selectedGroupId = groupId;
+        
+        // Notify 3D scene to highlight only the items inside container
+        if (this.scene3d && this.scene3d.highlightGroup) {
+            // Pass the filtered items to highlight only those inside
+            this.scene3d.highlightGroup(groupId, itemsInsideContainer);
+        }
+        
+        // Notify UI about selection change
+        if (this.onGroupSelectionChanged) {
+            this.onGroupSelectionChanged(groupId);
+        }
+    }
+    
+    deselectGroup() {
+        if (!this.selectedGroupId) {
+            return; // Nothing selected
+        }
+        
+        const previousGroupId = this.selectedGroupId;
+        this.selectedGroupId = null;
+        
+        // Clear highlighting in 3D scene
+        if (this.scene3d && this.scene3d.clearGroupHighlight) {
+            this.scene3d.clearGroupHighlight();
+        }
+        
+        // Notify UI about deselection
+        if (this.onGroupSelectionChanged) {
+            this.onGroupSelectionChanged(null);
+        }
+    }
+    
+    getSelectedGroup() {
+        if (!this.selectedGroupId) {
+            return null;
+        }
+        
+        const groupItems = this.cargoItems.filter(item => item.groupId === this.selectedGroupId);
+        if (groupItems.length === 0) {
+            // Group no longer exists, clear selection
+            this.selectedGroupId = null;
+            return null;
+        }
+        
+        return {
+            groupId: this.selectedGroupId,
+            items: groupItems,
+            sample: groupItems[0]
+        };
+    }
+    
+    isGroupSelected(groupId) {
+        return this.selectedGroupId === groupId;
+    }
+    
+    toggleGroupSelection(groupId) {
+        if (this.selectedGroupId === groupId) {
+            this.deselectGroup();
+        } else {
+            this.selectGroup(groupId);
+        }
+    }
+    
+    rotateGroup(groupId, angle) {
+        // Get all items in the group that are inside the container
+        const groupItems = this.cargoItems.filter(item => 
+            item.groupId === groupId && !item.isOutside
+        );
+        if (groupItems.length === 0) return;
+        
+        // Remember if this group is selected for highlighting restoration
+        const wasSelected = this.selectedGroupId === groupId;
+        
+        // Update dimensions for each item if rotating 90 or -90 degrees
+        if (Math.abs(angle) === 90) {
+            groupItems.forEach(item => {
+                // Swap length and width
+                const tempLength = item.length;
+                item.length = item.width;
+                item.width = tempLength;
+            });
+        }
+        
+        // Now use autoArrangeGroup to rearrange only the items inside container
+        // This will keep other groups and outside units in place
+        this.autoArrangeGroup(groupId);
+        
+        // Restore highlighting if group was selected
+        if (wasSelected && this.scene3d) {
+            // Small delay to ensure meshes are created
+            setTimeout(() => {
+                // Force re-selection by temporarily clearing the selected group
+                const tempSelectedId = this.selectedGroupId;
+                this.selectedGroupId = null;
+                
+                // Clear any old highlighting state in scene
+                if (this.scene3d.clearGroupHighlight) {
+                    this.scene3d.clearGroupHighlight();
+                }
+                
+                // Now re-select the group (this will work because selectedGroupId is null)
+                this.selectGroup(groupId);
+            }, 100);
+        }
     }
 }

@@ -18,6 +18,7 @@ class UI {
         this.setupModalHandlers();
         this.setupMobileToggles();
         this.setupAxleSettingsModal();
+        this.setupGroupSelectionCallbacks();
         this.updateStatistics();
     }
     
@@ -1042,6 +1043,58 @@ class UI {
         return methods.map(m => methodNames[m] || m).join(', ');
     }
     
+    createDimensionInputs(group) {
+        const sample = group.sample;
+        const groupId = group.groupId;
+        
+        if (sample.type === 'steel-coil') {
+            // Steel Coil: only length is editable (diameter fixed at 180cm)
+            return `<input type="number" class="dimension-input-compact edit-dimension-length" 
+                           value="${Math.round(sample.length * 100)}" 
+                           data-group-id="${groupId}" 
+                           data-dimension="length"
+                           min="50" max="1360" step="1"
+                           maxlength="4"
+                           title="Długość (cm)" />×180×180 <span class="dimension-unit-small">cm</span>`;
+        } else if (sample.type === 'roll' && !sample.fixedDiameter) {
+            // Roll: diameter and height are editable
+            return `<input type="number" class="dimension-input-compact edit-dimension-diameter" 
+                           value="${Math.round((sample.diameter || sample.width) * 100)}" 
+                           data-group-id="${groupId}" 
+                           data-dimension="diameter"
+                           min="10" max="1360" step="1"
+                           maxlength="4"
+                           title="Średnica (cm)" />×<input type="number" class="dimension-input-compact edit-dimension-height" 
+                           value="${Math.round(sample.height * 100)}" 
+                           data-group-id="${groupId}" 
+                           data-dimension="height"
+                           min="10" max="300" step="1"
+                           maxlength="3"
+                           title="Wysokość (cm)" /> <span class="dimension-unit-small">cm</span>`;
+        } else {
+            // Regular units: all dimensions editable - keep original display format
+            return `<input type="number" class="dimension-input-compact edit-dimension-length" 
+                           value="${Math.round(sample.length * 100)}" 
+                           data-group-id="${groupId}" 
+                           data-dimension="length"
+                           min="1" max="1360" step="1"
+                           maxlength="4"
+                           title="Długość (cm)" />×<input type="number" class="dimension-input-compact edit-dimension-width" 
+                           value="${Math.round(sample.width * 100)}" 
+                           data-group-id="${groupId}" 
+                           data-dimension="width"
+                           min="1" max="1360" step="1"
+                           maxlength="4"
+                           title="Szerokość (cm)" />×<input type="number" class="dimension-input-compact edit-dimension-height" 
+                           value="${Math.round(sample.height * 100)}" 
+                           data-group-id="${groupId}" 
+                           data-dimension="height"
+                           min="1" max="300" step="1"
+                           maxlength="3"
+                           title="Wysokość (cm)" /> <span class="dimension-unit-small">cm</span>`;
+        }
+    }
+    
     formatAccessMethodsWithColor(methods, groupId = null, type = null) {
         const allMethods = ['rear', 'side', 'top'];
         const methodNames = {
@@ -1110,6 +1163,11 @@ class UI {
             element.draggable = true;
             element.dataset.groupId = group.groupId;
             element.dataset.groupIndex = index;
+            
+            // Add selected class if this group is selected
+            if (this.cargoManager.isGroupSelected(group.groupId)) {
+                element.classList.add('selected-group');
+            }
             
             // Count items inside and outside the container
             const itemsInside = group.items.filter(item => !item.isOutside).length;
@@ -1184,7 +1242,7 @@ class UI {
                         <span class="unit-order-number">${index + 1}</span>
                         <span class="unit-color-dot" ${colorStyle}></span>
                         <span class="unit-quantity-badge">× ${itemsInside}${itemsOutside > 0 ? ` <span style="color: #ef4444; font-size: 0.9em;">(+${itemsOutside} poza)</span>` : ''}</span>
-                        <span class="unit-title">${group.sample.name}</span>
+                        <input type="text" class="unit-title-input edit-name" value="${group.sample.name}" data-group-id="${group.groupId}" title="Nazwa grupy" />
                         <div class="unit-quantity-controls">
                             <button class="unit-btn-remove" data-group-id="${group.groupId}" title="Usuń jednostkę">−</button>
                             <button class="unit-btn-add" data-group-id="${group.groupId}" title="Dodaj jednostkę">+</button>
@@ -1199,13 +1257,15 @@ class UI {
                         <div class="unit-grid">
                             <div class="unit-item">
                                 <div class="unit-item-label">Wymiary</div>
-                                <div class="unit-item-value">${(group.sample.length * 100).toFixed(0)}×${(group.sample.width * 100).toFixed(0)}×${(group.sample.height * 100).toFixed(0)} cm</div>
+                                <div class="unit-dimensions-editable">
+                                    ${this.createDimensionInputs(group)}
+                                </div>
                                 <div class="unit-item-sublabel">
                                     ${group.sample.type === 'roll' && !group.sample.fixedDiameter ? 
                                         `<button class="orientation-toggle-btn" data-group-id="${group.groupId}" style="background: none; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 11px;">
                                             ${group.sample.isVerticalRoll ? '⬆ Pionowo' : '➡ Poziomo'}
                                         </button>` : 
-                                        '(dł. / szer. / wys.)'}
+                                        (group.sample.type === 'steel-coil' ? '(dł. × śred. × śred.)' : '(dł. / szer. / wys.)')}
                                 </div>
                             </div>
                             <div class="unit-item">
@@ -1225,7 +1285,7 @@ class UI {
                                 <div class="stacking-inputs-container">
                                     <input type="text" class="stacking-input-small edit-stack" value="${group.sample.maxStack}" data-group-id="${group.groupId}" title="Ilość warstw" />
                                     <span class="stacking-separator">/</span>
-                                    <input type="text" class="stacking-input-small edit-max-weight" value="${group.sample.maxStackWeight || 0}kg" data-group-id="${group.groupId}" title="Max waga na górze" />
+                                    <input type="text" class="stacking-input-small edit-max-weight auto-resize-input" value="${(group.sample.maxStackWeight || 0).toString().replace(/[^\d.]/g, '')}kg" data-group-id="${group.groupId}" maxlength="6" title="Max waga na górze" />
                                 </div>
                             </div>
                             <div class="unit-item">
@@ -1248,7 +1308,7 @@ class UI {
                             <div class="unit-footer-label">ŁĄCZNA WAGA</div>
                         </div>
                         <div class="unit-footer-item">
-                            <div class="unit-footer-value">${totalVolume.toFixed(3)} m³</div>
+                            <div class="unit-footer-value">${totalVolume.toFixed(2)} m³</div>
                             <div class="unit-footer-label">OBJĘTOŚĆ</div>
                         </div>
                         <div class="unit-footer-item">
@@ -1264,12 +1324,16 @@ class UI {
             `;
             
             // Add edit event listeners
+            const nameInput = element.querySelector('.edit-name');
             const weightInput = element.querySelector('.edit-weight');
             const stackInput = element.querySelector('.edit-stack');
             const maxWeightInput = element.querySelector('.edit-max-weight');
             const addBtn = element.querySelector('.unit-btn-add');
             const removeBtn = element.querySelector('.unit-btn-remove');
             const deleteAllBtn = element.querySelector('.unit-btn-delete-all');
+            
+            // Add dimension input listeners
+            const dimensionInputs = element.querySelectorAll('.edit-dimension-length, .edit-dimension-width, .edit-dimension-height, .edit-dimension-diameter');
             
             // Disable remove button if only one item in group
             if (group.items.length <= 1) {
@@ -1305,8 +1369,8 @@ class UI {
                 });
             }
             
-            // Auto-select text on focus for all editable inputs
-            [weightInput, stackInput, maxWeightInput].forEach(input => {
+            // Auto-select text on focus for all editable inputs  
+            [nameInput, weightInput, stackInput, maxWeightInput, ...dimensionInputs].forEach(input => {
                 input.addEventListener('focus', (e) => {
                     e.target.select();
                 });
@@ -1314,6 +1378,90 @@ class UI {
                 input.addEventListener('click', (e) => {
                     e.target.select();
                 });
+            });
+            
+            // Handle dimension inputs
+            dimensionInputs.forEach(input => {
+                // Function to auto-resize input width based on content
+                const autoResize = () => {
+                    const length = input.value.length;
+                    const maxLength = input.getAttribute('maxlength') || '4';
+                    const maxChars = parseInt(maxLength);
+                    const width = Math.max(2, Math.min(maxChars, length)) + 'ch';
+                    input.style.width = width;
+                };
+                
+                // Auto-resize on input and initially
+                input.addEventListener('input', (e) => {
+                    // Limit based on maxlength attribute
+                    const maxLength = e.target.getAttribute('maxlength') || '4';
+                    const maxChars = parseInt(maxLength);
+                    if (e.target.value.length > maxChars) {
+                        e.target.value = e.target.value.slice(0, maxChars);
+                    }
+                    autoResize();
+                });
+                
+                // Initial resize
+                autoResize();
+                
+                const handleDimensionChange = () => {
+                    const groupId = input.dataset.groupId;
+                    const dimension = input.dataset.dimension;
+                    const valueInCm = parseFloat(input.value) || 0;
+                    const valueInM = valueInCm / 100;
+                    
+                    // Validate input based on dimension type
+                    let maxValue = 1360; // Default for length/width/diameter
+                    if (dimension === 'height') {
+                        maxValue = 300;
+                    }
+                    
+                    if (valueInCm < 1 || valueInCm > maxValue) {
+                        const maxText = dimension === 'height' ? '300cm' : '1360cm';
+                        this.showNotification(`${dimension === 'height' ? 'Wysokość' : 'Wymiar'} musi być między 1cm a ${maxText}`, 'error');
+                        return;
+                    }
+                    
+                    // Update dimensions for this group
+                    this.updateGroupDimensions(groupId, dimension, valueInM);
+                };
+                
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        input.blur();
+                    }
+                });
+                
+                input.addEventListener('blur', handleDimensionChange);
+                input.addEventListener('change', handleDimensionChange);
+            });
+            
+            // Handle name input - only apply "Bez nazwy" when user confirms (blur)
+            nameInput.addEventListener('input', (e) => {
+                // Just update the parameter without forcing "Bez nazwy"
+                const newName = e.target.value.trim();
+                if (newName) {
+                    this.updateGroupParameter(group.groupId, 'name', newName);
+                }
+            });
+            
+            nameInput.addEventListener('blur', (e) => {
+                // Apply "Bez nazwy" only when user leaves the field empty
+                const newName = e.target.value.trim() || 'Bez nazwy';
+                this.updateGroupParameter(group.groupId, 'name', newName);
+                e.target.value = newName;
+            });
+            
+            nameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    // Confirm the change and blur the field
+                    const newName = e.target.value.trim() || 'Bez nazwy';
+                    this.updateGroupParameter(group.groupId, 'name', newName);
+                    e.target.value = newName;
+                    e.target.blur();
+                }
             });
             
             // Handle weight input with kg suffix
@@ -1326,6 +1474,15 @@ class UI {
                 // Update footer total weight
                 const totalWeight = group.items.length * newWeight;
                 element.querySelector('.unit-box-footer .unit-footer-value').textContent = totalWeight + ' kg';
+                
+                // Auto-update max stack weight when unit weight changes
+                const stackCount = parseInt(stackInput.value) || 0;
+                if (stackCount > 0) {
+                    const autoMaxWeight = Math.round(newWeight * stackCount);
+                    maxWeightInput.value = autoMaxWeight + 'kg';
+                    this.updateGroupParameter(group.groupId, 'maxStackWeight', autoMaxWeight);
+                    autoResizeMaxWeight();
+                }
             });
             
             // Handle stack count input
@@ -1334,7 +1491,31 @@ class UI {
                 const newStack = parseInt(value) || 0;
                 this.updateGroupParameter(group.groupId, 'maxStack', newStack);
                 e.target.value = newStack;
+                
+                // Auto-calculate max stack weight: stack count × unit weight
+                const unitWeight = group.sample.weight || 0;
+                const autoMaxWeight = Math.round(unitWeight * newStack);
+                
+                // Update the max weight input field
+                maxWeightInput.value = autoMaxWeight + 'kg';
+                
+                // Update the parameter in the system
+                this.updateGroupParameter(group.groupId, 'maxStackWeight', autoMaxWeight);
+                
+                // Auto-resize the input
+                autoResizeMaxWeight();
             });
+            
+            // Setup auto-resize for max weight input
+            const autoResizeMaxWeight = () => {
+                const numericValue = maxWeightInput.value.replace(/[^\d.]/g, '');
+                const displayValue = numericValue + 'kg';
+                const width = Math.max(6, displayValue.length + 2) + 'ch'; // +2 for extra space for 'kg'
+                maxWeightInput.style.width = width;
+            };
+            
+            // Initial resize
+            autoResizeMaxWeight();
             
             // Handle max weight input with kg suffix
             maxWeightInput.addEventListener('input', (e) => {
@@ -1342,6 +1523,7 @@ class UI {
                 const newMaxWeight = parseFloat(value) || 0;
                 this.updateGroupParameter(group.groupId, 'maxStackWeight', newMaxWeight);
                 e.target.value = newMaxWeight + 'kg';
+                autoResizeMaxWeight();
             });
             
             
@@ -1412,8 +1594,105 @@ class UI {
             });
             element.addEventListener('dragend', (e) => this.handleDragEnd(e));
             
+            // Remove click handler for group selection - groups can only be selected via context menu
+            
             freshContainer.appendChild(element);
         });
+    }
+    
+    updateGroupDimensions(groupId, dimension, newValue) {
+        // Find the group - handle both string and number groupId
+        const groupItems = this.cargoManager.cargoItems.filter(item => 
+            item.groupId === groupId || item.groupId === parseInt(groupId) || item.groupId === groupId.toString()
+        );
+        if (groupItems.length === 0) return;
+        
+        const firstItem = groupItems[0];
+        const oldDimensions = {
+            length: firstItem.length,
+            width: firstItem.width,
+            height: firstItem.height
+        };
+        
+        // Create new dimensions object
+        const newDimensions = { ...oldDimensions };
+        
+        // Handle different dimension types
+        if (dimension === 'length') {
+            newDimensions.length = newValue;
+        } else if (dimension === 'width') {
+            newDimensions.width = newValue;
+        } else if (dimension === 'height') {
+            newDimensions.height = newValue;
+        } else if (dimension === 'diameter') {
+            // For rolls, diameter affects both width and height depending on orientation
+            if (firstItem.type === 'roll') {
+                if (firstItem.isVerticalRoll) {
+                    // Vertical roll: diameter is width and length
+                    newDimensions.width = newValue;
+                    newDimensions.length = newValue;
+                } else {
+                    // Horizontal roll: diameter is height and width
+                    newDimensions.width = newValue;
+                    newDimensions.height = newValue;
+                }
+                // Update diameter property
+                groupItems.forEach(item => {
+                    item.diameter = newValue;
+                });
+            }
+        }
+        
+        // Check if dimensions actually changed
+        if (newDimensions.length === oldDimensions.length && 
+            newDimensions.width === oldDimensions.width && 
+            newDimensions.height === oldDimensions.height) {
+            return;
+        }
+        
+        // Update all items in the group
+        groupItems.forEach(item => {
+            item.length = newDimensions.length;
+            item.width = newDimensions.width;
+            item.height = newDimensions.height;
+            
+            // Update groupKey to include new dimensions (needed for future group comparisons)
+            const loadingStr = item.loadingMethods ? item.loadingMethods.join(',') : 'rear,side,top';
+            const unloadingStr = item.unloadingMethods ? item.unloadingMethods.join(',') : 'rear,side,top';
+            item.groupKey = `${item.type}_${item.name}_${item.weight}_${item.maxStack}_${item.maxStackWeight}_${loadingStr}_${unloadingStr}_${newDimensions.length}_${newDimensions.width}_${newDimensions.height}`;
+            
+            // Remove old mesh from scene
+            if (item.mesh) {
+                this.scene3d.removeCargo(item.mesh);
+                item.mesh = null;
+                item.position = null;
+            }
+            
+            // Mark as not outside (will be re-evaluated during auto-arrange)
+            item.isOutside = false;
+        });
+        
+        // Trigger auto-arrangement
+        const result = this.cargoManager.autoArrange();
+        
+        // Update UI
+        this.updateLoadedUnitsList();
+        this.updateStatistics();
+        this.updateAxleIndicators();
+        
+        // Show notification about the change
+        if (result && !result.success) {
+            const messages = [];
+            if (result.unpackedCount > 0) {
+                messages.push(`${result.unpackedCount} jednostek nie zmieściło się w przestrzeni`);
+            }
+            if (result.exceedingWeightCount > 0) {
+                messages.push(`${result.exceedingWeightCount} jednostek przekracza limit wagi`);
+            }
+            this.showNotification(messages.join(', '), 'warning');
+        } else {
+            this.showNotification(`Wymiary grupy zostały zaktualizowane`, 'success');
+        }
     }
     
     updateGroupParameter(groupId, parameter, value) {
@@ -2207,5 +2486,20 @@ class UI {
         
         // Update 3D visualization
         this.scene3d.updateAxleVisualization(config);
+    }
+    
+    // Removed - group selection is now only available via context menu (RMB)
+    // handleGroupClick(event, group) { ... }
+    
+    setupGroupSelectionCallbacks() {
+        // Set up callback for group selection changes
+        this.cargoManager.onGroupSelectionChanged = (groupId) => {
+            this.onGroupSelectionChanged(groupId);
+        };
+    }
+    
+    onGroupSelectionChanged(selectedGroupId) {
+        // Update UI to reflect group selection state
+        this.updateLoadedUnitsList();
     }
 }
