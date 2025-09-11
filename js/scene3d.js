@@ -19,6 +19,9 @@ class Scene3D {
         this.rulerGroup = null;
         this.rulerVisible = false;
         
+        // Dimension labels properties
+        this.dimensionLabelsGroup = null;
+        
         // Drag & Drop properties
         this.isDragging = false;
         this.draggedObjects = [];
@@ -1188,16 +1191,20 @@ class Scene3D {
                 }
                 // Show grab cursor
                 document.body.style.cursor = 'grab';
-                // Show ruler for hovered cargo only if inside container
+                // Show ruler and dimension labels for hovered cargo only if inside container
                 if (!this.isPositionOutsideContainer(this.hoveredObject.position)) {
                     this.showRulerForCargo(this.hoveredObject);
+                    this.createDimensionLabels(this.hoveredObject);
+                } else {
+                    // Hide dimension labels for units outside container
+                    this.hideDimensionLabels();
                 }
             } else {
                 // Not hovering over cargo - enable OrbitControls
                 this.controls.enabled = true;
                 this.hoveredObject = null;
                 document.body.style.cursor = 'default';
-                // Hide ruler when not hovering
+                // Hide ruler and dimension labels when not hovering
                 this.hideRuler();
                 
                 // Restore group highlight if any group is selected
@@ -1409,9 +1416,10 @@ class Scene3D {
                 this.draggedObjects = this.getAllObjectsAbove(clickedObject);
             }
             
-            // Show ruler for the dragged object only if inside container
+            // Show ruler and dimension labels for the dragged object only if inside container
             if (!this.isPositionOutsideContainer(clickedObject.position)) {
                 this.showRulerForCargo(clickedObject);
+                this.createDimensionLabels(clickedObject);
             }
             
             // Create drag plane at the clicked object's Y position
@@ -1574,9 +1582,10 @@ class Scene3D {
             const clickedMesh = intersects[0].object;
             this.showContextMenu(event.clientX, event.clientY, clickedMesh);
             
-            // Show ruler for the right-clicked cargo only if inside container
+            // Show ruler and dimension labels for the right-clicked cargo only if inside container
             if (!this.isPositionOutsideContainer(clickedMesh.position)) {
                 this.showRulerForCargo(clickedMesh);
+                this.createDimensionLabels(clickedMesh);
             }
         } else {
             // Right-click on empty space - keep default orbit control behavior
@@ -2313,8 +2322,9 @@ class Scene3D {
                     // Store this as last valid position
                     this.lastValidPosition = finalPosition.clone();
                     
-                    // Update ruler position
+                    // Update ruler and dimension labels position
                     this.showRulerForCargo(this.draggedObjects[0]);
+                    this.createDimensionLabels(this.draggedObjects[0]);
                 } else {
                     // Position is invalid - try to find closest valid position along the path
                     const slidePosition = this.findSlidePosition(targetPosition, clampedPosition);
@@ -2331,8 +2341,9 @@ class Scene3D {
                             obj.position.z += deltaZ;
                         });
                         
-                        // Update ruler position for slide position
+                        // Update ruler and dimension labels position for slide position
                         this.showRulerForCargo(this.draggedObjects[0]);
+                        this.createDimensionLabels(this.draggedObjects[0]);
                         
                         // Store this as last valid position
                         this.lastValidPosition = slidePosition.clone();
@@ -3424,6 +3435,169 @@ class Scene3D {
         this.createRuler(cargoMesh);
     }
     
+    getClosestVertexAndFaces(mesh) {
+        if (!mesh || !mesh.userData) return null;
+        
+        const halfLength = mesh.userData.length / 2;
+        const halfWidth = mesh.userData.width / 2;
+        const halfHeight = mesh.userData.height / 2;
+        
+        // Get mesh world position
+        const meshWorldPos = new THREE.Vector3();
+        mesh.getWorldPosition(meshWorldPos);
+        
+        // Define 8 vertices of the box in world coordinates
+        const vertices = [
+            new THREE.Vector3(-halfLength, -halfHeight, -halfWidth).add(meshWorldPos),
+            new THREE.Vector3(halfLength, -halfHeight, -halfWidth).add(meshWorldPos),
+            new THREE.Vector3(halfLength, -halfHeight, halfWidth).add(meshWorldPos),
+            new THREE.Vector3(-halfLength, -halfHeight, halfWidth).add(meshWorldPos),
+            new THREE.Vector3(-halfLength, halfHeight, -halfWidth).add(meshWorldPos),
+            new THREE.Vector3(halfLength, halfHeight, -halfWidth).add(meshWorldPos),
+            new THREE.Vector3(halfLength, halfHeight, halfWidth).add(meshWorldPos),
+            new THREE.Vector3(-halfLength, halfHeight, halfWidth).add(meshWorldPos)
+        ];
+        
+        // Find closest vertex to camera
+        let closestVertex = vertices[0];
+        let closestDistance = closestVertex.distanceTo(this.camera.position);
+        let closestIndex = 0;
+        
+        for (let i = 1; i < vertices.length; i++) {
+            const distance = vertices[i].distanceTo(this.camera.position);
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestVertex = vertices[i];
+                closestIndex = i;
+            }
+        }
+        
+        // Define face normals and centers (in local space)
+        const faces = [
+            { 
+                normal: new THREE.Vector3(1, 0, 0), 
+                dimension: 'length', 
+                axis: 'x',
+                center: new THREE.Vector3(halfLength, 0, 0).add(meshWorldPos)
+            },   // Right face
+            { 
+                normal: new THREE.Vector3(-1, 0, 0), 
+                dimension: 'length', 
+                axis: 'x',
+                center: new THREE.Vector3(-halfLength, 0, 0).add(meshWorldPos)
+            },  // Left face
+            { 
+                normal: new THREE.Vector3(0, 1, 0), 
+                dimension: 'height', 
+                axis: 'y',
+                center: new THREE.Vector3(0, halfHeight, 0).add(meshWorldPos)
+            },   // Top face
+            { 
+                normal: new THREE.Vector3(0, -1, 0), 
+                dimension: 'height', 
+                axis: 'y',
+                center: new THREE.Vector3(0, -halfHeight, 0).add(meshWorldPos)
+            },  // Bottom face
+            { 
+                normal: new THREE.Vector3(0, 0, 1), 
+                dimension: 'width', 
+                axis: 'z',
+                center: new THREE.Vector3(0, 0, halfWidth).add(meshWorldPos)
+            },    // Front face
+            { 
+                normal: new THREE.Vector3(0, 0, -1), 
+                dimension: 'width', 
+                axis: 'z',
+                center: new THREE.Vector3(0, 0, -halfWidth).add(meshWorldPos)
+            }    // Back face
+        ];
+        
+        // Get camera direction
+        const cameraDir = new THREE.Vector3();
+        this.camera.getWorldDirection(cameraDir);
+        
+        // Find the face that is most facing the camera
+        let mostPerpendicularFace = faces[0];
+        let bestScore = -Infinity;
+        
+        // Calculate vector from mesh center to camera
+        const meshToCamera = new THREE.Vector3().subVectors(this.camera.position, meshWorldPos);
+        meshToCamera.normalize();
+        
+        for (const face of faces) {
+            // Apply mesh rotation to face normal
+            const worldNormal = face.normal.clone();
+            worldNormal.applyQuaternion(mesh.quaternion);
+            
+            // Calculate dot product with vector from mesh to camera
+            // Positive dot product means face is pointing towards camera
+            const dotProduct = worldNormal.dot(meshToCamera);
+            
+            // We want the face with the highest dot product (most facing the camera)
+            if (dotProduct > bestScore) {
+                bestScore = dotProduct;
+                mostPerpendicularFace = face;
+            }
+        }
+        
+        // Update face normals to faceNormals for compatibility
+        const faceNormals = faces.map(f => ({ normal: f.normal, dimension: f.dimension, axis: f.axis }));
+        
+        // Calculate dot products for each face normal with camera direction
+        // More negative = more perpendicular (facing camera)
+        const faceDots = faceNormals.map(face => ({
+            ...face,
+            dot: face.normal.dot(cameraDir)
+        }));
+        
+        // Sort by most perpendicular (most negative dot product)
+        faceDots.sort((a, b) => a.dot - b.dot);
+        
+        // Get the three faces that share the closest vertex
+        const vertexFaces = this.getFacesForVertex(closestIndex);
+        
+        // Filter to only faces that share the closest vertex
+        const relevantFaces = faceDots.filter(face => {
+            return vertexFaces.some(vf => vf.normal.equals(face.normal));
+        });
+        
+        // Take the two most perpendicular faces from the relevant ones
+        const selectedFaces = relevantFaces.slice(0, 2);
+        
+        // Determine which dimensions to show on each face
+        const dimensions = new Set(selectedFaces.map(f => f.dimension));
+        const missingDimension = ['length', 'width', 'height'].find(d => !dimensions.has(d));
+        
+        // If we have two faces with the same dimension, replace one with the missing dimension
+        if (selectedFaces[0].dimension === selectedFaces[1].dimension && missingDimension) {
+            selectedFaces[1].dimension = missingDimension;
+        }
+        
+        return {
+            closestVertex,
+            closestIndex,
+            faces: selectedFaces,
+            meshWorldPos,
+            mostPerpendicularFace: mostPerpendicularFace
+        };
+    }
+    
+    getFacesForVertex(vertexIndex) {
+        // Define which three faces each vertex touches
+        const vertexFaceMap = {
+            0: [new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, -1)], // Left, Bottom, Back
+            1: [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, -1)],  // Right, Bottom, Back
+            2: [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1)],   // Right, Bottom, Front
+            3: [new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1)],  // Left, Bottom, Front
+            4: [new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, -1)],  // Left, Top, Back
+            5: [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, -1)],   // Right, Top, Back
+            6: [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)],    // Right, Top, Front
+            7: [new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)]    // Left, Top, Front
+        };
+        
+        return vertexFaceMap[vertexIndex].map(normal => ({ normal }));
+    }
+    
     hideRuler() {
         if (this.rulerGroup) {
             this.scene.remove(this.rulerGroup);
@@ -3438,6 +3612,907 @@ class Scene3D {
             this.rulerGroup = null;
             this.rulerVisible = false;
         }
+        
+        // Also hide dimension labels
+        this.hideDimensionLabels();
+    }
+    
+    createDimensionLabels(mesh) {
+        if (!mesh || !mesh.userData) return;
+        
+        // Remove existing labels
+        this.hideDimensionLabels();
+        
+        // Get closest vertex and most perpendicular faces
+        const vertexData = this.getClosestVertexAndFaces(mesh);
+        if (!vertexData) return;
+        
+        // Create new group for labels
+        this.dimensionLabelsGroup = new THREE.Group();
+        
+        const halfLength = mesh.userData.length / 2;
+        const halfWidth = mesh.userData.width / 2;
+        const halfHeight = mesh.userData.height / 2;
+        
+        // Check if it's a cylindrical unit (Roll or Steel Coil)
+        const isRoll = mesh.userData.isRoll;
+        const isVerticalRoll = mesh.userData.isVerticalRoll;
+        const isSteelCoil = mesh.userData.fixedDiameter;
+        
+        // Get dimensions in centimeters - adapt for cylindrical units
+        let dimensions;
+        if (isSteelCoil) {
+            // Steel Coil - horizontal cylinder with fixed diameter
+            // height is the diameter, length is the actual length
+            dimensions = {
+                length: Math.round(mesh.userData.length * 100),
+                diameter: Math.round(mesh.userData.height * 100),  // height is diameter
+                radius: Math.round(mesh.userData.height * 50)      // radius is half diameter
+            };
+        } else if (isRoll && isVerticalRoll) {
+            // Vertical Roll - standing cylinder
+            // width/length are diameter, height is the actual height
+            dimensions = {
+                diameter: Math.round(mesh.userData.width * 100),   // width is diameter
+                radius: Math.round(mesh.userData.width * 50),      // radius is half diameter
+                height: Math.round(mesh.userData.height * 100)
+            };
+        } else if (isRoll && !isVerticalRoll) {
+            // Horizontal Roll - lying cylinder
+            // length is actual length, width/height are diameter
+            dimensions = {
+                length: Math.round(mesh.userData.length * 100),
+                diameter: Math.round(mesh.userData.width * 100),   // width is diameter
+                radius: Math.round(mesh.userData.width * 50)       // radius is half diameter
+            };
+        } else {
+            // Regular box unit
+            dimensions = {
+                length: Math.round(mesh.userData.length * 100),
+                width: Math.round(mesh.userData.width * 100),
+                height: Math.round(mesh.userData.height * 100)
+            };
+        }
+        
+        // Determine which edges are visible based on closest vertex
+        const vertexIndex = vertexData.closestIndex;
+        
+        // Map vertex index to which edges are visible
+        // Each vertex connects three edges
+        const edgeMap = {
+            0: { // back-bottom-left
+                edges: [
+                    { dimension: 'length', start: [-halfLength, -halfHeight, -halfWidth], end: [halfLength, -halfHeight, -halfWidth] },
+                    { dimension: 'width', start: [-halfLength, -halfHeight, -halfWidth], end: [-halfLength, -halfHeight, halfWidth] },
+                    { dimension: 'height', start: [-halfLength, -halfHeight, -halfWidth], end: [-halfLength, halfHeight, -halfWidth] }
+                ]
+            },
+            1: { // back-bottom-right
+                edges: [
+                    { dimension: 'length', start: [-halfLength, -halfHeight, -halfWidth], end: [halfLength, -halfHeight, -halfWidth] },
+                    { dimension: 'width', start: [halfLength, -halfHeight, -halfWidth], end: [halfLength, -halfHeight, halfWidth] },
+                    { dimension: 'height', start: [halfLength, -halfHeight, -halfWidth], end: [halfLength, halfHeight, -halfWidth] }
+                ]
+            },
+            2: { // front-bottom-right
+                edges: [
+                    { dimension: 'length', start: [-halfLength, -halfHeight, halfWidth], end: [halfLength, -halfHeight, halfWidth] },
+                    { dimension: 'width', start: [halfLength, -halfHeight, -halfWidth], end: [halfLength, -halfHeight, halfWidth] },
+                    { dimension: 'height', start: [halfLength, -halfHeight, halfWidth], end: [halfLength, halfHeight, halfWidth] }
+                ]
+            },
+            3: { // front-bottom-left
+                edges: [
+                    { dimension: 'length', start: [-halfLength, -halfHeight, halfWidth], end: [halfLength, -halfHeight, halfWidth] },
+                    { dimension: 'width', start: [-halfLength, -halfHeight, -halfWidth], end: [-halfLength, -halfHeight, halfWidth] },
+                    { dimension: 'height', start: [-halfLength, -halfHeight, halfWidth], end: [-halfLength, halfHeight, halfWidth] }
+                ]
+            },
+            4: { // back-top-left
+                edges: [
+                    { dimension: 'length', start: [-halfLength, halfHeight, -halfWidth], end: [halfLength, halfHeight, -halfWidth] },
+                    { dimension: 'width', start: [-halfLength, halfHeight, -halfWidth], end: [-halfLength, halfHeight, halfWidth] },
+                    { dimension: 'height', start: [-halfLength, -halfHeight, -halfWidth], end: [-halfLength, halfHeight, -halfWidth] }
+                ]
+            },
+            5: { // back-top-right
+                edges: [
+                    { dimension: 'length', start: [-halfLength, halfHeight, -halfWidth], end: [halfLength, halfHeight, -halfWidth] },
+                    { dimension: 'width', start: [halfLength, halfHeight, -halfWidth], end: [halfLength, halfHeight, halfWidth] },
+                    { dimension: 'height', start: [halfLength, -halfHeight, -halfWidth], end: [halfLength, halfHeight, -halfWidth] }
+                ]
+            },
+            6: { // front-top-right
+                edges: [
+                    { dimension: 'length', start: [-halfLength, halfHeight, halfWidth], end: [halfLength, halfHeight, halfWidth] },
+                    { dimension: 'width', start: [halfLength, halfHeight, -halfWidth], end: [halfLength, halfHeight, halfWidth] },
+                    { dimension: 'height', start: [halfLength, -halfHeight, halfWidth], end: [halfLength, halfHeight, halfWidth] }
+                ]
+            },
+            7: { // front-top-left
+                edges: [
+                    { dimension: 'length', start: [-halfLength, halfHeight, halfWidth], end: [halfLength, halfHeight, halfWidth] },
+                    { dimension: 'width', start: [-halfLength, halfHeight, -halfWidth], end: [-halfLength, halfHeight, halfWidth] },
+                    { dimension: 'height', start: [-halfLength, -halfHeight, halfWidth], end: [-halfLength, halfHeight, halfWidth] }
+                ]
+            }
+        };
+        
+        // For cylindrical units, we need to create custom labels
+        if (isSteelCoil || isRoll) {
+            // For cylindrical units, show different dimensions
+            const edges = edgeMap[vertexIndex].edges;
+            
+            // Track if we already showed radius
+            let radiusShown = false;
+            
+            edges.forEach(edge => {
+                let dimensionValue;
+                let dimensionText;
+                let shouldShowLabel = true;
+                
+                if (isSteelCoil) {
+                    // Steel Coil: show length and radius (only once)
+                    if (edge.dimension === 'length') {
+                        dimensionValue = dimensions.length;
+                        dimensionText = `${dimensionValue} cm`;
+                    } else if ((edge.dimension === 'width' || edge.dimension === 'height') && !radiusShown) {
+                        // Show radius only once, on the first width/height edge
+                        dimensionValue = dimensions.radius;
+                        dimensionText = `${dimensionValue} cm`;
+                        radiusShown = true;
+                    } else {
+                        shouldShowLabel = false;
+                    }
+                } else if (isRoll && isVerticalRoll) {
+                    // Vertical Roll: show height and radius (only once)
+                    if (edge.dimension === 'height') {
+                        dimensionValue = dimensions.height;
+                        dimensionText = `${dimensionValue} cm`;
+                    } else if ((edge.dimension === 'length' || edge.dimension === 'width') && !radiusShown) {
+                        // Show radius only once, on the first length/width edge
+                        dimensionValue = dimensions.radius;
+                        dimensionText = `${dimensionValue} cm`;
+                        radiusShown = true;
+                    } else {
+                        shouldShowLabel = false;
+                    }
+                } else if (isRoll && !isVerticalRoll) {
+                    // Horizontal Roll: show length and radius (only once)
+                    if (edge.dimension === 'length') {
+                        dimensionValue = dimensions.length;
+                        dimensionText = `${dimensionValue} cm`;
+                    } else if ((edge.dimension === 'width' || edge.dimension === 'height') && !radiusShown) {
+                        // Show radius only once, on the first width/height edge
+                        dimensionValue = dimensions.radius;
+                        dimensionText = `${dimensionValue} cm`;
+                        radiusShown = true;
+                    } else {
+                        shouldShowLabel = false;
+                    }
+                }
+                
+                if (shouldShowLabel) {
+                    // For cylindrical units, position labels in the center
+                    if (isSteelCoil || isRoll) {
+                        const meshWorldPos = vertexData.meshWorldPos;
+                        const cameraRelative = this.camera.position.clone().sub(meshWorldPos);
+                        
+                        let labelPosition;
+                        let radiusStart, radiusEnd;
+                        
+                        // Check if this is a radius or other dimension
+                        // For vertical roll: width/length edges show radius, height edge shows height
+                        // For horizontal roll/steel coil: width/height edges show radius, length edge shows length
+                        const isRadiusEdge = (isRoll && isVerticalRoll && (edge.dimension === 'width' || edge.dimension === 'length')) ||
+                                           ((isSteelCoil || (isRoll && !isVerticalRoll)) && (edge.dimension === 'width' || edge.dimension === 'height'));
+                        const isRadius = radiusShown && isRadiusEdge;
+                        const isHeight = edge.dimension === 'height' && isRoll && isVerticalRoll;
+                        const isLength = edge.dimension === 'length' && (isSteelCoil || (isRoll && !isVerticalRoll));
+                        
+                        if (isRadius) {
+                            // Radius label - position at center of circular face
+                            if (isSteelCoil) {
+                                // Horizontal cylinder along X axis - choose front or back face based on camera
+                                const xOffset = cameraRelative.x > 0 ? halfLength : -halfLength;
+                                labelPosition = new THREE.Vector3(xOffset, 0, 0).add(meshWorldPos);
+                                radiusStart = new THREE.Vector3(xOffset, 0, 0);
+                                radiusEnd = new THREE.Vector3(xOffset, halfHeight, 0);
+                            } else if (isRoll && isVerticalRoll) {
+                                // Vertical cylinder - choose top or bottom face based on camera
+                                const yOffset = cameraRelative.y > 0 ? halfHeight : -halfHeight;
+                                labelPosition = new THREE.Vector3(0, yOffset, 0).add(meshWorldPos);
+                                radiusStart = new THREE.Vector3(0, yOffset, 0);
+                                radiusEnd = new THREE.Vector3(halfWidth, yOffset, 0);
+                            } else if (isRoll && !isVerticalRoll) {
+                                // Horizontal cylinder along X axis - choose front or back face based on camera
+                                const xOffset = cameraRelative.x > 0 ? halfLength : -halfLength;
+                                labelPosition = new THREE.Vector3(xOffset, 0, 0).add(meshWorldPos);
+                                radiusStart = new THREE.Vector3(xOffset, 0, 0);
+                                radiusEnd = new THREE.Vector3(xOffset, halfWidth, 0);
+                            }
+                        } else if (isHeight || isLength) {
+                            // Height/Length label - position at center of cylinder body
+                            labelPosition = new THREE.Vector3(0, 0, 0).add(meshWorldPos);
+                            // Create dummy line for text orientation
+                            if (isHeight) {
+                                // Vertical line for height
+                                radiusStart = new THREE.Vector3(0, -halfHeight, 0);
+                                radiusEnd = new THREE.Vector3(0, halfHeight, 0);
+                            } else {
+                                // Horizontal line for length
+                                radiusStart = new THREE.Vector3(-halfLength, 0, 0);
+                                radiusEnd = new THREE.Vector3(halfLength, 0, 0);
+                            }
+                        }
+                        
+                        // Transform dummy line to world space for orientation
+                        const radiusStartWorld = radiusStart.clone().add(meshWorldPos);
+                        const radiusEndWorld = radiusEnd.clone().add(meshWorldPos);
+                        
+                        // Get the actual dimension value in meters
+                        let actualDimension;
+                        if (isRadius) {
+                            actualDimension = mesh.userData.width / 2;  // radius in meters
+                        } else if (isHeight) {
+                            actualDimension = mesh.userData.height;  // height in meters
+                        } else if (isLength) {
+                            actualDimension = mesh.userData.length;  // length in meters
+                        }
+                        
+                        // Create the label at the calculated position
+                        this.createDimensionLabel(labelPosition, dimensionText, radiusStartWorld, radiusEndWorld, actualDimension, mesh);
+                    }
+                    
+                    if (!isSteelCoil && !isRoll) {
+                        // Regular edge label for box units
+                        const edgeCenter = new THREE.Vector3(
+                            (edge.start[0] + edge.end[0]) / 2,
+                            (edge.start[1] + edge.end[1]) / 2,
+                            (edge.start[2] + edge.end[2]) / 2
+                        );
+                        edgeCenter.add(vertexData.meshWorldPos);
+                        
+                        const edgeStartWorld = new THREE.Vector3(
+                            edge.start[0],
+                            edge.start[1],
+                            edge.start[2]
+                        ).add(vertexData.meshWorldPos);
+                        
+                        const edgeEndWorld = new THREE.Vector3(
+                            edge.end[0],
+                            edge.end[1],
+                            edge.end[2]
+                        ).add(vertexData.meshWorldPos);
+                        
+                        const labelPosition = edgeCenter.clone();
+                        const edgeDimensionValue = mesh.userData[edge.dimension];
+                        
+                        this.createDimensionLabel(labelPosition, dimensionText, edgeStartWorld, edgeEndWorld, edgeDimensionValue, mesh);
+                    }
+                }
+            });
+        } else {
+            // Regular box units - use existing logic
+            const edges = edgeMap[vertexIndex].edges;
+            
+            edges.forEach(edge => {
+                const dimensionValue = dimensions[edge.dimension];
+                const dimensionText = `${dimensionValue} cm`;
+                
+                // Calculate edge center position in world space
+                const edgeCenter = new THREE.Vector3(
+                    (edge.start[0] + edge.end[0]) / 2,
+                    (edge.start[1] + edge.end[1]) / 2,
+                    (edge.start[2] + edge.end[2]) / 2
+                );
+                edgeCenter.add(vertexData.meshWorldPos);
+                
+                // Calculate edge direction vector for rotation
+                const edgeDirection = new THREE.Vector3(
+                    edge.end[0] - edge.start[0],
+                    edge.end[1] - edge.start[1],
+                    edge.end[2] - edge.start[2]
+                );
+                
+                // Calculate edge start and end in world space for label
+                const edgeStartWorld = new THREE.Vector3(
+                    edge.start[0],
+                    edge.start[1],
+                    edge.start[2]
+                ).add(vertexData.meshWorldPos);
+                
+                const edgeEndWorld = new THREE.Vector3(
+                    edge.end[0],
+                    edge.end[1],
+                    edge.end[2]
+                ).add(vertexData.meshWorldPos);
+                
+                // Position label directly on the edge center (text will be on the edge line)
+                const labelPosition = edgeCenter.clone();
+                
+                // Calculate the actual dimension value for this edge
+                const edgeDimensionValue = mesh.userData[edge.dimension];
+                
+                // Create the label with dimension info and edge endpoints for rotation
+                this.createDimensionLabel(labelPosition, dimensionText, edgeStartWorld, edgeEndWorld, edgeDimensionValue, mesh);
+            });
+        }
+        
+        // Add group name and weight label on the most perpendicular face
+        if (vertexData.mostPerpendicularFace) {
+            this.createGroupInfoLabel(mesh, vertexData.mostPerpendicularFace);
+        }
+        
+        this.scene.add(this.dimensionLabelsGroup);
+    }
+    
+    createGroupInfoLabel(mesh, face) {
+        // Get group name and weight from userData
+        const cargoData = mesh.userData;
+        const groupName = cargoData.name || 'Jednostka';
+        const weight = cargoData.weight || 0;
+        
+        // Check if it's a cylindrical unit
+        const isRoll = mesh.userData.isRoll;
+        const isVerticalRoll = mesh.userData.isVerticalRoll;
+        const isSteelCoil = mesh.userData.fixedDiameter;
+        
+        // Skip cylindrical units for now - they need special handling
+        if (isSteelCoil || isRoll) {
+            return;
+        }
+        
+        // Create the label text
+        const labelText = `${groupName}\n${weight} kg`;
+        
+        // Create canvas for text
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 128;
+        const context = canvas.getContext('2d');
+        
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        
+        // Clear background
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Add shadow for better contrast (same style as dimension labels)
+        context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        context.shadowBlur = 6;
+        context.shadowOffsetX = 0;
+        context.shadowOffsetY = 0;
+        
+        // Draw text in white (same style as dimension labels)
+        context.fillStyle = '#FFFFFF';
+        context.font = 'bold 42px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        
+        // Split text into lines and draw each
+        const lines = labelText.split('\n');
+        const lineHeight = 45;
+        const startY = canvas.height / 2 - (lines.length - 1) * lineHeight / 2;
+        
+        lines.forEach((line, index) => {
+            context.fillText(line, canvas.width / 2, startY + index * lineHeight);
+        });
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        
+        // Create sprite for constant screen size (same as dimension labels)
+        const spriteMaterial = new THREE.SpriteMaterial({ 
+            map: texture,
+            sizeAttenuation: false,  // This makes the sprite maintain constant screen size
+            opacity: 1,
+            transparent: true,
+            depthTest: false  // Always render on top
+        });
+        
+        const sprite = new THREE.Sprite(spriteMaterial);
+        
+        // Position the sprite at face center
+        const faceCenter = face.center.clone();
+        sprite.position.copy(faceCenter);
+        
+        // Offset slightly from the face
+        const worldNormal = face.normal.clone();
+        worldNormal.applyQuaternion(mesh.quaternion);
+        sprite.position.add(worldNormal.clone().multiplyScalar(0.02));
+        
+        // Calculate scale based on face dimensions - always 80% of smaller face dimension
+        let baseScaleX = 0.2;  // Default
+        let baseScaleY = 0.05; // Default
+        
+        if (mesh) {
+            // Get face dimensions
+            let faceWidth, faceHeight;
+            
+            if (face.axis === 'x') {
+                // Left/Right face
+                faceWidth = mesh.userData.width;
+                faceHeight = mesh.userData.height;
+            } else if (face.axis === 'y') {
+                // Top/Bottom face
+                faceWidth = mesh.userData.length;
+                faceHeight = mesh.userData.width;
+            } else if (face.axis === 'z') {
+                // Front/Back face
+                faceWidth = mesh.userData.length;
+                faceHeight = mesh.userData.height;
+            }
+            
+            // Use smaller dimension to ensure label fits
+            const smallerDimension = Math.min(faceWidth, faceHeight);
+            
+            // Create points for the smaller dimension
+            const halfDim = smallerDimension / 2;
+            
+            // Create two points on the face to measure screen size
+            let point1, point2;
+            if (faceWidth < faceHeight || (faceWidth === faceHeight)) {
+                // Measure width
+                point1 = face.center.clone();
+                point2 = face.center.clone();
+                if (face.axis === 'x') {
+                    point1.z += halfDim;
+                    point2.z -= halfDim;
+                } else if (face.axis === 'y') {
+                    point1.x += halfDim;
+                    point2.x -= halfDim;
+                } else if (face.axis === 'z') {
+                    point1.x += halfDim;
+                    point2.x -= halfDim;
+                }
+            } else {
+                // Measure height
+                point1 = face.center.clone();
+                point2 = face.center.clone();
+                if (face.axis === 'x') {
+                    point1.y += halfDim;
+                    point2.y -= halfDim;
+                } else if (face.axis === 'y') {
+                    point1.z += halfDim;
+                    point2.z -= halfDim;
+                } else if (face.axis === 'z') {
+                    point1.y += halfDim;
+                    point2.y -= halfDim;
+                }
+            }
+            
+            // Apply mesh rotation to points
+            const meshRotation = mesh.quaternion;
+            point1.applyQuaternion(meshRotation);
+            point2.applyQuaternion(meshRotation);
+            
+            // Project to screen space
+            const screen1 = point1.clone().project(this.camera);
+            const screen2 = point2.clone().project(this.camera);
+            
+            // Calculate screen distance
+            const screenDist = Math.sqrt(
+                Math.pow(screen2.x - screen1.x, 2) + 
+                Math.pow(screen2.y - screen1.y, 2)
+            );
+            
+            // Set label to 70% of smaller dimension on screen
+            baseScaleX = screenDist * 0.7;
+            baseScaleY = baseScaleX * 0.25; // Maintain aspect ratio (4:1)
+            
+            // Apply minimum and maximum scale limits
+            baseScaleX = Math.max(0.05, Math.min(0.5, baseScaleX));
+            baseScaleY = Math.max(0.0125, Math.min(0.125, baseScaleY));
+        }
+        
+        sprite.scale.set(baseScaleX, baseScaleY, 1);
+        
+        // Store reference to mesh and face for dynamic updates
+        sprite.userData = {
+            mesh: mesh,
+            isGroupInfo: true,
+            face: face,
+            baseScaleX: baseScaleX,
+            baseScaleY: baseScaleY
+        };
+        
+        this.dimensionLabelsGroup.add(sprite);
+    }
+    
+    createDimensionLabel(position, text, edgeStart, edgeEnd, edgeDimension, mesh) {
+        // Create canvas for text
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const context = canvas.getContext('2d');
+        
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Add shadow for better contrast (same style as ruler)
+        context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        context.shadowBlur = 6;
+        context.shadowOffsetX = 0;
+        context.shadowOffsetY = 0;
+        
+        // Draw text in white (same style as ruler)
+        context.fillStyle = '#FFFFFF';
+        context.font = 'bold 32px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';  // Increased font size
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(text, canvas.width / 2, canvas.height / 2);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        
+        // Create sprite for constant screen size (like ruler labels)
+        const spriteMaterial = new THREE.SpriteMaterial({ 
+            map: texture,
+            sizeAttenuation: false,  // This makes the sprite maintain constant screen size
+            opacity: 1,
+            transparent: true,
+            depthTest: false  // Always render on top
+        });
+        
+        const sprite = new THREE.Sprite(spriteMaterial);
+        
+        // Base scale for good visibility
+        let baseScaleX = 0.15;  // Further reduced for smaller labels
+        let baseScaleY = 0.04;   // Proportionally reduced
+        
+        // Fixed absolute maximum scale regardless of zoom
+        const absoluteMaxScale = 0.08; // Strict absolute maximum size
+        
+        // Calculate maximum scale based on 1 meter at container origin
+        let maxScaleBasedOnMeter = absoluteMaxScale;
+        if (this.containerBounds) {
+            // Get container origin position (front-left corner of cargo space)
+            const containerOrigin = new THREE.Vector3(
+                this.containerBounds.min.x,
+                this.containerBounds.min.y, 
+                this.containerBounds.min.z
+            );
+            
+            // Point 1 meter from the origin along X axis
+            const meterPoint = new THREE.Vector3(
+                this.containerBounds.min.x + 1.0,
+                this.containerBounds.min.y,
+                this.containerBounds.min.z
+            );
+            
+            // Project both points to screen space
+            const originScreen = containerOrigin.clone().project(this.camera);
+            const meterScreen = meterPoint.clone().project(this.camera);
+            
+            // Get canvas dimensions
+            const canvasWidth = this.renderer.domElement.width;
+            const canvasHeight = this.renderer.domElement.height;
+            
+            // Convert to screen pixels
+            const originX = (originScreen.x + 1) * canvasWidth / 2;
+            const meterX = (meterScreen.x + 1) * canvasWidth / 2;
+            
+            // Calculate screen distance for 1 meter
+            const screenDistanceForMeter = Math.abs(meterX - originX);
+            
+            // Calculate the normalized screen size (0-1 range)
+            const normalizedMeterSize = screenDistanceForMeter / canvasWidth;
+            
+            // This is our maximum allowed scale (similar to how 1 meter would appear)
+            // Use smaller multiplier to keep labels compact
+            maxScaleBasedOnMeter = normalizedMeterSize * 0.3;
+            
+            // Apply strict limits
+            maxScaleBasedOnMeter = Math.min(maxScaleBasedOnMeter, absoluteMaxScale); // Never larger than absolute max
+            maxScaleBasedOnMeter = Math.max(maxScaleBasedOnMeter, 0.02); // Never smaller than 0.02
+        }
+        
+        // If we have mesh and edge dimension, calculate scale based on edge but limited by meter scale
+        if (mesh && edgeDimension) {
+            // Get mesh world position and scale
+            const meshWorldPos = new THREE.Vector3();
+            mesh.getWorldPosition(meshWorldPos);
+            
+            // Calculate distance from camera to mesh
+            const distanceToCamera = this.camera.position.distanceTo(meshWorldPos);
+            
+            // Calculate how large the edge appears on screen
+            // Using perspective projection formula
+            const fov = this.camera.fov * Math.PI / 180;
+            const aspect = this.camera.aspect;
+            
+            // Calculate vertical and horizontal FOV
+            const vFovHalf = Math.tan(fov / 2);
+            const hFovHalf = vFovHalf * aspect;
+            
+            // Calculate screen height at the distance of the object
+            const screenHeightAtDistance = 2 * distanceToCamera * vFovHalf;
+            const screenWidthAtDistance = 2 * distanceToCamera * hFovHalf;
+            
+            // Calculate what portion of the screen the edge takes up
+            // We use width for horizontal comparison since sprite width matters most
+            const edgeScreenRatio = edgeDimension / screenWidthAtDistance;
+            
+            // Limit label to 80% of edge length on screen
+            const maxAllowedScaleForEdge = edgeScreenRatio * 0.8;
+            
+            // Use the smaller of the two limits: edge-based or meter-based
+            const maxAllowedScale = Math.min(maxAllowedScaleForEdge, maxScaleBasedOnMeter);
+            
+            // Apply the limit if label would be too large
+            if (baseScaleX > maxAllowedScale) {
+                const scaleFactor = maxAllowedScale / baseScaleX;
+                baseScaleX *= scaleFactor;
+                baseScaleY *= scaleFactor;
+            }
+        }
+        
+        sprite.scale.set(baseScaleX, baseScaleY, 1);
+        sprite.position.copy(position);
+        
+        // Store reference to mesh, dimension, and edge endpoints for dynamic updates
+        sprite.userData = {
+            mesh: mesh,
+            edgeDimension: edgeDimension,
+            edgeStart: edgeStart,
+            edgeEnd: edgeEnd,
+            baseScaleX: 0.15,   // Updated to match new base scale
+            baseScaleY: 0.04    // Updated to match new base scale
+        };
+        
+        this.dimensionLabelsGroup.add(sprite);
+    }
+    
+    hideDimensionLabels() {
+        if (this.dimensionLabelsGroup) {
+            this.scene.remove(this.dimensionLabelsGroup);
+            // Dispose of geometries and materials
+            this.dimensionLabelsGroup.traverse((child) => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (child.material.map) child.material.map.dispose();
+                    child.material.dispose();
+                }
+            });
+            this.dimensionLabelsGroup = null;
+        }
+    }
+    
+    updateDimensionLabelsScale() {
+        if (!this.dimensionLabelsGroup) return;
+        
+        // Get canvas dimensions for accurate calculations
+        const canvasWidth = this.renderer.domElement.width;
+        const canvasHeight = this.renderer.domElement.height;
+        
+        // Update scale and rotation for each label sprite based on current camera position
+        this.dimensionLabelsGroup.children.forEach(child => {
+            // Handle group info labels (now sprites)
+            if (child.userData && child.userData.isGroupInfo) {
+                const mesh = child.userData.mesh;
+                
+                // Recalculate most perpendicular face facing camera
+                const vertexData = this.getClosestVertexAndFaces(mesh);
+                if (vertexData && vertexData.mostPerpendicularFace) {
+                    const face = vertexData.mostPerpendicularFace;
+                    
+                    // Update position to new face center
+                    const faceCenter = face.center.clone();
+                    child.position.copy(faceCenter);
+                    
+                    // Offset slightly from the face
+                    const worldNormal = face.normal.clone();
+                    worldNormal.applyQuaternion(mesh.quaternion);
+                    child.position.add(worldNormal.clone().multiplyScalar(0.02));
+                    
+                    // Store new face
+                    child.userData.face = face;
+                    
+                    // Recalculate scale based on face size - 70% of smaller dimension
+                    let scaleX = 0.2;  // Default
+                    let scaleY = 0.05; // Default
+                    
+                    // Get face dimensions
+                    let faceWidth, faceHeight;
+                    
+                    if (face.axis === 'x') {
+                        faceWidth = mesh.userData.width;
+                        faceHeight = mesh.userData.height;
+                    } else if (face.axis === 'y') {
+                        faceWidth = mesh.userData.length;
+                        faceHeight = mesh.userData.width;
+                    } else if (face.axis === 'z') {
+                        faceWidth = mesh.userData.length;
+                        faceHeight = mesh.userData.height;
+                    }
+                    
+                    // Use smaller dimension to ensure label fits
+                    const smallerDimension = Math.min(faceWidth, faceHeight);
+                    
+                    // Create points for the smaller dimension
+                    const halfDim = smallerDimension / 2;
+                    
+                    // Create two points on the face to measure screen size
+                    let point1, point2;
+                    if (faceWidth < faceHeight || (faceWidth === faceHeight)) {
+                        // Measure width
+                        point1 = face.center.clone();
+                        point2 = face.center.clone();
+                        if (face.axis === 'x') {
+                            point1.z += halfDim;
+                            point2.z -= halfDim;
+                        } else if (face.axis === 'y') {
+                            point1.x += halfDim;
+                            point2.x -= halfDim;
+                        } else if (face.axis === 'z') {
+                            point1.x += halfDim;
+                            point2.x -= halfDim;
+                        }
+                    } else {
+                        // Measure height
+                        point1 = face.center.clone();
+                        point2 = face.center.clone();
+                        if (face.axis === 'x') {
+                            point1.y += halfDim;
+                            point2.y -= halfDim;
+                        } else if (face.axis === 'y') {
+                            point1.z += halfDim;
+                            point2.z -= halfDim;
+                        } else if (face.axis === 'z') {
+                            point1.y += halfDim;
+                            point2.y -= halfDim;
+                        }
+                    }
+                    
+                    // Apply mesh rotation to points
+                    const meshRotation = mesh.quaternion;
+                    point1.applyQuaternion(meshRotation);
+                    point2.applyQuaternion(meshRotation);
+                    
+                    // Project to screen space
+                    const screen1 = point1.clone().project(this.camera);
+                    const screen2 = point2.clone().project(this.camera);
+                    
+                    // Calculate screen distance
+                    const screenDist = Math.sqrt(
+                        Math.pow(screen2.x - screen1.x, 2) + 
+                        Math.pow(screen2.y - screen1.y, 2)
+                    );
+                    
+                    // Set label to 70% of smaller dimension on screen
+                    scaleX = screenDist * 0.7;
+                    scaleY = scaleX * 0.25; // Maintain aspect ratio (4:1)
+                    
+                    // Apply minimum and maximum scale limits
+                    scaleX = Math.max(0.05, Math.min(0.5, scaleX));
+                    scaleY = Math.max(0.0125, Math.min(0.125, scaleY));
+                    
+                    child.scale.set(scaleX, scaleY, 1);
+                }
+                return;
+            }
+            
+            const sprite = child;
+            if (sprite.userData && sprite.userData.mesh && sprite.userData.edgeDimension) {
+                const mesh = sprite.userData.mesh;
+                const edgeDimension = sprite.userData.edgeDimension;
+                const edgeStart = sprite.userData.edgeStart;
+                const edgeEnd = sprite.userData.edgeEnd;
+                
+                // If we have edge endpoints, calculate rotation
+                if (edgeStart && edgeEnd) {
+                    // Project edge endpoints to screen space
+                    const startScreen = edgeStart.clone().project(this.camera);
+                    const endScreen = edgeEnd.clone().project(this.camera);
+                    
+                    // Convert from normalized device coordinates to screen pixels
+                    const startX = (startScreen.x + 1) * canvasWidth / 2;
+                    const startY = (-startScreen.y + 1) * canvasHeight / 2;
+                    const endX = (endScreen.x + 1) * canvasWidth / 2;
+                    const endY = (-endScreen.y + 1) * canvasHeight / 2;
+                    
+                    // Calculate angle of the edge on screen
+                    let angle = Math.atan2(endY - startY, endX - startX);
+                    
+                    // Normalize angle to be between -PI and PI
+                    while (angle > Math.PI) angle -= 2 * Math.PI;
+                    while (angle < -Math.PI) angle += 2 * Math.PI;
+                    
+                    // If text would be upside down (angle is between 90 and 270 degrees), flip it
+                    if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
+                        angle = angle + Math.PI;  // Rotate 180 degrees
+                    }
+                    
+                    // Apply rotation to sprite (sprites rotate around Z axis)
+                    sprite.material.rotation = -angle;  // Negative because screen Y is inverted
+                    
+                    // Calculate the edge length in screen pixels for scaling
+                    const edgeScreenLength = Math.sqrt(
+                        Math.pow(endX - startX, 2) + 
+                        Math.pow(endY - startY, 2)
+                    );
+                    
+                    // Convert edge screen length to normalized screen space (0-1)
+                    const edgeNormalizedLength = edgeScreenLength / canvasWidth;
+                    
+                    // Base scales
+                    let scaleX = sprite.userData.baseScaleX;
+                    let scaleY = sprite.userData.baseScaleY;
+                    
+                    // Limit label to 80% of edge length on screen
+                    const maxAllowedScale = edgeNormalizedLength * 0.8;
+                    
+                    // Apply the limit if label would be too large
+                    if (scaleX > maxAllowedScale) {
+                        const scaleFactor = maxAllowedScale / scaleX;
+                        scaleX *= scaleFactor;
+                        scaleY *= scaleFactor;
+                    }
+                    
+                    // Also apply a minimum scale so labels don't become too small
+                    const minScale = 0.1;
+                    scaleX = Math.max(scaleX, minScale);
+                    scaleY = Math.max(scaleY, minScale * 0.24); // Maintain aspect ratio
+                    
+                    // Apply maximum scale to prevent labels from being too large
+                    const maxScale = 0.4;
+                    scaleX = Math.min(scaleX, maxScale);
+                    scaleY = Math.min(scaleY, maxScale * 0.24);
+                    
+                    sprite.scale.set(scaleX, scaleY, 1);
+                } else {
+                    // Fallback for labels without edge endpoints (shouldn't happen with new code)
+                    const meshWorldPos = new THREE.Vector3();
+                    mesh.getWorldPosition(meshWorldPos);
+                    
+                    const edgeStart = new THREE.Vector3(-edgeDimension/2, 0, 0).add(meshWorldPos);
+                    const edgeEnd = new THREE.Vector3(edgeDimension/2, 0, 0).add(meshWorldPos);
+                    
+                    const startScreen = edgeStart.clone().project(this.camera);
+                    const endScreen = edgeEnd.clone().project(this.camera);
+                    
+                    startScreen.x = (startScreen.x + 1) * canvasWidth / 2;
+                    startScreen.y = (-startScreen.y + 1) * canvasHeight / 2;
+                    endScreen.x = (endScreen.x + 1) * canvasWidth / 2;
+                    endScreen.y = (-endScreen.y + 1) * canvasHeight / 2;
+                    
+                    const edgeScreenLength = Math.sqrt(
+                        Math.pow(endScreen.x - startScreen.x, 2) + 
+                        Math.pow(endScreen.y - startScreen.y, 2)
+                    );
+                    
+                    const edgeNormalizedLength = edgeScreenLength / canvasWidth;
+                    
+                    let scaleX = sprite.userData.baseScaleX;
+                    let scaleY = sprite.userData.baseScaleY;
+                    
+                    const maxAllowedScale = edgeNormalizedLength * 0.8;
+                    
+                    if (scaleX > maxAllowedScale) {
+                        const scaleFactor = maxAllowedScale / scaleX;
+                        scaleX *= scaleFactor;
+                        scaleY *= scaleFactor;
+                    }
+                    
+                    const minScale = 0.1;
+                    scaleX = Math.max(scaleX, minScale);
+                    scaleY = Math.max(scaleY, minScale * 0.24);
+                    
+                    const maxScale = 0.4;
+                    scaleX = Math.min(scaleX, maxScale);
+                    scaleY = Math.min(scaleY, maxScale * 0.24);
+                    
+                    sprite.scale.set(scaleX, scaleY, 1);
+                }
+            }
+        });
     }
     
     animate() {
@@ -3447,6 +4522,9 @@ class Scene3D {
         if (this.controls.enabled) {
             this.controls.update();
         }
+        
+        // Update dimension labels scale if they exist
+        this.updateDimensionLabelsScale();
         
         this.renderer.render(this.scene, this.camera);
     }
