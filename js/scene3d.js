@@ -950,14 +950,20 @@ class Scene3D {
                     );
                 } else {
                     // Horizontal cylinder - lying on its side
-                    // For horizontal: length is the cylinder length, width/height are diameter
-                    const radius = cargoData.width / 2; // width = diameter for horizontal
-                    const length = cargoData.length;
+                    // Use diameter property if available (for rotated rolls)
+                    // Otherwise use width as diameter
+                    const diameter = cargoData.diameter || cargoData.width;
+                    const radius = diameter / 2;
+                    
+                    // Cylinder length is the larger of length/width (for rotated items)
+                    const cylinderLength = cargoData.diameter ? 
+                        Math.max(cargoData.length, cargoData.width) : 
+                        cargoData.length;
                     
                     geometry = new THREE.CylinderGeometry(
                         radius,    // top radius
                         radius,    // bottom radius
-                        length,    // length along the axis
+                        cylinderLength,    // length along the axis
                         32,        // radial segments
                         1,         // height segments
                         false      // open ended
@@ -1001,6 +1007,11 @@ class Scene3D {
             cargoData.y || cargoData.height / 2,
             cargoData.z || 0
         );
+        
+        // Apply rotation if it exists (for rotated items)
+        if (cargoData.rotation) {
+            mesh.rotation.y = cargoData.rotation;
+        }
         
         mesh.userData = cargoData;
         
@@ -1449,23 +1460,69 @@ class Scene3D {
     }
     
     getAllObjectsAbove(clickedObject) {
-        const objects = [clickedObject];
-        const clickedPos = clickedObject.position;
+        const allObjects = new Set([clickedObject]);
+        const clickedData = clickedObject.userData;
         const tolerance = 0.1;
         
-        // Find all objects that are above the clicked one (in the same stack)
-        for (let mesh of this.cargoMeshes) {
-            if (mesh === clickedObject) continue;
+        // Recursive function to find all objects supported by a given object
+        const findSupported = (supportObject) => {
+            const supportData = supportObject.userData;
+            const supportTop = supportObject.position.y + supportData.height / 2;
+            const supportHalfLength = supportData.length / 2;
+            const supportHalfWidth = supportData.width / 2;
             
-            // Check if this mesh is in the same X/Z position and above
-            if (Math.abs(mesh.position.x - clickedPos.x) < tolerance &&
-                Math.abs(mesh.position.z - clickedPos.z) < tolerance &&
-                mesh.position.y > clickedPos.y) {
-                objects.push(mesh);
+            for (let mesh of this.cargoMeshes) {
+                if (allObjects.has(mesh)) continue; // Already in our set
+                
+                const meshData = mesh.userData;
+                const meshBottom = mesh.position.y - meshData.height / 2;
+                const meshHalfLength = meshData.length / 2;
+                const meshHalfWidth = meshData.width / 2;
+                
+                // Check if this mesh is directly on top of the support object
+                if (Math.abs(meshBottom - supportTop) < tolerance) {
+                    // Check if mesh is actually ON TOP of support (not just touching sides)
+                    // The mesh center must be within the support boundaries
+                    const xMin = supportObject.position.x - supportHalfLength;
+                    const xMax = supportObject.position.x + supportHalfLength;
+                    const zMin = supportObject.position.z - supportHalfWidth;
+                    const zMax = supportObject.position.z + supportHalfWidth;
+                    
+                    // Check if any part of the mesh is within support boundaries
+                    const meshXMin = mesh.position.x - meshHalfLength;
+                    const meshXMax = mesh.position.x + meshHalfLength;
+                    const meshZMin = mesh.position.z - meshHalfWidth;
+                    const meshZMax = mesh.position.z + meshHalfWidth;
+                    
+                    // Check for actual overlap (not just touching)
+                    const xOverlap = meshXMax > xMin && meshXMin < xMax;
+                    const zOverlap = meshZMax > zMin && meshZMin < zMax;
+                    
+                    if (xOverlap && zOverlap) {
+                        // Additional check: ensure significant overlap (not just edge touching)
+                        const overlapX = Math.min(meshXMax, xMax) - Math.max(meshXMin, xMin);
+                        const overlapZ = Math.min(meshZMax, zMax) - Math.max(meshZMin, zMin);
+                        
+                        // Require at least 10% overlap in both dimensions to be considered "supported"
+                        const minOverlapX = Math.min(meshData.length, supportData.length) * 0.1;
+                        const minOverlapZ = Math.min(meshData.width, supportData.width) * 0.1;
+                        
+                        if (overlapX > minOverlapX && overlapZ > minOverlapZ) {
+                            // This mesh is truly supported by our object
+                            allObjects.add(mesh);
+                            // Recursively find what this mesh supports
+                            findSupported(mesh);
+                        }
+                    }
+                }
             }
-        }
+        };
         
-        // Sort by Y position (bottom to top)
+        // Start the recursive search from the clicked object
+        findSupported(clickedObject);
+        
+        // Convert set to array and sort by Y position (bottom to top)
+        const objects = Array.from(allObjects);
         objects.sort((a, b) => a.position.y - b.position.y);
         
         return objects;
@@ -1670,22 +1727,35 @@ class Scene3D {
         // Menu items
         const menuItems = [];
         
+        // Check if this is a Steel Coil (cannot be rotated)
+        const isSteelCoil = cargoData.type === 'steel-coil' || cargoData.fixedDiameter;
+        
         if (isUnitOutside) {
             // Units outside container - only individual operations, no group operations
+            // Steel Coils cannot be rotated
+            if (!isSteelCoil) {
+                menuItems.push(
+                    { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
+                    { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                    { text: '⟲ Obróć do góry (180°)', action: () => this.rotateUnit(mesh, 180) },
+                    { separator: true }
+                );
+            }
             menuItems.push(
-                { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
-                { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
-                { text: '⟲ Obróć do góry (180°)', action: () => this.rotateUnit(mesh, 180) },
-                { separator: true },
                 { text: '🗑️ Usuń jednostkę', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
             );
         } else if (isGroupSelected) {
             // Group operations - only for units inside container
+            // Steel Coil groups cannot be rotated
+            if (!isSteelCoil) {
+                menuItems.push(
+                    { text: '↻ Obróć grupę w prawo (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
+                    { text: '↺ Obróć grupę w lewo (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
+                    { text: '⟲ Obróć grupę do góry (180°)', action: () => this.rotateGroup(cargoData.groupId, 180), style: 'font-weight: bold; color: #10b981;' },
+                    { separator: true }
+                );
+            }
             menuItems.push(
-                { text: '↻ Obróć grupę w prawo (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
-                { text: '↺ Obróć grupę w lewo (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
-                { text: '⟲ Obróć grupę do góry (180°)', action: () => this.rotateGroup(cargoData.groupId, 180), style: 'font-weight: bold; color: #10b981;' },
-                { separator: true },
                 { text: '📦 Przenieś grupę poza przestrzeń', action: () => this.moveGroupOutsideContainer(cargoData.groupId), style: 'font-weight: bold; color: #10b981;' },
                 { text: '🗑️ Usuń całą grupę', action: () => this.removeGroup(cargoData.groupId), style: 'font-weight: bold; color: #dc3545;' },
                 { separator: true },
@@ -1701,11 +1771,16 @@ class Scene3D {
                 );
             }
             
+            // Steel Coils cannot be rotated
+            if (!isSteelCoil) {
+                menuItems.push(
+                    { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
+                    { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                    { text: '⟲ Obróć do góry (180°)', action: () => this.rotateUnit(mesh, 180) },
+                    { separator: true }
+                );
+            }
             menuItems.push(
-                { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
-                { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
-                { text: '⟲ Obróć do góry (180°)', action: () => this.rotateUnit(mesh, 180) },
-                { separator: true },
                 { text: '📦 Przenieś poza przestrzeń', action: () => this.moveOutsideContainer(mesh) },
                 { text: '🗑️ Usuń jednostkę', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
             );
@@ -1764,6 +1839,12 @@ class Scene3D {
     }
     
     rotateUnit(mesh, angle) {
+        // Check if this is a Steel Coil - they cannot be rotated
+        if (mesh.userData.type === 'steel-coil' || mesh.userData.fixedDiameter) {
+            console.warn('Steel Coils cannot be rotated');
+            return;
+        }
+        
         // Get the entire stack (units above AND below)
         const entireStack = this.findEntireStack(mesh.position);
         
@@ -1953,12 +2034,26 @@ class Scene3D {
                 const otherHalfHeight = otherData.height / 2;
                 
                 // Check for overlap
-                const overlapX = Math.abs(test.newX - otherMesh.position.x) < (halfLength + otherHalfLength - 0.01);
-                const overlapZ = Math.abs(test.newZ - otherMesh.position.z) < (halfWidth + otherHalfWidth - 0.01);
-                const overlapY = Math.abs(test.y - otherMesh.position.y) < (halfHeight + otherHalfHeight - 0.01);
+                // Use <= to check for overlap or touching
+                const overlapX = Math.abs(test.newX - otherMesh.position.x) <= (halfLength + otherHalfLength);
+                const overlapZ = Math.abs(test.newZ - otherMesh.position.z) <= (halfWidth + otherHalfWidth);
+                const overlapY = Math.abs(test.y - otherMesh.position.y) <= (halfHeight + otherHalfHeight);
                 
                 if (overlapX && overlapZ && overlapY) {
-                    return false;
+                    // Check if units are truly overlapping (not just touching)
+                    const xDistance = Math.abs(test.newX - otherMesh.position.x);
+                    const zDistance = Math.abs(test.newZ - otherMesh.position.z);
+                    const xSum = halfLength + otherHalfLength;
+                    const zSum = halfWidth + otherHalfWidth;
+                    
+                    // Units are overlapping if distance is less than sum of half-dimensions
+                    // Allow exact touching (distance == sum) with small tolerance
+                    const xOverlapping = xDistance < (xSum - 0.001);
+                    const zOverlapping = zDistance < (zSum - 0.001);
+                    
+                    if (xOverlapping && zOverlapping) {
+                        return false; // Units are overlapping
+                    }
                 }
             }
         }
@@ -2307,11 +2402,13 @@ class Scene3D {
                 // Check if position is valid (no collisions with other units)
                 const isValidPosition = this.checkValidPosition(finalPosition) && (this.canStackAtPosition !== false);
                 
+                
                 if (isValidPosition) {
                     // Valid position - move all dragged objects
                     const deltaX = finalPosition.x - this.draggedObjects[0].position.x;
                     const deltaY = finalPosition.y - this.draggedObjects[0].position.y;
                     const deltaZ = finalPosition.z - this.draggedObjects[0].position.z;
+                    
                     
                     this.draggedObjects.forEach(obj => {
                         obj.position.x += deltaX;
@@ -2384,7 +2481,7 @@ class Scene3D {
         const distance = currentPos.distanceTo(clampedPosition);
         
         // If we're very close, don't bother sliding
-        if (distance < 0.01) return null;
+        if (distance < 0.001) return null;
         
         // First, try to move directly to the target position
         const directDropPos = this.calculateDropPosition(clampedPosition);
@@ -2392,12 +2489,14 @@ class Scene3D {
             return directDropPos;
         }
         
-        // Try incremental movement along the path
-        const steps = Math.min(20, Math.ceil(distance / 0.1)); // Max 20 steps, every 10cm
+        // Phase 1: Coarse search with smaller steps (5cm instead of 10cm)
+        const coarseStepSize = 0.05; // 5cm steps
+        const coarseSteps = Math.min(40, Math.ceil(distance / coarseStepSize));
         let lastValidPos = null;
+        let collisionFraction = 1.0;
         
-        for (let i = 1; i <= steps; i++) {
-            const fraction = i / steps;
+        for (let i = 1; i <= coarseSteps; i++) {
+            const fraction = i / coarseSteps;
             const testPos = new THREE.Vector3(
                 currentPos.x + deltaX * fraction,
                 currentPos.y,
@@ -2408,82 +2507,129 @@ class Scene3D {
             if (this.checkValidPosition(dropPos) && (this.canStackAtPosition !== false)) {
                 lastValidPos = dropPos;
             } else {
-                // Hit an obstacle - return the last valid position we found
-                if (lastValidPos) {
-                    return lastValidPos;
-                }
+                // Found collision point
+                collisionFraction = fraction;
                 break;
             }
         }
         
-        // If we got here with a valid position, use it
+        // Phase 2: Binary search refinement to get closer to obstacles
+        if (lastValidPos && collisionFraction < 1.0) {
+            // We found a collision, now refine using binary search
+            let lowFraction = (collisionFraction * coarseSteps - 1) / coarseSteps; // Last valid position
+            let highFraction = collisionFraction; // First invalid position
+            const tolerance = 0.001 / distance; // 1mm tolerance relative to total distance
+            
+            // Binary search to find the exact boundary
+            let iterations = 0;
+            const maxIterations = 10; // Limit iterations for performance
+            
+            while (highFraction - lowFraction > tolerance && iterations < maxIterations) {
+                const midFraction = (lowFraction + highFraction) / 2;
+                const testPos = new THREE.Vector3(
+                    currentPos.x + deltaX * midFraction,
+                    currentPos.y,
+                    currentPos.z + deltaZ * midFraction
+                );
+                
+                const dropPos = this.calculateDropPosition(testPos);
+                if (this.checkValidPosition(dropPos) && (this.canStackAtPosition !== false)) {
+                    // Valid position, try to get closer
+                    lowFraction = midFraction;
+                    lastValidPos = dropPos;
+                } else {
+                    // Invalid position, back off
+                    highFraction = midFraction;
+                }
+                
+                iterations++;
+            }
+        }
+        
+        // If we found a valid position close to obstacle, use it
         if (lastValidPos) {
             return lastValidPos;
         }
         
-        // Try sliding along axes when blocked
+        // Try sliding along axes when completely blocked
         // This creates the "sliding along walls" effect
         
         // Determine which axis has more movement
         const absX = Math.abs(deltaX);
         const absZ = Math.abs(deltaZ);
         
-        // Try moving along the dominant axis first
-        if (absX > absZ && absX > 0.01) {
+        // Try moving along the dominant axis first with binary search
+        if (absX > absZ && absX > 0.001) {
             // Try moving only in X direction
-            const xOnlyPos = new THREE.Vector3(clampedPosition.x, currentPos.y, currentPos.z);
-            const xDropPos = this.calculateDropPosition(xOnlyPos);
-            if (this.checkValidPosition(xDropPos) && (this.canStackAtPosition !== false)) {
-                return xDropPos;
-            }
-            
-            // Try partial X movement
-            for (let fraction = 0.9; fraction > 0.1; fraction -= 0.1) {
-                const partialX = new THREE.Vector3(
-                    currentPos.x + deltaX * fraction,
-                    currentPos.y,
-                    currentPos.z
-                );
-                const partialDropPos = this.calculateDropPosition(partialX);
-                if (this.checkValidPosition(partialDropPos) && (this.canStackAtPosition !== false)) {
-                    return partialDropPos;
-                }
-            }
+            const xResult = this.binarySearchAxis(currentPos, clampedPosition.x, currentPos.z, true);
+            if (xResult) return xResult;
         }
         
-        if (absZ > 0.01) {
+        if (absZ > 0.001) {
             // Try moving only in Z direction
-            const zOnlyPos = new THREE.Vector3(currentPos.x, currentPos.y, clampedPosition.z);
-            const zDropPos = this.calculateDropPosition(zOnlyPos);
-            if (this.checkValidPosition(zDropPos) && (this.canStackAtPosition !== false)) {
-                return zDropPos;
-            }
-            
-            // Try partial Z movement
-            for (let fraction = 0.9; fraction > 0.1; fraction -= 0.1) {
-                const partialZ = new THREE.Vector3(
-                    currentPos.x,
-                    currentPos.y,
-                    currentPos.z + deltaZ * fraction
-                );
-                const partialDropPos = this.calculateDropPosition(partialZ);
-                if (this.checkValidPosition(partialDropPos) && (this.canStackAtPosition !== false)) {
-                    return partialDropPos;
-                }
-            }
+            const zResult = this.binarySearchAxis(currentPos, currentPos.x, clampedPosition.z, false);
+            if (zResult) return zResult;
         }
         
         // Try the other axis if the dominant one failed
-        if (absZ > absX && absX > 0.01) {
+        if (absZ > absX && absX > 0.001) {
             // Try X movement since Z was dominant but failed
-            const xOnlyPos = new THREE.Vector3(clampedPosition.x, currentPos.y, currentPos.z);
-            const xDropPos = this.calculateDropPosition(xOnlyPos);
-            if (this.checkValidPosition(xDropPos) && (this.canStackAtPosition !== false)) {
-                return xDropPos;
-            }
+            const xResult = this.binarySearchAxis(currentPos, clampedPosition.x, currentPos.z, true);
+            if (xResult) return xResult;
         }
         
         return null; // No valid slide position found
+    }
+    
+    // Helper method for binary search along a single axis
+    binarySearchAxis(currentPos, targetX, targetZ, isXAxis) {
+        const startValue = isXAxis ? currentPos.x : currentPos.z;
+        const endValue = isXAxis ? targetX : targetZ;
+        const delta = endValue - startValue;
+        
+        if (Math.abs(delta) < 0.001) return null;
+        
+        // First check if we can move all the way
+        const fullPos = new THREE.Vector3(
+            isXAxis ? endValue : currentPos.x,
+            currentPos.y,
+            isXAxis ? currentPos.z : endValue
+        );
+        const fullDropPos = this.calculateDropPosition(fullPos);
+        if (this.checkValidPosition(fullDropPos) && (this.canStackAtPosition !== false)) {
+            return fullDropPos;
+        }
+        
+        // Binary search for the maximum valid position
+        let lowFraction = 0;
+        let highFraction = 1;
+        let lastValidPos = null;
+        const tolerance = 0.001 / Math.abs(delta); // 1mm tolerance
+        let iterations = 0;
+        const maxIterations = 10;
+        
+        while (highFraction - lowFraction > tolerance && iterations < maxIterations) {
+            const midFraction = (lowFraction + highFraction) / 2;
+            const testValue = startValue + delta * midFraction;
+            
+            const testPos = new THREE.Vector3(
+                isXAxis ? testValue : currentPos.x,
+                currentPos.y,
+                isXAxis ? currentPos.z : testValue
+            );
+            
+            const dropPos = this.calculateDropPosition(testPos);
+            if (this.checkValidPosition(dropPos) && (this.canStackAtPosition !== false)) {
+                lowFraction = midFraction;
+                lastValidPos = dropPos;
+            } else {
+                highFraction = midFraction;
+            }
+            
+            iterations++;
+        }
+        
+        return lastValidPos;
     }
     
     isPositionOutsideContainer(position) {
@@ -2713,7 +2859,8 @@ class Scene3D {
         let closestUnit = null;
         let closestDistance = Infinity;
         // Different thresholds for different unit types
-        const snapThreshold = draggedData.isVerticalRoll ? 0.1 : 1.0; // Rolls: 10cm, others: 1m
+        // Reduced threshold to avoid interfering with stacking
+        const snapThreshold = draggedData.isVerticalRoll ? 0.1 : 0.5; // Rolls: 10cm, others: 50cm
         
         
         // Special handling for vertical rolls - they can stack in pyramid formation
@@ -2734,32 +2881,122 @@ class Scene3D {
             const targetHalfLength = targetData.length / 2;
             const targetHalfHeight = targetData.height / 2;
             
-            // Check if cursor is directly over this unit (for stacking)
-            const overlapX = Math.abs(adjustedPosition.x - mesh.position.x) < Math.min(halfLength, targetHalfLength) * 0.8;
-            const overlapZ = Math.abs(adjustedPosition.z - mesh.position.z) < Math.min(halfWidth, targetHalfWidth) * 0.8;
+            // Check if cursor is over this unit (for stacking)
+            // Check if the cursor position itself is within the target unit's bounds
+            const xDistance = Math.abs(adjustedPosition.x - mesh.position.x);
+            const zDistance = Math.abs(adjustedPosition.z - mesh.position.z);
             
-            if (overlapX && overlapZ) {
-                // We're directly over the unit - try to stack on top
-                const canStackResult = this.canStackOn(mesh);
-                const canFitResult = this.canFitOnTop(draggedData, targetData);
-                const stackAllowed = canStackResult && canFitResult;
-                
+            // Check if cursor is directly over the target unit's surface
+            const cursorOverX = xDistance <= targetHalfLength;
+            const cursorOverZ = zDistance <= targetHalfWidth;
+            
+            // Prioritize stacking only if cursor is directly over the unit
+            if (cursorOverX && cursorOverZ) {
+                // We're over the unit - try to stack on top
                 // Calculate the Y position on top of this unit
                 const stackY = mesh.position.y + targetHalfHeight + halfHeight;
                 
+                // Removed verbose stacking log
+                
                 // If this unit is at or above our current target height
                 if (mesh.position.y + targetHalfHeight >= targetY - halfHeight) {
-                    // Stack on top - center on the unit below
-                    targetY = stackY;
-                    snapPosition = {
-                        x: mesh.position.x,
-                        z: mesh.position.z
-                    };
-                    canStack = stackAllowed;
-                    isStacking = true;
+                    // Create a proposed position for stacking
+                    const proposedStackPosition = new THREE.Vector3(
+                        adjustedPosition.x,  // Keep the cursor X position
+                        stackY,
+                        adjustedPosition.z   // Keep the cursor Z position
+                    );
+                    
+                    // First clamp position to ensure unit stays within bounds of target
+                    const clampedX = Math.max(
+                        mesh.position.x - targetHalfLength + halfLength,
+                        Math.min(
+                            adjustedPosition.x,
+                            mesh.position.x + targetHalfLength - halfLength
+                        )
+                    );
+                    const clampedZ = Math.max(
+                        mesh.position.z - targetHalfWidth + halfWidth,
+                        Math.min(
+                            adjustedPosition.z,
+                            mesh.position.z + targetHalfWidth - halfWidth
+                        )
+                    );
+                    
+                    // Now check if we can place at the clamped position
+                    const clampedStackPosition = new THREE.Vector3(
+                        clampedX,
+                        stackY,
+                        clampedZ
+                    );
+                    
+                    const canPlaceHere = this.canPlaceOnSurface(draggedData, mesh, clampedStackPosition);
+                    
+                    if (canPlaceHere) {
+                        // Stack on top at the clamped position
+                        targetY = stackY;
+                        
+                        // Only snap if we had to adjust the position
+                        if (Math.abs(clampedX - adjustedPosition.x) > 0.01 || 
+                            Math.abs(clampedZ - adjustedPosition.z) > 0.01) {
+                            snapPosition = {
+                                x: clampedX,
+                                z: clampedZ
+                            };
+                        } else {
+                            snapPosition = null; // Position is already valid
+                        }
+                        
+                        canStack = true;
+                        isStacking = true;
+                    } else {
+                        // Can't stack at this position
+                        // Only search for alternative position if we're truly trying to stack on top
+                        // (not when placing side-by-side on the same floor)
+                        
+                        // Check if there are other units at the same Y level that might be blocking
+                        let hasCollisionOnSameFloor = false;
+                        for (let otherMesh of this.cargoMeshes) {
+                            if (this.draggedObjects.includes(otherMesh) || otherMesh === mesh) continue;
+                            
+                            // Check if other unit is at the same Y level as our proposed position
+                            if (Math.abs(otherMesh.position.y - stackY) < 0.1) {
+                                const otherData = otherMesh.userData;
+                                const otherHalfLength = otherData.length / 2;
+                                const otherHalfWidth = otherData.width / 2;
+                                
+                                // Check if it would collide at the clamped position
+                                const xDist = Math.abs(clampedX - otherMesh.position.x);
+                                const zDist = Math.abs(clampedZ - otherMesh.position.z);
+                                
+                                if (xDist < (halfLength + otherHalfLength - 0.001) &&
+                                    zDist < (halfWidth + otherHalfWidth - 0.001)) {
+                                    hasCollisionOnSameFloor = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Only search for alternative position if we're stacking on top of a unit
+                        // and the collision is not with units on the same floor
+                        if (!hasCollisionOnSameFloor) {
+                            const validPosition = this.findValidStackPosition(draggedData, mesh, adjustedPosition);
+                            if (validPosition) {
+                                targetY = stackY;
+                                snapPosition = {
+                                    x: validPosition.x,
+                                    z: validPosition.z
+                                };
+                                canStack = true;
+                                isStacking = true;
+                            }
+                        }
+                        // If collision is on same floor, don't try to find alternative position
+                        // This prevents the "bouncing" effect
+                    }
                 }
             } else {
-                // Not directly over - check for side snapping
+                // Not over this unit - check for side snapping
                 const distance = Math.sqrt(
                     Math.pow(adjustedPosition.x - mesh.position.x, 2) + 
                     Math.pow(adjustedPosition.z - mesh.position.z, 2)
@@ -2771,15 +3008,20 @@ class Scene3D {
                 const expectedGroundY = meshIsOutside ? targetData.height / 2 : (trailerHeight + targetData.height / 2);
                 const isGroundLevel = Math.abs(mesh.position.y - expectedGroundY) < 0.1;
                 
-                if (isGroundLevel && distance < closestDistance) {
+                // Also check if we're NOT currently above a higher unit (to avoid side-snapping when we should be stacking)
+                const notAboveHigherUnit = !isStacking || mesh.position.y < targetY - halfHeight;
+                
+                if (isGroundLevel && distance < closestDistance && notAboveHigherUnit) {
                     closestDistance = distance;
                     closestUnit = mesh;
                 }
             }
         }
         
-        // If not stacking and we have a close unit, snap to its side
-        if (!isStacking && closestUnit && closestDistance < snapThreshold) {
+        // If not stacking and we have a very close unit, snap to its side
+        // Additional check: make sure we're really trying to place beside, not on top
+        const reallyCloseToBeside = closestDistance < snapThreshold * 0.7;
+        if (!isStacking && closestUnit && reallyCloseToBeside) {
             const targetData = closestUnit.userData;
             const targetHalfWidth = targetData.width / 2;
             const targetHalfLength = targetData.length / 2;
@@ -2868,13 +3110,196 @@ class Scene3D {
         return finalPosition;
     }
     
-    canFitOnTop(draggedData, targetData) {
-        // Check if dragged unit can fit on top of target
-        // Dragged unit must be same size or smaller than target
-        const lengthFits = draggedData.length <= targetData.length;
-        const widthFits = draggedData.width <= targetData.width;
+    canFitOnTop(draggedData, targetData, draggedPosition, targetPosition) {
+        // Check if dragged unit can fit on top of target at the given position
+        // If positions are not provided, use simple dimension comparison (backward compatibility)
+        if (!draggedPosition || !targetPosition) {
+            // Old logic - simple dimension comparison
+            const lengthFits = draggedData.length <= targetData.length;
+            const widthFits = draggedData.width <= targetData.width;
+            return lengthFits && widthFits;
+        }
         
-        return lengthFits && widthFits;
+        // New logic - check if unit fits within the bounds at the specific position
+        const draggedHalfLength = draggedData.length / 2;
+        const draggedHalfWidth = draggedData.width / 2;
+        const targetHalfLength = targetData.length / 2;
+        const targetHalfWidth = targetData.width / 2;
+        
+        // Calculate the edges of dragged unit at the proposed position
+        const draggedMinX = draggedPosition.x - draggedHalfLength;
+        const draggedMaxX = draggedPosition.x + draggedHalfLength;
+        const draggedMinZ = draggedPosition.z - draggedHalfWidth;
+        const draggedMaxZ = draggedPosition.z + draggedHalfWidth;
+        
+        // Calculate the edges of target unit
+        const targetMinX = targetPosition.x - targetHalfLength;
+        const targetMaxX = targetPosition.x + targetHalfLength;
+        const targetMinZ = targetPosition.z - targetHalfWidth;
+        const targetMaxZ = targetPosition.z + targetHalfWidth;
+        
+        // Check if dragged unit is completely within target unit bounds
+        // Use very small tolerance to prevent units from extending beyond edges
+        const tolerance = 0.01; // 1cm tolerance - strict but allows for floating point errors
+        const fitsInX = draggedMinX >= targetMinX - tolerance && draggedMaxX <= targetMaxX + tolerance;
+        const fitsInZ = draggedMinZ >= targetMinZ - tolerance && draggedMaxZ <= targetMaxZ + tolerance;
+        
+        return fitsInX && fitsInZ;
+    }
+    
+    findValidStackPosition(draggedData, targetMesh, desiredPosition) {
+        // Try to find a valid position on the target surface near the desired position
+        const targetData = targetMesh.userData;
+        const targetPosition = targetMesh.position;
+        const targetHalfLength = targetData.length / 2;
+        const targetHalfWidth = targetData.width / 2;
+        const targetHalfHeight = targetData.height / 2;
+        const draggedHalfLength = draggedData.length / 2;
+        const draggedHalfWidth = draggedData.width / 2;
+        const draggedHalfHeight = draggedData.height / 2;
+        
+        const stackY = targetPosition.y + targetHalfHeight + draggedHalfHeight;
+        
+        // First try the exact desired position
+        const exactPos = new THREE.Vector3(desiredPosition.x, stackY, desiredPosition.z);
+        if (this.canPlaceOnSurface(draggedData, targetMesh, exactPos)) {
+            return exactPos;
+        }
+        
+        // If the exact position doesn't work, try to clamp to valid bounds
+        // This helps when dragging near edges
+        const clampedX = Math.max(
+            targetPosition.x - targetHalfLength + draggedHalfLength,
+            Math.min(
+                desiredPosition.x,
+                targetPosition.x + targetHalfLength - draggedHalfLength
+            )
+        );
+        const clampedZ = Math.max(
+            targetPosition.z - targetHalfWidth + draggedHalfWidth,
+            Math.min(
+                desiredPosition.z,
+                targetPosition.z + targetHalfWidth - draggedHalfWidth
+            )
+        );
+        
+        const clampedPos = new THREE.Vector3(clampedX, stackY, clampedZ);
+        if (this.canPlaceOnSurface(draggedData, targetMesh, clampedPos)) {
+            return clampedPos;
+        }
+        
+        // If clamped position still doesn't work (due to collision with other units),
+        // search for the closest valid position
+        const searchStep = 0.05; // 5cm steps for finer control
+        const maxSearchDistance = Math.max(draggedHalfLength, draggedHalfWidth) * 0.5;
+        
+        let closestValidPos = null;
+        let closestDistance = Infinity;
+        
+        // Start search from clamped position, not desired position
+        const searchCenter = clampedPos;
+        
+        // Search in a grid pattern around the clamped position
+        for (let dx = -maxSearchDistance; dx <= maxSearchDistance; dx += searchStep) {
+            for (let dz = -maxSearchDistance; dz <= maxSearchDistance; dz += searchStep) {
+                const testPos = new THREE.Vector3(
+                    searchCenter.x + dx,
+                    stackY,
+                    searchCenter.z + dz
+                );
+                
+                if (this.canPlaceOnSurface(draggedData, targetMesh, testPos)) {
+                    const distance = Math.sqrt(dx * dx + dz * dz);
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestValidPos = testPos;
+                    }
+                }
+            }
+        }
+        
+        return closestValidPos;
+    }
+    
+    canPlaceOnSurface(draggedData, targetMesh, proposedPosition) {
+        // Check if unit can be placed on the surface of target at the proposed position
+        const targetData = targetMesh.userData;
+        const targetPosition = targetMesh.position;
+        
+        // First check if the unit physically fits within the bounds
+        const fitsOnTop = this.canFitOnTop(draggedData, targetData, proposedPosition, targetPosition);
+        if (!fitsOnTop) {
+            // Silently reject - unit doesn't fit on top
+            return false;
+        }
+        
+        // Check if stacking is allowed on this target at the proposed position
+        const canStack = this.canStackOn(targetMesh, proposedPosition);
+        if (!canStack) {
+            // Silently reject - cannot stack on this target
+            return false;
+        }
+        
+        // Check for collisions with other units on the same level
+        const targetTopY = targetPosition.y + targetData.height / 2;
+        const draggedBottomY = proposedPosition.y - draggedData.height / 2;
+        
+        // Ensure the unit is actually on top (not floating or embedded)
+        if (Math.abs(draggedBottomY - targetTopY) > 0.01) {
+            // Silently reject - not properly on top
+            return false;
+        }
+        
+        // Check for collisions with other units at the same Y level
+        const tolerance = 0.01;
+        const draggedHalfLength = draggedData.length / 2;
+        const draggedHalfWidth = draggedData.width / 2;
+        const draggedHalfHeight = draggedData.height / 2;
+        
+        for (let mesh of this.cargoMeshes) {
+            if (this.draggedObjects.includes(mesh) || mesh === targetMesh) continue;
+            
+            const otherData = mesh.userData;
+            const otherHalfLength = otherData.length / 2;
+            const otherHalfWidth = otherData.width / 2;
+            const otherHalfHeight = otherData.height / 2;
+            
+            // Check if units are at the same floor level (same Y position)
+            const sameFloor = Math.abs(mesh.position.y - proposedPosition.y) < tolerance;
+            
+            if (sameFloor) {
+                // Check X/Z collision between units on the same floor
+                // Use <= to allow exact touching without overlap
+                const xOverlap = Math.abs(proposedPosition.x - mesh.position.x) <= 
+                                (draggedHalfLength + otherHalfLength);
+                const zOverlap = Math.abs(proposedPosition.z - mesh.position.z) <= 
+                                (draggedHalfWidth + otherHalfWidth);
+                
+                // But they can't be at exactly the same position (would be inside each other)
+                const samePosition = Math.abs(proposedPosition.x - mesh.position.x) < 0.001 && 
+                                    Math.abs(proposedPosition.z - mesh.position.z) < 0.001;
+                
+                if (xOverlap && zOverlap && !samePosition) {
+                    // Check if units are truly overlapping (not just touching)
+                    const xDistance = Math.abs(proposedPosition.x - mesh.position.x);
+                    const zDistance = Math.abs(proposedPosition.z - mesh.position.z);
+                    const xSum = draggedHalfLength + otherHalfLength;
+                    const zSum = draggedHalfWidth + otherHalfWidth;
+                    
+                    // Units are overlapping if distance is less than sum of half-dimensions
+                    // Allow exact touching (distance == sum) with small tolerance for floating point
+                    const xOverlapping = xDistance < (xSum - 0.001);
+                    const zOverlapping = zDistance < (zSum - 0.001);
+                    
+                    if (xOverlapping && zOverlapping) {
+                        return false; // Units are overlapping
+                    }
+                }
+            }
+        }
+        
+        // All checks passed - can place on surface
+        return true;
     }
     
     // Removed createGhostMesh - no longer using ghost preview
@@ -2958,6 +3383,7 @@ class Scene3D {
     checkValidSinglePosition(position) {
         if (!this.containerBounds || !this.draggedObjects[0]) return false;
         
+        
         // Special handling for steel coils in groove
         const firstItem = this.draggedObjects[0].userData;
         if (firstItem.fixedDiameter && this.containerBounds.hasGroove) {
@@ -3016,6 +3442,9 @@ class Scene3D {
         }
         
         // Check each dragged object for validity
+        // Get the offset of the first dragged object (the one being directly moved)
+        const firstObject = this.draggedObjects[0];
+        
         for (let i = 0; i < this.draggedObjects.length; i++) {
             const draggedMesh = this.draggedObjects[i];
             const draggedData = draggedMesh.userData;
@@ -3023,27 +3452,31 @@ class Scene3D {
             const halfLength = draggedData.length / 2;
             const halfHeight = draggedData.height / 2;
             
-            // Calculate position for this object in the stack
-            const objectPosition = position.clone();
-            if (i > 0) {
-                // Adjust Y position for stacked objects
-                let stackHeight = 0;
-                for (let j = 0; j < i; j++) {
-                    stackHeight += this.draggedObjects[j].userData.height;
-                }
-                objectPosition.y = position.y + stackHeight;
-            }
+            // Calculate position for this object maintaining relative positions
+            const relativeOffset = {
+                x: draggedMesh.position.x - firstObject.position.x,
+                y: draggedMesh.position.y - firstObject.position.y,
+                z: draggedMesh.position.z - firstObject.position.z
+            };
+            
+            const objectPosition = new THREE.Vector3(
+                position.x + relativeOffset.x,
+                position.y + relativeOffset.y,
+                position.z + relativeOffset.z
+            );
             
             // Check if this object is within container bounds
+            // Allow 1mm tolerance for height to handle exact fit scenarios
             if (objectPosition.x - halfLength < this.containerBounds.min.x ||
                 objectPosition.x + halfLength > this.containerBounds.max.x ||
                 objectPosition.z - halfWidth < this.containerBounds.min.z ||
                 objectPosition.z + halfWidth > this.containerBounds.max.z ||
-                objectPosition.y + halfHeight > this.containerBounds.max.y) {
+                objectPosition.y + halfHeight > this.containerBounds.max.y + 0.001) {
                 return false; // Outside container bounds
             }
             
             // Check for collisions with other cargo
+            
             for (let mesh of this.cargoMeshes) {
                 // Skip the dragged objects
                 if (this.draggedObjects.includes(mesh)) continue;
@@ -3076,20 +3509,54 @@ class Scene3D {
                 } else {
                     // Regular rectangular collision detection
                     // Check if boxes would overlap in X and Z
-                    const overlapX = Math.abs(objectPosition.x - mesh.position.x) < (halfLength + targetHalfLength - 0.01);
-                    const overlapZ = Math.abs(objectPosition.z - mesh.position.z) < (halfWidth + targetHalfWidth - 0.01);
+                    const xDistance = Math.abs(objectPosition.x - mesh.position.x);
+                    const zDistance = Math.abs(objectPosition.z - mesh.position.z);
+                    const xSum = halfLength + targetHalfLength;
+                    const zSum = halfWidth + targetHalfWidth;
+                    
+                    // Check for actual overlap (not just touching)
+                    const overlapX = xDistance < (xSum - 0.001);
+                    const overlapZ = zDistance < (zSum - 0.001);
+                    
                     
                     if (overlapX && overlapZ) {
                         // Check if we're at the same height level (collision)
                         const heightOverlap = Math.abs(objectPosition.y - mesh.position.y) < (halfHeight + targetHalfHeight - 0.01);
                         
                         if (heightOverlap) {
-                            // Check if this is a valid stacking position
-                            const isStacking = Math.abs(objectPosition.y - (mesh.position.y + targetHalfHeight + halfHeight)) < 0.1;
-                            const canStack = this.canStackOn(mesh) && this.canFitOnTop(draggedData, targetData);
+                            // Check if units are at the same floor level (same Y position)
+                            const sameFloor = Math.abs(objectPosition.y - mesh.position.y) < 0.1;
                             
-                            if (!isStacking || !canStack) {
-                                return false; // Collision or invalid stacking
+                            if (sameFloor) {
+                                // Units on the same floor - this is a collision
+                                return false;
+                            } else {
+                                // Check if this is a valid stacking position
+                                const isAbove = objectPosition.y > mesh.position.y;
+                                if (isAbove) {
+                                    // Check if we're directly on top
+                                    const expectedStackY = mesh.position.y + targetHalfHeight + halfHeight;
+                                    const isDirectlyOnTop = Math.abs(objectPosition.y - expectedStackY) < 0.1;
+                                    
+                                    if (isDirectlyOnTop) {
+                                        // We're stacking - check if it's allowed
+                                        const proposedPos = new THREE.Vector3(
+                                            objectPosition.x,
+                                            objectPosition.y,
+                                            objectPosition.z
+                                        );
+                                        const canPlace = this.canPlaceOnSurface(draggedData, mesh, proposedPos);
+                                        if (!canPlace) {
+                                            return false; // Can't stack here
+                                        }
+                                    } else {
+                                        // Floating or embedded - not allowed
+                                        return false;
+                                    }
+                                } else {
+                                    // Unit is below - this shouldn't happen in normal dragging
+                                    return false;
+                                }
                             }
                         }
                     }
@@ -3110,7 +3577,7 @@ class Scene3D {
         return methods.map(m => methodNames[m] || m).join(', ');
     }
     
-    canStackOn(targetMesh) {
+    canStackOn(targetMesh, proposedPosition = null) {
         // Check if the target allows stacking
         const targetData = targetMesh.userData;
         const draggedData = this.draggedObjects[0]?.userData;
@@ -3135,6 +3602,11 @@ class Scene3D {
             }
         }
         
+        // Only horizontal rolls can stack on horizontal rolls
+        if (targetData.isHorizontalRoll && !draggedData.isHorizontalRoll) {
+            return false;
+        }
+        
         // Don't allow mixing vertical and horizontal rolls
         if ((draggedData.isVerticalRoll && targetData.isHorizontalRoll) ||
             (draggedData.isHorizontalRoll && targetData.isVerticalRoll)) {
@@ -3150,52 +3622,151 @@ class Scene3D {
             draggedStackWeight += obj.userData.weight || 0;
         }
         
-        // Find ALL units in the target stack (below and including target)
-        const stackUnits = [];
+        // Find ALL units that support the target (including the target itself)
+        const supportingUnits = new Set([targetMesh]);
         const tolerance = 0.1;
         
-        // First, find all units at this X/Z position
-        for (let mesh of this.cargoMeshes) {
-            if (this.draggedObjects.includes(mesh)) continue;
+        // Recursive function to find all units that support a given unit
+        const findSupportingUnits = (unit) => {
+            const unitBottom = unit.position.y - unit.userData.height / 2;
+            const unitHalfLength = unit.userData.length / 2;
+            const unitHalfWidth = unit.userData.width / 2;
             
-            if (Math.abs(mesh.position.x - targetMesh.position.x) < tolerance &&
-                Math.abs(mesh.position.z - targetMesh.position.z) < tolerance &&
-                mesh.position.y <= targetMesh.position.y + tolerance) {
-                stackUnits.push(mesh);
+            for (let mesh of this.cargoMeshes) {
+                if (this.draggedObjects.includes(mesh) || supportingUnits.has(mesh)) continue;
+                
+                const meshTop = mesh.position.y + mesh.userData.height / 2;
+                const meshHalfLength = mesh.userData.length / 2;
+                const meshHalfWidth = mesh.userData.width / 2;
+                
+                // Check if this mesh supports our unit (unit is on top of mesh)
+                if (Math.abs(unitBottom - meshTop) < tolerance) {
+                    // Check if there's an overlap in X/Z
+                    const xOverlap = Math.abs(mesh.position.x - unit.position.x) < 
+                                    (unitHalfLength + meshHalfLength);
+                    const zOverlap = Math.abs(mesh.position.z - unit.position.z) < 
+                                    (unitHalfWidth + meshHalfWidth);
+                    
+                    if (xOverlap && zOverlap) {
+                        // This mesh supports our unit
+                        supportingUnits.add(mesh);
+                        // Recursively find what supports this mesh
+                        findSupportingUnits(mesh);
+                    }
+                }
             }
-        }
+        };
         
-        // Sort by Y position (bottom to top)
+        // Find all supporting units recursively
+        findSupportingUnits(targetMesh);
+        
+        // Convert to array and sort by Y position (bottom to top)
+        const stackUnits = Array.from(supportingUnits);
         stackUnits.sort((a, b) => a.position.y - b.position.y);
         
-        // Check EACH unit in the stack from bottom up to see if it allows more units above it
+        // Check EACH supporting unit to see if it can handle the additional weight
         for (let unit of stackUnits) {
             const unitData = unit.userData;
             const maxStack = unitData.maxStack !== undefined ? unitData.maxStack : 1;
             const maxStackWeight = unitData.maxStackWeight !== undefined ? unitData.maxStackWeight : Infinity;
             
-            // Count how many units are currently ABOVE this specific unit and their total weight
-            let unitsAbove = 0;
-            let weightAbove = 0;
-            for (let mesh of this.cargoMeshes) {
-                if (this.draggedObjects.includes(mesh)) continue;
+            // Find all units supported by this unit (directly or indirectly)
+            const supportedUnits = new Set();
+            const floorsAbove = new Map(); // Map of floor level to units on that floor
+            
+            // Get the top of our base unit
+            const unitTop = unit.position.y + unit.userData.height / 2;
+            
+            // Recursive function to find all units supported by a given unit
+            const findSupportedByUnit = (baseUnit, currentFloorLevel = 0) => {
+                const baseTop = baseUnit.position.y + baseUnit.userData.height / 2;
+                const baseHalfLength = baseUnit.userData.length / 2;
+                const baseHalfWidth = baseUnit.userData.width / 2;
                 
-                if (Math.abs(mesh.position.x - unit.position.x) < tolerance &&
-                    Math.abs(mesh.position.z - unit.position.z) < tolerance &&
-                    mesh.position.y > unit.position.y + tolerance) {
-                    unitsAbove++;
-                    weightAbove += mesh.userData.weight || 0;
+                for (let mesh of this.cargoMeshes) {
+                    if (this.draggedObjects.includes(mesh) || supportedUnits.has(mesh)) continue;
+                    if (mesh === unit) continue; // Don't count the unit itself
+                    
+                    const meshBottom = mesh.position.y - mesh.userData.height / 2;
+                    const meshHalfLength = mesh.userData.length / 2;
+                    const meshHalfWidth = mesh.userData.width / 2;
+                    
+                    // Check if this mesh is directly on top of baseUnit
+                    if (Math.abs(meshBottom - baseTop) < tolerance) {
+                        // Check if there's an overlap in X/Z
+                        const xOverlap = Math.abs(mesh.position.x - baseUnit.position.x) < 
+                                        (meshHalfLength + baseHalfLength);
+                        const zOverlap = Math.abs(mesh.position.z - baseUnit.position.z) < 
+                                        (meshHalfWidth + baseHalfWidth);
+                        
+                        if (xOverlap && zOverlap) {
+                            // This mesh is supported by baseUnit
+                            supportedUnits.add(mesh);
+                            
+                            // Calculate which floor this is on (relative to our base unit)
+                            // Floor 1 = directly on unit, Floor 2 = on top of floor 1, etc.
+                            const nextFloorLevel = currentFloorLevel + 1;
+                            
+                            if (!floorsAbove.has(nextFloorLevel)) {
+                                floorsAbove.set(nextFloorLevel, new Set());
+                            }
+                            floorsAbove.get(nextFloorLevel).add(mesh);
+                            
+                            // Recursively find what this mesh supports
+                            findSupportedByUnit(mesh, nextFloorLevel);
+                        }
+                    }
+                }
+            };
+            
+            // Start from the current unit and find everything it supports
+            findSupportedByUnit(unit, 0);
+            
+            // Calculate total weight of all supported units
+            let weightAbove = 0;
+            for (let mesh of supportedUnits) {
+                weightAbove += mesh.userData.weight || 0;
+            }
+            
+            // The number of floors above is what counts for maxStack
+            // This is the highest floor level we found
+            const numFloorsAbove = floorsAbove.size > 0 ? Math.max(...floorsAbove.keys()) : 0;
+            
+            // Check if adding the dragged unit would create too many floors
+            // When placing units side by side on the same floor, it doesn't increase floor count
+            // Only placing units on top of existing units increases floor count
+            let additionalFloors = 1; // Assume we're adding one new floor
+            
+            if (proposedPosition) {
+                // Check if we're placing at an existing floor level
+                // We need to check if the proposed Y position matches any existing floor
+                const proposedBottom = proposedPosition.y - draggedData.height / 2;
+                
+                // Check each floor to see if we're adding to it
+                for (const [floorLevel, unitsOnFloor] of floorsAbove) {
+                    // Check if any unit on this floor has the same bottom Y as our proposed position
+                    for (const floorUnit of unitsOnFloor) {
+                        const floorUnitBottom = floorUnit.position.y - floorUnit.userData.height / 2;
+                        if (Math.abs(proposedBottom - floorUnitBottom) < tolerance) {
+                            // We're adding to an existing floor
+                            additionalFloors = 0;
+                            break;
+                        }
+                    }
+                    if (additionalFloors === 0) break;
                 }
             }
             
-            // Check if adding the ENTIRE dragged stack would exceed this unit's count limit
-            // We're adding draggedStackSize units on top
-            if (unitsAbove + draggedStackSize > maxStack) {
-                return false; // This unit can't support the additional dragged stack
+            // Removed verbose stack check log
+            
+            if (numFloorsAbove + additionalFloors > maxStack) {
+                // Too many floors - silently reject
+                return false; // This unit can't support additional floors
             }
             
             // Check if adding the ENTIRE dragged stack would exceed this unit's weight limit
             if (weightAbove + draggedStackWeight > maxStackWeight) {
+                // Too much weight - silently reject
                 return false; // This unit can't support the additional weight
             }
         }
@@ -3205,15 +3776,27 @@ class Scene3D {
             // Get the height of the top unit in target stack
             const topTargetY = targetMesh.position.y + targetData.height / 2;
             
-            // Calculate total height of dragged stack
-            let draggedStackHeight = 0;
+            // Find the highest point in the dragged stack
+            let highestDraggedY = -Infinity;
+            let lowestDraggedY = Infinity;
             for (let obj of this.draggedObjects) {
-                draggedStackHeight += obj.userData.height;
+                const objTop = obj.position.y + obj.userData.height / 2;
+                const objBottom = obj.position.y - obj.userData.height / 2;
+                if (objTop > highestDraggedY) {
+                    highestDraggedY = objTop;
+                }
+                if (objBottom < lowestDraggedY) {
+                    lowestDraggedY = objBottom;
+                }
             }
             
+            // Calculate the actual height of the dragged stack
+            const draggedStackHeight = highestDraggedY - lowestDraggedY;
+            
             // Check if placing dragged stack on top would exceed container height
+            // Allow 1mm tolerance for exact fit scenarios
             const newTopY = topTargetY + draggedStackHeight;
-            if (newTopY > this.containerBounds.max.y) {
+            if (newTopY > this.containerBounds.max.y + 0.001) {
                 return false; // Stack would be too tall for container
             }
         }
@@ -3446,17 +4029,23 @@ class Scene3D {
         const meshWorldPos = new THREE.Vector3();
         mesh.getWorldPosition(meshWorldPos);
         
-        // Define 8 vertices of the box in world coordinates
+        // Define 8 vertices of the box in local coordinates, then transform them
         const vertices = [
-            new THREE.Vector3(-halfLength, -halfHeight, -halfWidth).add(meshWorldPos),
-            new THREE.Vector3(halfLength, -halfHeight, -halfWidth).add(meshWorldPos),
-            new THREE.Vector3(halfLength, -halfHeight, halfWidth).add(meshWorldPos),
-            new THREE.Vector3(-halfLength, -halfHeight, halfWidth).add(meshWorldPos),
-            new THREE.Vector3(-halfLength, halfHeight, -halfWidth).add(meshWorldPos),
-            new THREE.Vector3(halfLength, halfHeight, -halfWidth).add(meshWorldPos),
-            new THREE.Vector3(halfLength, halfHeight, halfWidth).add(meshWorldPos),
-            new THREE.Vector3(-halfLength, halfHeight, halfWidth).add(meshWorldPos)
+            new THREE.Vector3(-halfLength, -halfHeight, -halfWidth),
+            new THREE.Vector3(halfLength, -halfHeight, -halfWidth),
+            new THREE.Vector3(halfLength, -halfHeight, halfWidth),
+            new THREE.Vector3(-halfLength, -halfHeight, halfWidth),
+            new THREE.Vector3(-halfLength, halfHeight, -halfWidth),
+            new THREE.Vector3(halfLength, halfHeight, -halfWidth),
+            new THREE.Vector3(halfLength, halfHeight, halfWidth),
+            new THREE.Vector3(-halfLength, halfHeight, halfWidth)
         ];
+        
+        // Apply mesh rotation to vertices and then add world position
+        vertices.forEach(vertex => {
+            vertex.applyQuaternion(mesh.quaternion);
+            vertex.add(meshWorldPos);
+        });
         
         // Find closest vertex to camera
         let closestVertex = vertices[0];
@@ -3472,45 +4061,51 @@ class Scene3D {
             }
         }
         
-        // Define face normals and centers (in local space)
+        // Define face normals and centers (in local space, then transform)
         const faces = [
             { 
                 normal: new THREE.Vector3(1, 0, 0), 
                 dimension: 'length', 
                 axis: 'x',
-                center: new THREE.Vector3(halfLength, 0, 0).add(meshWorldPos)
+                center: new THREE.Vector3(halfLength, 0, 0)
             },   // Right face
             { 
                 normal: new THREE.Vector3(-1, 0, 0), 
                 dimension: 'length', 
                 axis: 'x',
-                center: new THREE.Vector3(-halfLength, 0, 0).add(meshWorldPos)
+                center: new THREE.Vector3(-halfLength, 0, 0)
             },  // Left face
             { 
                 normal: new THREE.Vector3(0, 1, 0), 
                 dimension: 'height', 
                 axis: 'y',
-                center: new THREE.Vector3(0, halfHeight, 0).add(meshWorldPos)
+                center: new THREE.Vector3(0, halfHeight, 0)
             },   // Top face
             { 
                 normal: new THREE.Vector3(0, -1, 0), 
                 dimension: 'height', 
                 axis: 'y',
-                center: new THREE.Vector3(0, -halfHeight, 0).add(meshWorldPos)
+                center: new THREE.Vector3(0, -halfHeight, 0)
             },  // Bottom face
             { 
                 normal: new THREE.Vector3(0, 0, 1), 
                 dimension: 'width', 
                 axis: 'z',
-                center: new THREE.Vector3(0, 0, halfWidth).add(meshWorldPos)
+                center: new THREE.Vector3(0, 0, halfWidth)
             },    // Front face
             { 
                 normal: new THREE.Vector3(0, 0, -1), 
                 dimension: 'width', 
                 axis: 'z',
-                center: new THREE.Vector3(0, 0, -halfWidth).add(meshWorldPos)
+                center: new THREE.Vector3(0, 0, -halfWidth)
             }    // Back face
         ];
+        
+        // Apply mesh rotation to face centers and add world position
+        faces.forEach(face => {
+            face.center.applyQuaternion(mesh.quaternion);
+            face.center.add(meshWorldPos);
+        });
         
         // Get camera direction
         const cameraDir = new THREE.Vector3();
@@ -3751,40 +4346,47 @@ class Scene3D {
                 let dimensionText;
                 let shouldShowLabel = true;
                 
+                // Get group name and weight for cylindrical units
+                const groupName = mesh.userData.name || 'Jednostka';
+                const weight = mesh.userData.weight || 0;
+                
                 if (isSteelCoil) {
-                    // Steel Coil: show length and radius (only once)
+                    // Steel Coil: show length and diameter (only once)
                     if (edge.dimension === 'length') {
                         dimensionValue = dimensions.length;
-                        dimensionText = `${dimensionValue} cm`;
+                        // Add name and weight to length label
+                        dimensionText = `${dimensionValue} cm\n${groupName}\n${weight} kg`;
                     } else if ((edge.dimension === 'width' || edge.dimension === 'height') && !radiusShown) {
-                        // Show radius only once, on the first width/height edge
-                        dimensionValue = dimensions.radius;
+                        // Show diameter only once, on the first width/height edge
+                        dimensionValue = dimensions.diameter;
                         dimensionText = `${dimensionValue} cm`;
                         radiusShown = true;
                     } else {
                         shouldShowLabel = false;
                     }
                 } else if (isRoll && isVerticalRoll) {
-                    // Vertical Roll: show height and radius (only once)
+                    // Vertical Roll: show height and diameter (only once)
                     if (edge.dimension === 'height') {
                         dimensionValue = dimensions.height;
-                        dimensionText = `${dimensionValue} cm`;
+                        // Add name and weight to height label (for vertical roll)
+                        dimensionText = `${dimensionValue} cm\n${groupName}\n${weight} kg`;
                     } else if ((edge.dimension === 'length' || edge.dimension === 'width') && !radiusShown) {
-                        // Show radius only once, on the first length/width edge
-                        dimensionValue = dimensions.radius;
+                        // Show diameter only once, on the first length/width edge
+                        dimensionValue = dimensions.diameter;
                         dimensionText = `${dimensionValue} cm`;
                         radiusShown = true;
                     } else {
                         shouldShowLabel = false;
                     }
                 } else if (isRoll && !isVerticalRoll) {
-                    // Horizontal Roll: show length and radius (only once)
+                    // Horizontal Roll: show length and diameter (only once)
                     if (edge.dimension === 'length') {
                         dimensionValue = dimensions.length;
-                        dimensionText = `${dimensionValue} cm`;
+                        // Add name and weight to length label
+                        dimensionText = `${dimensionValue} cm\n${groupName}\n${weight} kg`;
                     } else if ((edge.dimension === 'width' || edge.dimension === 'height') && !radiusShown) {
-                        // Show radius only once, on the first width/height edge
-                        dimensionValue = dimensions.radius;
+                        // Show diameter only once, on the first width/height edge
+                        dimensionValue = dimensions.diameter;
                         dimensionText = `${dimensionValue} cm`;
                         radiusShown = true;
                     } else {
@@ -3832,17 +4434,32 @@ class Scene3D {
                                 radiusEnd = new THREE.Vector3(xOffset, halfWidth, 0);
                             }
                         } else if (isHeight || isLength) {
-                            // Height/Length label - position at center of cylinder body
-                            labelPosition = new THREE.Vector3(0, 0, 0).add(meshWorldPos);
-                            // Create dummy line for text orientation
+                            // Height/Length label - position at center of cylinder LENGTH FACE (not cylinder center)
                             if (isHeight) {
+                                // Vertical Roll - position on the side surface of cylinder
+                                // Choose front or back based on camera position
+                                const zOffset = cameraRelative.z > 0 ? halfWidth : -halfWidth;
+                                labelPosition = new THREE.Vector3(0, 0, zOffset).add(meshWorldPos);
                                 // Vertical line for height
-                                radiusStart = new THREE.Vector3(0, -halfHeight, 0);
-                                radiusEnd = new THREE.Vector3(0, halfHeight, 0);
+                                radiusStart = new THREE.Vector3(0, -halfHeight, zOffset);
+                                radiusEnd = new THREE.Vector3(0, halfHeight, zOffset);
                             } else {
-                                // Horizontal line for length
-                                radiusStart = new THREE.Vector3(-halfLength, 0, 0);
-                                radiusEnd = new THREE.Vector3(halfLength, 0, 0);
+                                // Horizontal Roll/Steel Coil - position on the visible curved surface
+                                // Calculate the optimal position on the cylinder's circumference
+                                // Project camera direction onto the YZ plane (perpendicular to cylinder axis)
+                                const cameraDir = cameraRelative.clone().normalize();
+                                
+                                // For horizontal cylinder (along X axis), we need angle in YZ plane
+                                const angleToCamera = Math.atan2(cameraDir.z, cameraDir.y);
+                                
+                                // Position label on the surface facing the camera
+                                const yOffset = Math.cos(angleToCamera) * halfHeight;
+                                const zOffset = Math.sin(angleToCamera) * halfWidth;
+                                
+                                labelPosition = new THREE.Vector3(0, yOffset, zOffset).add(meshWorldPos);
+                                // Horizontal line for length at the same position
+                                radiusStart = new THREE.Vector3(-halfLength, yOffset, zOffset);
+                                radiusEnd = new THREE.Vector3(halfLength, yOffset, zOffset);
                             }
                         }
                         
@@ -4029,21 +4646,36 @@ class Scene3D {
         let baseScaleY = 0.05; // Default
         
         if (mesh) {
-            // Get face dimensions
+            // Get face dimensions - we need to compute actual face dimensions in world space
+            // Transform the face normal to world space to determine actual face orientation
+            const worldNormal = face.normal.clone();
+            worldNormal.applyQuaternion(mesh.quaternion);
+            
+            // Determine which world axis the face is most aligned with
+            const absX = Math.abs(worldNormal.x);
+            const absY = Math.abs(worldNormal.y);
+            const absZ = Math.abs(worldNormal.z);
+            
             let faceWidth, faceHeight;
             
-            if (face.axis === 'x') {
-                // Left/Right face
-                faceWidth = mesh.userData.width;
-                faceHeight = mesh.userData.height;
-            } else if (face.axis === 'y') {
-                // Top/Bottom face
-                faceWidth = mesh.userData.length;
-                faceHeight = mesh.userData.width;
-            } else if (face.axis === 'z') {
-                // Front/Back face
-                faceWidth = mesh.userData.length;
-                faceHeight = mesh.userData.height;
+            // Original dimensions
+            const length = mesh.userData.length;
+            const width = mesh.userData.width;
+            const height = mesh.userData.height;
+            
+            // Determine face dimensions based on world-space normal orientation
+            if (absX > absY && absX > absZ) {
+                // Face is perpendicular to X axis (left/right face)
+                faceWidth = width;
+                faceHeight = height;
+            } else if (absY > absX && absY > absZ) {
+                // Face is perpendicular to Y axis (top/bottom face)
+                faceWidth = length;
+                faceHeight = width;
+            } else {
+                // Face is perpendicular to Z axis (front/back face)
+                faceWidth = length;
+                faceHeight = height;
             }
             
             // Use smaller dimension to ensure label fits
@@ -4052,42 +4684,57 @@ class Scene3D {
             // Create points for the smaller dimension
             const halfDim = smallerDimension / 2;
             
+            // Get dimensions from userData for creating points
+            const halfLength = mesh.userData.length / 2;
+            const halfWidth = mesh.userData.width / 2;
+            const halfHeight = mesh.userData.height / 2;
+            
+            // Get mesh world position
+            const meshWorldPos = new THREE.Vector3();
+            mesh.getWorldPosition(meshWorldPos);
+            
             // Create two points on the face to measure screen size
-            let point1, point2;
+            // We need to create points in local space first, then transform
+            let localPoint1, localPoint2;
             if (faceWidth < faceHeight || (faceWidth === faceHeight)) {
                 // Measure width
-                point1 = face.center.clone();
-                point2 = face.center.clone();
                 if (face.axis === 'x') {
-                    point1.z += halfDim;
-                    point2.z -= halfDim;
+                    // Left/Right face - measure along Z axis
+                    localPoint1 = new THREE.Vector3(face.axis === 'x' && face.normal.x > 0 ? halfLength : -halfLength, 0, halfDim);
+                    localPoint2 = new THREE.Vector3(face.axis === 'x' && face.normal.x > 0 ? halfLength : -halfLength, 0, -halfDim);
                 } else if (face.axis === 'y') {
-                    point1.x += halfDim;
-                    point2.x -= halfDim;
+                    // Top/Bottom face - measure along X axis
+                    localPoint1 = new THREE.Vector3(halfDim, face.normal.y > 0 ? halfHeight : -halfHeight, 0);
+                    localPoint2 = new THREE.Vector3(-halfDim, face.normal.y > 0 ? halfHeight : -halfHeight, 0);
                 } else if (face.axis === 'z') {
-                    point1.x += halfDim;
-                    point2.x -= halfDim;
+                    // Front/Back face - measure along X axis
+                    localPoint1 = new THREE.Vector3(halfDim, 0, face.normal.z > 0 ? halfWidth : -halfWidth);
+                    localPoint2 = new THREE.Vector3(-halfDim, 0, face.normal.z > 0 ? halfWidth : -halfWidth);
                 }
             } else {
                 // Measure height
-                point1 = face.center.clone();
-                point2 = face.center.clone();
                 if (face.axis === 'x') {
-                    point1.y += halfDim;
-                    point2.y -= halfDim;
+                    // Left/Right face - measure along Y axis
+                    localPoint1 = new THREE.Vector3(face.normal.x > 0 ? halfLength : -halfLength, halfDim, 0);
+                    localPoint2 = new THREE.Vector3(face.normal.x > 0 ? halfLength : -halfLength, -halfDim, 0);
                 } else if (face.axis === 'y') {
-                    point1.z += halfDim;
-                    point2.z -= halfDim;
+                    // Top/Bottom face - measure along Z axis
+                    localPoint1 = new THREE.Vector3(0, face.normal.y > 0 ? halfHeight : -halfHeight, halfDim);
+                    localPoint2 = new THREE.Vector3(0, face.normal.y > 0 ? halfHeight : -halfHeight, -halfDim);
                 } else if (face.axis === 'z') {
-                    point1.y += halfDim;
-                    point2.y -= halfDim;
+                    // Front/Back face - measure along Y axis
+                    localPoint1 = new THREE.Vector3(0, halfDim, face.normal.z > 0 ? halfWidth : -halfWidth);
+                    localPoint2 = new THREE.Vector3(0, -halfDim, face.normal.z > 0 ? halfWidth : -halfWidth);
                 }
             }
             
-            // Apply mesh rotation to points
-            const meshRotation = mesh.quaternion;
-            point1.applyQuaternion(meshRotation);
-            point2.applyQuaternion(meshRotation);
+            // Transform points from local to world space
+            const point1 = localPoint1.clone();
+            const point2 = localPoint2.clone();
+            point1.applyQuaternion(mesh.quaternion);
+            point2.applyQuaternion(mesh.quaternion);
+            point1.add(meshWorldPos);
+            point2.add(meshWorldPos);
             
             // Project to screen space
             const screen1 = point1.clone().project(this.camera);
@@ -4123,16 +4770,62 @@ class Scene3D {
     }
     
     createDimensionLabel(position, text, edgeStart, edgeEnd, edgeDimension, mesh) {
+        // Check if text has multiple lines
+        const lines = text.split('\n');
+        const isMultiLine = lines.length > 1;
+        
+        // Check if this is for a vertical roll HEIGHT label (not radius)
+        // We only rotate the height label, not the radius label
+        const isVerticalRoll = mesh && mesh.userData && mesh.userData.isRoll && mesh.userData.isVerticalRoll;
+        // Check if this is specifically the height dimension (not radius)
+        const isHeightLabel = isVerticalRoll && isMultiLine && lines[0].includes('cm') && lines.length > 2;
+        
+        // Calculate if we need to flip the vertical roll label based on camera position
+        let needsFlip = false;
+        if (isHeightLabel && edgeStart && edgeEnd) {
+            // Get edge vector in screen space
+            const edge3D = new THREE.Vector3().subVectors(edgeEnd, edgeStart);
+            const edgeScreenStart = edgeStart.clone().project(this.camera);
+            const edgeScreenEnd = edgeEnd.clone().project(this.camera);
+            
+            // Calculate screen space edge vector
+            const edgeScreen = new THREE.Vector2(
+                edgeScreenEnd.x - edgeScreenStart.x,
+                edgeScreenEnd.y - edgeScreenStart.y
+            );
+            
+            // For vertical roll height labels, the edge is vertical in 3D
+            // After 90° rotation, text baseline will be perpendicular to the edge
+            // Check if the edge appears more left-to-right or right-to-left on screen
+            // If edge goes from right to left (negative X), we need to flip
+            needsFlip = edgeScreen.x < 0;
+        }
+        
         // Create canvas for text
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 64;
+        canvas.width = isMultiLine ? 256 : 256;   // Same width as single-line
+        canvas.height = isMultiLine ? 128 : 64;   // Reduced height for tighter spacing
         const context = canvas.getContext('2d');
         
         context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = 'high';
         
         context.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // For vertical roll HEIGHT labels only, rotate the canvas context
+        if (isHeightLabel) {
+            // Save the context state
+            context.save();
+            // Move to center of canvas
+            context.translate(canvas.width / 2, canvas.height / 2);
+            // Rotate 90 degrees clockwise or counter-clockwise based on camera
+            if (needsFlip) {
+                context.rotate(-Math.PI / 2);  // Counter-clockwise for flipped text
+            } else {
+                context.rotate(Math.PI / 2);   // Clockwise for normal orientation
+            }
+            // Now drawing will be relative to the rotated coordinate system
+        }
         
         // Add shadow for better contrast (same style as ruler)
         context.shadowColor = 'rgba(0, 0, 0, 0.8)';
@@ -4142,10 +4835,32 @@ class Scene3D {
         
         // Draw text in white (same style as ruler)
         context.fillStyle = '#FFFFFF';
-        context.font = 'bold 32px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';  // Increased font size
+        context.font = 'bold 32px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';  // Same font size for all labels
         context.textAlign = 'center';
         context.textBaseline = 'middle';
-        context.fillText(text, canvas.width / 2, canvas.height / 2);
+        
+        if (isMultiLine) {
+            // Draw each line separately for multi-line text
+            const lineHeight = 38;  // Tighter line spacing for better readability
+            const startY = isHeightLabel ? 0 : canvas.height / 2 - (lines.length - 1) * lineHeight / 2;
+            
+            lines.forEach((line, index) => {
+                if (isHeightLabel) {
+                    // For rotated context, draw at origin with offset
+                    context.fillText(line, 0, -((lines.length - 1) * lineHeight / 2) + index * lineHeight);
+                } else {
+                    context.fillText(line, canvas.width / 2, startY + index * lineHeight);
+                }
+            });
+        } else {
+            // Single line text
+            context.fillText(text, canvas.width / 2, canvas.height / 2);
+        }
+        
+        // Restore context if it was rotated
+        if (isHeightLabel) {
+            context.restore();
+        }
         
         const texture = new THREE.CanvasTexture(canvas);
         texture.needsUpdate = true;
@@ -4163,12 +4878,13 @@ class Scene3D {
         
         const sprite = new THREE.Sprite(spriteMaterial);
         
-        // Base scale for good visibility
-        let baseScaleX = 0.15;  // Further reduced for smaller labels
-        let baseScaleY = 0.04;   // Proportionally reduced
+        // Base scale for good visibility (isMultiLine already declared above)
+        // Canvas is 256x128 for multi-line (ratio 2:1), 256x64 for single (ratio 4:1)
+        let baseScaleX = isMultiLine ? 0.15 : 0.15;  // Same width as radius labels
+        let baseScaleY = isMultiLine ? 0.075 : 0.04;   // 2x height for tighter multi-line text
         
         // Fixed absolute maximum scale regardless of zoom
-        const absoluteMaxScale = 0.08; // Strict absolute maximum size
+        const absoluteMaxScale = isMultiLine ? 0.12 : 0.08; // Reasonable max for multi-line labels
         
         // Calculate maximum scale based on 1 meter at container origin
         let maxScaleBasedOnMeter = absoluteMaxScale;
@@ -4215,7 +4931,8 @@ class Scene3D {
         }
         
         // If we have mesh and edge dimension, calculate scale based on edge but limited by meter scale
-        if (mesh && edgeDimension) {
+        // Skip this limiting logic for multi-line labels - they need to be larger
+        if (mesh && edgeDimension && !isMultiLine) {
             // Get mesh world position and scale
             const meshWorldPos = new THREE.Vector3();
             mesh.getWorldPosition(meshWorldPos);
@@ -4258,13 +4975,14 @@ class Scene3D {
         sprite.position.copy(position);
         
         // Store reference to mesh, dimension, and edge endpoints for dynamic updates
+        // Store the actual calculated base scales, not fixed values
         sprite.userData = {
             mesh: mesh,
             edgeDimension: edgeDimension,
             edgeStart: edgeStart,
             edgeEnd: edgeEnd,
-            baseScaleX: 0.15,   // Updated to match new base scale
-            baseScaleY: 0.04    // Updated to match new base scale
+            baseScaleX: baseScaleX,   // Use the actual calculated scale
+            baseScaleY: baseScaleY    // Use the actual calculated scale
         };
         
         this.dimensionLabelsGroup.add(sprite);
@@ -4319,18 +5037,36 @@ class Scene3D {
                     let scaleX = 0.2;  // Default
                     let scaleY = 0.05; // Default
                     
-                    // Get face dimensions
+                    // Get face dimensions - compute actual face dimensions in world space
+                    // Transform the face normal to world space to determine actual face orientation
+                    const worldNormalForDims = face.normal.clone();
+                    worldNormalForDims.applyQuaternion(mesh.quaternion);
+                    
+                    // Determine which world axis the face is most aligned with
+                    const absX = Math.abs(worldNormalForDims.x);
+                    const absY = Math.abs(worldNormalForDims.y);
+                    const absZ = Math.abs(worldNormalForDims.z);
+                    
                     let faceWidth, faceHeight;
                     
-                    if (face.axis === 'x') {
-                        faceWidth = mesh.userData.width;
-                        faceHeight = mesh.userData.height;
-                    } else if (face.axis === 'y') {
-                        faceWidth = mesh.userData.length;
-                        faceHeight = mesh.userData.width;
-                    } else if (face.axis === 'z') {
-                        faceWidth = mesh.userData.length;
-                        faceHeight = mesh.userData.height;
+                    // Original dimensions
+                    const length = mesh.userData.length;
+                    const width = mesh.userData.width;
+                    const height = mesh.userData.height;
+                    
+                    // Determine face dimensions based on world-space normal orientation
+                    if (absX > absY && absX > absZ) {
+                        // Face is perpendicular to X axis (left/right face)
+                        faceWidth = width;
+                        faceHeight = height;
+                    } else if (absY > absX && absY > absZ) {
+                        // Face is perpendicular to Y axis (top/bottom face)
+                        faceWidth = length;
+                        faceHeight = width;
+                    } else {
+                        // Face is perpendicular to Z axis (front/back face)
+                        faceWidth = length;
+                        faceHeight = height;
                     }
                     
                     // Use smaller dimension to ensure label fits
@@ -4340,41 +5076,56 @@ class Scene3D {
                     const halfDim = smallerDimension / 2;
                     
                     // Create two points on the face to measure screen size
-                    let point1, point2;
+                    // Need to get dimensions from userData
+                    const halfLength = mesh.userData.length / 2;
+                    const halfWidth = mesh.userData.width / 2;
+                    const halfHeight = mesh.userData.height / 2;
+                    
+                    // Get mesh world position for transforms
+                    const meshWorldPos = new THREE.Vector3();
+                    mesh.getWorldPosition(meshWorldPos);
+                    
+                    // Create points in local space first, then transform
+                    let localPoint1, localPoint2;
                     if (faceWidth < faceHeight || (faceWidth === faceHeight)) {
                         // Measure width
-                        point1 = face.center.clone();
-                        point2 = face.center.clone();
                         if (face.axis === 'x') {
-                            point1.z += halfDim;
-                            point2.z -= halfDim;
+                            // Left/Right face - measure along Z axis
+                            localPoint1 = new THREE.Vector3(face.normal.x > 0 ? halfLength : -halfLength, 0, halfDim);
+                            localPoint2 = new THREE.Vector3(face.normal.x > 0 ? halfLength : -halfLength, 0, -halfDim);
                         } else if (face.axis === 'y') {
-                            point1.x += halfDim;
-                            point2.x -= halfDim;
+                            // Top/Bottom face - measure along X axis
+                            localPoint1 = new THREE.Vector3(halfDim, face.normal.y > 0 ? halfHeight : -halfHeight, 0);
+                            localPoint2 = new THREE.Vector3(-halfDim, face.normal.y > 0 ? halfHeight : -halfHeight, 0);
                         } else if (face.axis === 'z') {
-                            point1.x += halfDim;
-                            point2.x -= halfDim;
+                            // Front/Back face - measure along X axis
+                            localPoint1 = new THREE.Vector3(halfDim, 0, face.normal.z > 0 ? halfWidth : -halfWidth);
+                            localPoint2 = new THREE.Vector3(-halfDim, 0, face.normal.z > 0 ? halfWidth : -halfWidth);
                         }
                     } else {
                         // Measure height
-                        point1 = face.center.clone();
-                        point2 = face.center.clone();
                         if (face.axis === 'x') {
-                            point1.y += halfDim;
-                            point2.y -= halfDim;
+                            // Left/Right face - measure along Y axis
+                            localPoint1 = new THREE.Vector3(face.normal.x > 0 ? halfLength : -halfLength, halfDim, 0);
+                            localPoint2 = new THREE.Vector3(face.normal.x > 0 ? halfLength : -halfLength, -halfDim, 0);
                         } else if (face.axis === 'y') {
-                            point1.z += halfDim;
-                            point2.z -= halfDim;
+                            // Top/Bottom face - measure along Z axis
+                            localPoint1 = new THREE.Vector3(0, face.normal.y > 0 ? halfHeight : -halfHeight, halfDim);
+                            localPoint2 = new THREE.Vector3(0, face.normal.y > 0 ? halfHeight : -halfHeight, -halfDim);
                         } else if (face.axis === 'z') {
-                            point1.y += halfDim;
-                            point2.y -= halfDim;
+                            // Front/Back face - measure along Y axis
+                            localPoint1 = new THREE.Vector3(0, halfDim, face.normal.z > 0 ? halfWidth : -halfWidth);
+                            localPoint2 = new THREE.Vector3(0, -halfDim, face.normal.z > 0 ? halfWidth : -halfWidth);
                         }
                     }
                     
-                    // Apply mesh rotation to points
-                    const meshRotation = mesh.quaternion;
-                    point1.applyQuaternion(meshRotation);
-                    point2.applyQuaternion(meshRotation);
+                    // Transform points from local to world space
+                    const point1 = localPoint1.clone();
+                    const point2 = localPoint2.clone();
+                    point1.applyQuaternion(mesh.quaternion);
+                    point2.applyQuaternion(mesh.quaternion);
+                    point1.add(meshWorldPos);
+                    point2.add(meshWorldPos);
                     
                     // Project to screen space
                     const screen1 = point1.clone().project(this.camera);
@@ -4446,25 +5197,38 @@ class Scene3D {
                     let scaleX = sprite.userData.baseScaleX;
                     let scaleY = sprite.userData.baseScaleY;
                     
-                    // Limit label to 80% of edge length on screen
-                    const maxAllowedScale = edgeNormalizedLength * 0.8;
+                    // Check if this is a multi-line label (for Roll/Steel Coil units)
+                    const isMultiLine = sprite.userData.baseScaleY > 0.06;  // Multi-line labels have baseScaleY of 0.075
                     
-                    // Apply the limit if label would be too large
-                    if (scaleX > maxAllowedScale) {
-                        const scaleFactor = maxAllowedScale / scaleX;
-                        scaleX *= scaleFactor;
-                        scaleY *= scaleFactor;
+                    if (!isMultiLine) {
+                        // Regular single-line labels - limit to edge length
+                        const maxAllowedScale = edgeNormalizedLength * 0.8;
+                        
+                        // Apply the limit if label would be too large
+                        if (scaleX > maxAllowedScale) {
+                            const scaleFactor = maxAllowedScale / scaleX;
+                            scaleX *= scaleFactor;
+                            scaleY *= scaleFactor;
+                        }
+                    } else {
+                        // Multi-line labels - scale based on edge visibility but don't limit size
+                        // Just scale proportionally with zoom level
+                        const zoomFactor = edgeNormalizedLength / 0.2;  // Normalize to a reference edge size
+                        scaleX = sprite.userData.baseScaleX * Math.min(Math.max(zoomFactor, 0.5), 2.0);  // Allow 0.5x to 2x scaling
+                        scaleY = sprite.userData.baseScaleY * Math.min(Math.max(zoomFactor, 0.5), 2.0);
                     }
                     
-                    // Also apply a minimum scale so labels don't become too small
-                    const minScale = 0.1;
-                    scaleX = Math.max(scaleX, minScale);
-                    scaleY = Math.max(scaleY, minScale * 0.24); // Maintain aspect ratio
+                    // Apply minimum scale so labels don't become too small
+                    const minScaleX = isMultiLine ? 0.075 : 0.1;
+                    const minScaleY = isMultiLine ? 0.0375 : 0.024;
+                    scaleX = Math.max(scaleX, minScaleX);
+                    scaleY = Math.max(scaleY, minScaleY);
                     
                     // Apply maximum scale to prevent labels from being too large
-                    const maxScale = 0.4;
-                    scaleX = Math.min(scaleX, maxScale);
-                    scaleY = Math.min(scaleY, maxScale * 0.24);
+                    const maxScaleX = isMultiLine ? 0.3 : 0.4;
+                    const maxScaleY = isMultiLine ? 0.15 : 0.096;
+                    scaleX = Math.min(scaleX, maxScaleX);
+                    scaleY = Math.min(scaleY, maxScaleY);
                     
                     sprite.scale.set(scaleX, scaleY, 1);
                 } else {

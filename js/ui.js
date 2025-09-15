@@ -1283,9 +1283,9 @@ class UI {
                                     </span>
                                 </div>
                                 <div class="stacking-inputs-container">
-                                    <input type="text" class="stacking-input-small edit-stack" value="${group.sample.maxStack}" data-group-id="${group.groupId}" title="Ilość warstw" />
+                                    <input type="text" class="stacking-input-small edit-stack" value="${group.sample.maxStack}" data-group-id="${group.groupId}" title="Ilość warstw" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
                                     <span class="stacking-separator">/</span>
-                                    <input type="text" class="stacking-input-small edit-max-weight auto-resize-input" value="${(group.sample.maxStackWeight || 0).toString().replace(/[^\d.]/g, '')}kg" data-group-id="${group.groupId}" maxlength="6" title="Max waga na górze" />
+                                    <input type="text" class="stacking-input-small edit-max-weight auto-resize-input" value="${(group.sample.maxStackWeight || 0).toString().replace(/[^\d.]/g, '')}kg" data-group-id="${group.groupId}" maxlength="6" title="Max waga na górze" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
                                 </div>
                             </div>
                             <div class="unit-item">
@@ -1487,6 +1487,12 @@ class UI {
             
             // Handle stack count input
             stackInput.addEventListener('input', (e) => {
+                // Steel Coil cannot be stacked
+                if (group.sample.type === 'steel-coil') {
+                    e.target.value = 0;
+                    return;
+                }
+                
                 const value = e.target.value.replace(/[^\d]/g, ''); // Only digits
                 const newStack = parseInt(value) || 0;
                 this.updateGroupParameter(group.groupId, 'maxStack', newStack);
@@ -1519,6 +1525,12 @@ class UI {
             
             // Handle max weight input with kg suffix
             maxWeightInput.addEventListener('input', (e) => {
+                // Steel Coil cannot be stacked
+                if (group.sample.type === 'steel-coil') {
+                    e.target.value = '0kg';
+                    return;
+                }
+                
                 const value = e.target.value.replace(/[^\d.]/g, ''); // Remove non-numeric chars except dot
                 const newMaxWeight = parseFloat(value) || 0;
                 this.updateGroupParameter(group.groupId, 'maxStackWeight', newMaxWeight);
@@ -1749,22 +1761,15 @@ class UI {
         const templateItem = this.cargoManager.cargoItems.find(item => item.groupId === groupId);
         if (!templateItem) return;
         
-        // Create new item with same properties AND SAME COLOR (no new group)
+        // Create new item by copying ALL properties from template
         const newItem = {
-            type: templateItem.type,
-            name: templateItem.name,
-            length: templateItem.length,
-            width: templateItem.width,
-            height: templateItem.height,
-            weight: templateItem.weight,
-            maxStack: templateItem.maxStack,
-            maxStackWeight: templateItem.maxStackWeight || 0,
-            loadingMethods: templateItem.loadingMethods || ['rear', 'side', 'top'],
-            unloadingMethods: templateItem.unloadingMethods || ['rear', 'side', 'top'],
-            color: templateItem.color, // Keep same color
-            groupId: groupId, // Keep same groupId
+            ...templateItem,  // Copy all properties including isRoll, diameter, etc.
+            id: Date.now() + Math.random(),  // Generate new unique ID
             orderIndex: Math.max(...this.cargoManager.cargoItems.map(i => i.orderIndex || 0)) + 1,
-            addedTime: Date.now()
+            addedTime: Date.now(),
+            mesh: null,  // Reset mesh
+            position: null,  // Reset position
+            isOutside: false  // Reset outside status
         };
         
         // Add directly to cargoItems without creating new group

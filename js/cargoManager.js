@@ -266,7 +266,10 @@ class CargoManager {
                 z: binZ,
                 width: itemLength,
                 depth: itemWidth,
-                height: itemHeight
+                height: itemHeight,
+                isRoll: item.isRoll || false,
+                isVerticalRoll: item.isVerticalRoll || false,
+                isHorizontalRoll: item.isHorizontalRoll || false
             };
         });
         
@@ -451,6 +454,7 @@ class CargoManager {
                 maxStackWeight: stack.sample.maxStackWeight, // Pass maxStackWeight info
                 isRoll: stack.sample.isRoll, // Pass isRoll info for steel coils
                 isVerticalRoll: stack.sample.isVerticalRoll, // Pass isVerticalRoll info for rolls
+                isHorizontalRoll: stack.sample.isHorizontalRoll, // Pass isHorizontalRoll info for rolls
                 diameter: stack.sample.diameter, // Pass diameter for rolls
                 fixedDiameter: stack.sample.fixedDiameter // Pass fixedDiameter for steel coils
             }));
@@ -490,9 +494,12 @@ class CargoManager {
                             x: item.position.x,
                             y: item.position.y,
                             z: item.position.z,
-                            length: itemLength,
-                            width: itemWidth,
-                            height: stack.sample.height
+                            // Only override dimensions for non-roll items
+                            ...(item.type !== 'roll' && item.type !== 'steel-coil' ? {
+                                length: itemLength,
+                                width: itemWidth,
+                                height: stack.sample.height
+                            } : {})
                         };
                         
                         item.mesh = this.scene3d.addCargo(meshData);
@@ -563,6 +570,7 @@ class CargoManager {
                 maxStackWeight: stack.sample.maxStackWeight, // Pass maxStackWeight info
                 isRoll: stack.sample.isRoll, // Pass isRoll info for steel coils
                 isVerticalRoll: stack.sample.isVerticalRoll, // Pass isVerticalRoll info for rolls
+                isHorizontalRoll: stack.sample.isHorizontalRoll, // Pass isHorizontalRoll info for rolls
                 diameter: stack.sample.diameter, // Pass diameter for rolls
                 fixedDiameter: stack.sample.fixedDiameter // Pass fixedDiameter for steel coils
             }));
@@ -602,9 +610,12 @@ class CargoManager {
                         x: item.position.x,
                         y: item.position.y,
                         z: item.position.z,
-                        length: itemLength,
-                        width: itemWidth,
-                        height: stack.sample.height
+                        // Only override dimensions for non-roll items
+                        ...(item.type !== 'roll' && item.type !== 'steel-coil' ? {
+                            length: itemLength,
+                            width: itemWidth,
+                            height: stack.sample.height
+                        } : {})
                     };
                     
                     item.mesh = this.scene3d.addCargo(meshData);
@@ -800,6 +811,7 @@ class CargoManager {
             maxStackWeight: stack.sample.maxStackWeight,
             isRoll: stack.sample.isRoll,
             isVerticalRoll: stack.sample.isVerticalRoll,
+            isHorizontalRoll: stack.sample.isHorizontalRoll,
             diameter: stack.sample.diameter,
             fixedDiameter: stack.sample.fixedDiameter
         }));
@@ -815,13 +827,14 @@ class CargoManager {
                         packedItem.position.z - (this.containerDimensions.width / 2);
             
             stack.items.forEach((item, index) => {
-                const itemLength = packedItem.rotated ? stack.sample.width : stack.sample.length;
-                const itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
+                // Use actual item dimensions (which may have been rotated) instead of stack.sample
+                const itemLength = packedItem.rotated ? item.width : item.length;
+                const itemWidth = packedItem.rotated ? item.length : item.width;
                 
                 item.position = {
                     x: baseX + (itemLength / 2),
-                    y: trailerHeight + baseY + (index * stack.sample.height) + (stack.sample.height / 2),
-                    z: baseZ + ((stack.sample.isRoll && stack.sample.fixedDiameter) ? 0 : itemWidth / 2)
+                    y: trailerHeight + baseY + (index * item.height) + (item.height / 2),
+                    z: baseZ + ((item.isRoll && item.fixedDiameter) ? 0 : itemWidth / 2)
                 };
                 
                 const meshData = {
@@ -829,9 +842,12 @@ class CargoManager {
                     x: item.position.x,
                     y: item.position.y,
                     z: item.position.z,
-                    length: itemLength,
-                    width: itemWidth,
-                    height: stack.sample.height
+                    // Override dimensions for non-roll items (they don't need rotation)
+                    ...(item.type !== 'roll' && item.type !== 'steel-coil' ? {
+                        length: itemLength,
+                        width: itemWidth,
+                        height: item.height
+                    } : {})
                 };
                 
                 item.mesh = this.scene3d.addCargo(meshData);
@@ -1113,13 +1129,33 @@ class CargoManager {
         );
         if (groupItems.length === 0) return;
         
+        // Check if this is a Steel Coil group - they cannot be rotated
+        if (groupItems[0].type === 'steel-coil' || groupItems[0].fixedDiameter) {
+            console.warn('Steel Coil groups cannot be rotated');
+            return;
+        }
+        
         // Remember if this group is selected for highlighting restoration
         const wasSelected = this.selectedGroupId === groupId;
         
         // Update dimensions for each item if rotating 90 or -90 degrees
         if (Math.abs(angle) === 90) {
             groupItems.forEach(item => {
-                // Swap length and width
+                // For horizontal rolls, preserve the diameter info
+                if (item.type === 'roll' && !item.isVerticalRoll) {
+                    // Store diameter if not already stored
+                    if (!item.diameter) {
+                        item.diameter = item.width; // width is diameter for horizontal roll
+                    }
+                    
+                    // Track rotation ONLY for horizontal rolls
+                    if (!item.rotation) {
+                        item.rotation = 0;
+                    }
+                    item.rotation += (angle * Math.PI) / 180;
+                }
+                
+                // Swap dimensions for ALL items
                 const tempLength = item.length;
                 item.length = item.width;
                 item.width = tempLength;

@@ -97,7 +97,10 @@ class BinPacking3D {
                 z: occupied.z,
                 width: occupied.width,
                 depth: occupied.depth,
-                height: occupied.height
+                height: occupied.height,
+                isRoll: occupied.isRoll || false,
+                isVerticalRoll: occupied.isVerticalRoll || false,
+                isHorizontalRoll: occupied.isHorizontalRoll || false
             });
             
             // Process each free space and split it around the occupied space
@@ -174,7 +177,9 @@ class BinPacking3D {
                     width: packedItem.width,
                     depth: packedItem.depth,
                     height: packedItem.height,
-                    isVerticalRoll: item.isVerticalRoll || false
+                    isRoll: item.isRoll || false,
+                    isVerticalRoll: item.isVerticalRoll || false,
+                    isHorizontalRoll: item.isHorizontalRoll || false
                 });
                 
                 // Zaktualizuj wolne przestrzenie
@@ -437,15 +442,43 @@ class BinPacking3D {
         }
         
         // Przestrzeń na górze - tylko jeśli jednostka może być piętrowana
+        // Create multiple smaller spaces on top to allow flexible positioning
         if (canStackOnTop && position.y + item.height < space.y + space.height) {
+            // Instead of one large space, create the actual surface space of the item
+            // This allows multiple units to be placed side by side on top
             subspaces.push({
-                x: space.x,
+                x: position.x,  // Use the item's actual position
                 y: position.y + item.height,
-                z: space.z,
-                width: space.width,
-                depth: space.depth,
+                z: position.z,  // Use the item's actual position
+                width: item.width,  // Use the item's actual width
+                depth: item.depth,  // Use the item's actual depth
                 height: space.y + space.height - (position.y + item.height)
             });
+            
+            // Also add spaces around the item on top level if there's room
+            // Space to the right of the item (at the stacking level)
+            if (position.x + item.width < space.x + space.width) {
+                subspaces.push({
+                    x: position.x + item.width,
+                    y: position.y + item.height,
+                    z: space.z,
+                    width: space.x + space.width - (position.x + item.width),
+                    depth: space.depth,
+                    height: space.y + space.height - (position.y + item.height)
+                });
+            }
+            
+            // Space in front of the item (at the stacking level)
+            if (position.z + item.depth < space.z + space.depth) {
+                subspaces.push({
+                    x: space.x,
+                    y: position.y + item.height,
+                    z: position.z + item.depth,
+                    width: space.width,
+                    depth: space.z + space.depth - (position.z + item.depth),
+                    height: space.y + space.height - (position.y + item.height)
+                });
+            }
         }
         
         // Przestrzeń po lewej
