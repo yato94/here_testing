@@ -2859,8 +2859,7 @@ class Scene3D {
         let closestUnit = null;
         let closestDistance = Infinity;
         // Different thresholds for different unit types
-        // Reduced threshold to avoid interfering with stacking
-        const snapThreshold = draggedData.isVerticalRoll ? 0.1 : 0.5; // Rolls: 10cm, others: 50cm
+        const snapThreshold = draggedData.isVerticalRoll ? 0.15 : 0.5; // Rolls: 15cm, others: 50cm
         
         
         // Special handling for vertical rolls - they can stack in pyramid formation
@@ -2881,18 +2880,21 @@ class Scene3D {
             const targetHalfLength = targetData.length / 2;
             const targetHalfHeight = targetData.height / 2;
             
-            // Check if cursor is over this unit (for stacking)
-            // Check if the cursor position itself is within the target unit's bounds
+            // Calculate how close to the center of the unit we are (0 = edge, 1 = center)
             const xDistance = Math.abs(adjustedPosition.x - mesh.position.x);
             const zDistance = Math.abs(adjustedPosition.z - mesh.position.z);
+            const xRatio = targetHalfLength > 0 ? (1 - xDistance / targetHalfLength) : 0;
+            const zRatio = targetHalfWidth > 0 ? (1 - zDistance / targetHalfWidth) : 0;
+            const centerRatio = Math.min(xRatio, zRatio); // 0 at edge, 1 at center
             
             // Check if cursor is directly over the target unit's surface
             const cursorOverX = xDistance <= targetHalfLength;
             const cursorOverZ = zDistance <= targetHalfWidth;
             
-            // Prioritize stacking only if cursor is directly over the unit
-            if (cursorOverX && cursorOverZ) {
-                // We're over the unit - try to stack on top
+            // Prioritize stacking only if cursor is directly over the unit AND reasonably close to center
+            // Use centerRatio > 0.25 to require being at least 25% toward center for stacking
+            if (cursorOverX && cursorOverZ && centerRatio > 0.25) {
+                // We're over the unit and close enough to center - try to stack on top
                 // Calculate the Y position on top of this unit
                 const stackY = mesh.position.y + targetHalfHeight + halfHeight;
                 
@@ -2996,32 +2998,35 @@ class Scene3D {
                     }
                 }
             } else {
-                // Not over this unit - check for side snapping
-                const distance = Math.sqrt(
-                    Math.pow(adjustedPosition.x - mesh.position.x, 2) + 
-                    Math.pow(adjustedPosition.z - mesh.position.z, 2)
-                );
+                // Not over this unit OR near edge - check for side snapping
+                // Also check units that we're over but near the edge (centerRatio <= 0.25)
+                const shouldConsiderSideSnap = !cursorOverX || !cursorOverZ || centerRatio <= 0.25;
                 
-                // Only consider units at ground level for side snapping
-                // Check if mesh is at ground level (considering trailer height if inside container)
-                const meshIsOutside = this.isPositionOutsideContainer(mesh.position);
-                const expectedGroundY = meshIsOutside ? targetData.height / 2 : (trailerHeight + targetData.height / 2);
-                const isGroundLevel = Math.abs(mesh.position.y - expectedGroundY) < 0.1;
-                
-                // Also check if we're NOT currently above a higher unit (to avoid side-snapping when we should be stacking)
-                const notAboveHigherUnit = !isStacking || mesh.position.y < targetY - halfHeight;
-                
-                if (isGroundLevel && distance < closestDistance && notAboveHigherUnit) {
-                    closestDistance = distance;
-                    closestUnit = mesh;
+                if (shouldConsiderSideSnap) {
+                    const distance = Math.sqrt(
+                        Math.pow(adjustedPosition.x - mesh.position.x, 2) + 
+                        Math.pow(adjustedPosition.z - mesh.position.z, 2)
+                    );
+                    
+                    // Consider units on the same floor level for side snapping
+                    // Calculate expected Y position for dragged unit at same level as target
+                    const targetFloorY = mesh.position.y - targetHalfHeight + halfHeight;
+                    const onSameFloor = Math.abs(targetY - targetFloorY) < 0.2; // 20cm tolerance for same floor
+                    
+                    // Also check if we're NOT currently above a higher unit (to avoid side-snapping when we should be stacking)
+                    const notAboveHigherUnit = !isStacking || mesh.position.y < targetY - halfHeight;
+                    
+                    if (onSameFloor && distance < closestDistance && notAboveHigherUnit) {
+                        closestDistance = distance;
+                        closestUnit = mesh;
+                    }
                 }
             }
         }
         
-        // If not stacking and we have a very close unit, snap to its side
-        // Additional check: make sure we're really trying to place beside, not on top
-        const reallyCloseToBeside = closestDistance < snapThreshold * 0.7;
-        if (!isStacking && closestUnit && reallyCloseToBeside) {
+        // If not stacking and we have a close unit, snap to its side
+        // Use full snapThreshold for better side snapping
+        if (!isStacking && closestUnit && closestDistance < snapThreshold) {
             const targetData = closestUnit.userData;
             const targetHalfWidth = targetData.width / 2;
             const targetHalfLength = targetData.length / 2;
@@ -3090,8 +3095,8 @@ class Scene3D {
                 
                 snapPosition = { x: snapX, z: snapZ };
             }
-            // Ground level for side placement - use trailer height if inside container
-            targetY = isOutside ? halfHeight : (trailerHeight + halfHeight);
+            // Set Y to same level as the target unit (for side-by-side placement on same floor)
+            targetY = closestUnit.position.y - closestUnit.userData.height / 2 + halfHeight;
             canStack = true; // Side placement is always valid
         }
         
@@ -3234,7 +3239,7 @@ class Scene3D {
         }
         
         // Check if stacking is allowed on this target at the proposed position
-        const canStack = this.canStackOn(targetMesh, proposedPosition);
+        const canStack = this.canStackOn(targetMesh, proposedPosition, draggedData);
         if (!canStack) {
             // Silently reject - cannot stack on this target
             return false;
@@ -3577,10 +3582,14 @@ class Scene3D {
         return methods.map(m => methodNames[m] || m).join(', ');
     }
     
-    canStackOn(targetMesh, proposedPosition = null) {
+    canStackOn(targetMesh, proposedPosition = null, draggedData = null) {
         // Check if the target allows stacking
         const targetData = targetMesh.userData;
-        const draggedData = this.draggedObjects[0]?.userData;
+        
+        // Use passed draggedData or try to get from draggedObjects
+        if (!draggedData) {
+            draggedData = this.draggedObjects[0]?.userData;
+        }
         
         if (!targetData || !draggedData) return false;
         
@@ -3614,12 +3623,17 @@ class Scene3D {
         }
         
         // Count how many units we're dragging (entire stack)
-        const draggedStackSize = this.draggedObjects.length;
+        const draggedStackSize = this.draggedObjects.length || 1;
         
         // Calculate total weight of dragged stack
         let draggedStackWeight = 0;
-        for (let obj of this.draggedObjects) {
-            draggedStackWeight += obj.userData.weight || 0;
+        if (this.draggedObjects.length > 0) {
+            for (let obj of this.draggedObjects) {
+                draggedStackWeight += obj.userData.weight || 0;
+            }
+        } else {
+            // If not dragging, use the passed draggedData weight
+            draggedStackWeight = draggedData.weight || 0;
         }
         
         // Find ALL units that support the target (including the target itself)
@@ -3633,7 +3647,7 @@ class Scene3D {
             const unitHalfWidth = unit.userData.width / 2;
             
             for (let mesh of this.cargoMeshes) {
-                if (this.draggedObjects.includes(mesh) || supportingUnits.has(mesh)) continue;
+                if ((this.draggedObjects.length > 0 && this.draggedObjects.includes(mesh)) || supportingUnits.has(mesh)) continue;
                 
                 const meshTop = mesh.position.y + mesh.userData.height / 2;
                 const meshHalfLength = mesh.userData.length / 2;
@@ -3684,7 +3698,7 @@ class Scene3D {
                 const baseHalfWidth = baseUnit.userData.width / 2;
                 
                 for (let mesh of this.cargoMeshes) {
-                    if (this.draggedObjects.includes(mesh) || supportedUnits.has(mesh)) continue;
+                    if ((this.draggedObjects.length > 0 && this.draggedObjects.includes(mesh)) || supportedUnits.has(mesh)) continue;
                     if (mesh === unit) continue; // Don't count the unit itself
                     
                     const meshBottom = mesh.position.y - mesh.userData.height / 2;
