@@ -1135,6 +1135,12 @@ class CargoManager {
             return;
         }
         
+        // Check if this is a vertical Roll group - they cannot be rotated
+        if (groupItems[0].isRoll && groupItems[0].isVerticalRoll) {
+            console.warn('Vertical Roll groups cannot be rotated');
+            return;
+        }
+        
         // Remember if this group is selected for highlighting restoration
         const wasSelected = this.selectedGroupId === groupId;
         

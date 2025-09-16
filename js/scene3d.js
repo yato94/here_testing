@@ -1017,11 +1017,62 @@ class Scene3D {
         
         // Add wireframe only if less than 100 items (performance)
         // For steel coils, don't add wireframe as it looks better without edge lines
-        if (this.cargoMeshes.length < 100 && !cargoData.isRoll) {
-            const edges = new THREE.EdgesGeometry(geometry);
-            const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
-            const wireframe = new THREE.LineSegments(edges, lineMaterial);
-            mesh.add(wireframe);
+        if (this.cargoMeshes.length < 100 && cargoData.type !== 'steel-coil') {
+            // For Roll units, only add circular edges at the bases
+            if (cargoData.isRoll && !cargoData.fixedDiameter) {
+                const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
+                
+                if (cargoData.isVerticalRoll) {
+                    // Vertical cylinder - add circles at top and bottom
+                    const radius = cargoData.width / 2;
+                    const height = cargoData.height;
+                    
+                    // Top circle
+                    const topCircle = new THREE.EllipseCurve(0, 0, radius, radius, 0, 2 * Math.PI, false);
+                    const topPoints = topCircle.getPoints(32);
+                    const topGeometry = new THREE.BufferGeometry().setFromPoints(topPoints);
+                    const topLine = new THREE.LineLoop(topGeometry, lineMaterial);
+                    topLine.position.y = height / 2;
+                    topLine.rotation.x = Math.PI / 2;
+                    mesh.add(topLine);
+                    
+                    // Bottom circle
+                    const bottomLine = new THREE.LineLoop(topGeometry.clone(), lineMaterial);
+                    bottomLine.position.y = -height / 2;
+                    bottomLine.rotation.x = Math.PI / 2;
+                    mesh.add(bottomLine);
+                } else {
+                    // Horizontal cylinder - add circles at the ends
+                    const diameter = cargoData.diameter || cargoData.width;
+                    const radius = diameter / 2;
+                    const cylinderLength = cargoData.diameter ? 
+                        Math.max(cargoData.length, cargoData.width) : 
+                        cargoData.length;
+                    
+                    // Create circle curve
+                    const circle = new THREE.EllipseCurve(0, 0, radius, radius, 0, 2 * Math.PI, false);
+                    const points = circle.getPoints(32);
+                    const circleGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                    
+                    // Front circle
+                    const frontLine = new THREE.LineLoop(circleGeometry, lineMaterial);
+                    frontLine.position.x = cylinderLength / 2;
+                    frontLine.rotation.y = Math.PI / 2;
+                    mesh.add(frontLine);
+                    
+                    // Back circle
+                    const backLine = new THREE.LineLoop(circleGeometry.clone(), lineMaterial);
+                    backLine.position.x = -cylinderLength / 2;
+                    backLine.rotation.y = Math.PI / 2;
+                    mesh.add(backLine);
+                }
+            } else {
+                // Regular box units - add all edges
+                const edges = new THREE.EdgesGeometry(geometry);
+                const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
+                const wireframe = new THREE.LineSegments(edges, lineMaterial);
+                mesh.add(wireframe);
+            }
         }
         
         this.cargoMeshes.push(mesh);
@@ -1734,12 +1785,30 @@ class Scene3D {
             // Units outside container - only individual operations, no group operations
             // Steel Coils cannot be rotated
             if (!isSteelCoil) {
-                menuItems.push(
-                    { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
-                    { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
-                    { text: '⟲ Obróć do góry (180°)', action: () => this.rotateUnit(mesh, 180) },
-                    { separator: true }
-                );
+                // For Roll units, check orientation for rotation options
+                if (cargoData.isRoll && !cargoData.fixedDiameter) {
+                    if (!cargoData.isVerticalRoll) {
+                        // Horizontal roll - can rotate 90/-90
+                        menuItems.push(
+                            { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
+                            { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                            { separator: true }
+                        );
+                    }
+                    // Always show orientation toggle for rolls
+                    menuItems.push(
+                        { text: cargoData.isVerticalRoll ? '➡ Zmień na poziomo' : '⬆ Zmień na pionowo', 
+                          action: () => this.toggleRollOrientation(mesh) },
+                        { separator: true }
+                    );
+                } else {
+                    // Regular units - can rotate 90/-90
+                    menuItems.push(
+                        { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
+                        { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                        { separator: true }
+                    );
+                }
             }
             menuItems.push(
                 { text: '🗑️ Usuń jednostkę', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
@@ -1748,12 +1817,25 @@ class Scene3D {
             // Group operations - only for units inside container
             // Steel Coil groups cannot be rotated
             if (!isSteelCoil) {
-                menuItems.push(
-                    { text: '↻ Obróć grupę w prawo (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
-                    { text: '↺ Obróć grupę w lewo (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
-                    { text: '⟲ Obróć grupę do góry (180°)', action: () => this.rotateGroup(cargoData.groupId, 180), style: 'font-weight: bold; color: #10b981;' },
-                    { separator: true }
-                );
+                // For Roll groups, check orientation for rotation options
+                if (cargoData.isRoll && !cargoData.fixedDiameter) {
+                    if (!cargoData.isVerticalRoll) {
+                        // Horizontal roll group - can rotate 90/-90
+                        menuItems.push(
+                            { text: '↻ Obróć grupę w prawo (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
+                            { text: '↺ Obróć grupę w lewo (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
+                            { separator: true }
+                        );
+                    }
+                    // Note: Orientation toggle not available for groups - only individual units
+                } else {
+                    // Regular unit groups - can rotate 90/-90
+                    menuItems.push(
+                        { text: '↻ Obróć grupę w prawo (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
+                        { text: '↺ Obróć grupę w lewo (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
+                        { separator: true }
+                    );
+                }
             }
             menuItems.push(
                 { text: '📦 Przenieś grupę poza przestrzeń', action: () => this.moveGroupOutsideContainer(cargoData.groupId), style: 'font-weight: bold; color: #10b981;' },
@@ -1773,12 +1855,30 @@ class Scene3D {
             
             // Steel Coils cannot be rotated
             if (!isSteelCoil) {
-                menuItems.push(
-                    { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
-                    { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
-                    { text: '⟲ Obróć do góry (180°)', action: () => this.rotateUnit(mesh, 180) },
-                    { separator: true }
-                );
+                // For Roll units, check orientation for rotation options
+                if (cargoData.isRoll && !cargoData.fixedDiameter) {
+                    if (!cargoData.isVerticalRoll) {
+                        // Horizontal roll - can rotate 90/-90
+                        menuItems.push(
+                            { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
+                            { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                            { separator: true }
+                        );
+                    }
+                    // Always show orientation toggle for rolls
+                    menuItems.push(
+                        { text: cargoData.isVerticalRoll ? '➡ Zmień na poziomo' : '⬆ Zmień na pionowo', 
+                          action: () => this.toggleRollOrientation(mesh) },
+                        { separator: true }
+                    );
+                } else {
+                    // Regular units - can rotate 90/-90
+                    menuItems.push(
+                        { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
+                        { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                        { separator: true }
+                    );
+                }
             }
             menuItems.push(
                 { text: '📦 Przenieś poza przestrzeń', action: () => this.moveOutsideContainer(mesh) },
@@ -1838,10 +1938,143 @@ class Scene3D {
         }
     }
     
+    toggleRollOrientation(mesh) {
+        // Only for Roll units (not Steel Coils)
+        if (!mesh.userData.isRoll || mesh.userData.fixedDiameter) {
+            console.warn('Only Roll units can change orientation');
+            return;
+        }
+        
+        // Get the entire stack (units above AND below)
+        const entireStack = this.findEntireStack(mesh.position);
+        
+        // Find the bottom unit of the stack (pivot point)
+        const bottomUnit = entireStack[entireStack.length - 1];
+        
+        // Check if already outside container
+        const isAlreadyOutside = this.isPositionOutsideContainer(mesh.position);
+        
+        // Toggle orientation for all Roll units in the stack
+        entireStack.forEach(unit => {
+            if (unit.userData.isRoll && !unit.userData.fixedDiameter) {
+                // Store original values before change
+                const oldHeight = unit.userData.height;
+                const currentDiameter = unit.userData.diameter;
+                const currentCylinderLength = unit.userData.isVerticalRoll ? unit.userData.height : unit.userData.length;
+                
+                // Toggle the orientation
+                unit.userData.isVerticalRoll = !unit.userData.isVerticalRoll;
+                
+                if (unit.userData.isVerticalRoll) {
+                    // Changing from horizontal to vertical
+                    // diameter stays same, cylinder length becomes height
+                    unit.userData.diameter = currentDiameter;
+                    unit.userData.height = currentCylinderLength; // cylinder length becomes height
+                    unit.userData.length = currentDiameter; // footprint
+                    unit.userData.width = currentDiameter; // footprint
+                } else {
+                    // Changing from vertical to horizontal
+                    // diameter stays same, cylinder length becomes length
+                    unit.userData.diameter = currentDiameter;
+                    unit.userData.height = currentDiameter; // height is now diameter
+                    unit.userData.length = currentCylinderLength; // cylinder length
+                    unit.userData.width = currentDiameter; // width is diameter
+                }
+                
+                // Calculate new Y position to keep bottom at same level
+                const heightDifference = unit.userData.height - oldHeight;
+                unit.position.y += heightDifference / 2;
+                
+                // Update the mesh geometry
+                const geometry = new THREE.CylinderGeometry(
+                    unit.userData.diameter / 2,
+                    unit.userData.diameter / 2,
+                    unit.userData.isVerticalRoll ? unit.userData.height : unit.userData.length,
+                    32
+                );
+                
+                // Apply rotation for horizontal orientation
+                if (!unit.userData.isVerticalRoll) {
+                    geometry.rotateZ(Math.PI / 2);
+                }
+                
+                // Update mesh
+                unit.geometry.dispose();
+                unit.geometry = geometry;
+                
+                // Reset rotation since we're changing orientation
+                unit.rotation.y = 0;
+                
+                // Update userData position
+                unit.userData.position = {
+                    x: unit.position.x,
+                    y: unit.position.y,
+                    z: unit.position.z
+                };
+            }
+        });
+        
+        // If outside container, just update and return
+        if (isAlreadyOutside) {
+            // Notify about changes
+            if (this.onCargoMoved) {
+                this.onCargoMoved(entireStack.map(m => m.userData));
+            }
+            return;
+        }
+        
+        // Find valid position for the reoriented stack
+        const testPositions = entireStack.map(unit => ({
+            unit: unit,
+            newX: unit.position.x,
+            newZ: unit.position.z,
+            newLength: unit.userData.length,
+            newWidth: unit.userData.width,
+            y: unit.position.y
+        }));
+        
+        const result = this.findValidPositionForRotatedStack(testPositions, entireStack);
+        
+        if (result.shouldMoveOutside) {
+            this.moveOutsideContainer(bottomUnit);
+            console.warn('No valid position found for orientation change - units moved outside container');
+            return;
+        }
+        
+        const adjustedPositions = result.positions || result;
+        
+        // Apply the adjusted positions
+        adjustedPositions.forEach(test => {
+            const unit = test.unit;
+            
+            // Update position
+            unit.position.x = test.newX;
+            unit.position.z = test.newZ;
+            
+            // Update userData position
+            unit.userData.position = {
+                x: unit.position.x,
+                y: unit.position.y,
+                z: unit.position.z
+            };
+        });
+        
+        // Notify about changes
+        if (this.onCargoMoved) {
+            this.onCargoMoved(entireStack.map(m => m.userData));
+        }
+    }
+    
     rotateUnit(mesh, angle) {
         // Check if this is a Steel Coil - they cannot be rotated
         if (mesh.userData.type === 'steel-coil' || mesh.userData.fixedDiameter) {
             console.warn('Steel Coils cannot be rotated');
+            return;
+        }
+        
+        // Check if this is a vertical Roll - they cannot be rotated
+        if (mesh.userData.isRoll && mesh.userData.isVerticalRoll) {
+            console.warn('Vertical Rolls cannot be rotated. Use orientation toggle instead.');
             return;
         }
         
@@ -1850,6 +2083,9 @@ class Scene3D {
         
         // Find the bottom unit of the stack (pivot point)
         const bottomUnit = entireStack[entireStack.length - 1]; // Last in sorted array is bottom
+        
+        // Check if the unit is already outside the container
+        const isAlreadyOutside = this.isPositionOutsideContainer(mesh.position);
         
         // Rotate around Y axis (in radians)
         const radians = (angle * Math.PI) / 180;
@@ -1894,8 +2130,62 @@ class Scene3D {
             });
         });
         
-        // Find a valid position for the rotated stack
-        const adjustedPositions = this.findValidPositionForRotatedStack(testPositions, entireStack);
+        // If unit is already outside container, just rotate in place
+        if (isAlreadyOutside) {
+            // Just apply the rotation without looking for a new position
+            entireStack.forEach(unit => {
+                // Update rotation
+                unit.rotation.y += radians;
+                
+                // Update dimensions in userData
+                if (Math.abs(angle) === 90) {
+                    const tempLength = unit.userData.length;
+                    unit.userData.length = unit.userData.width;
+                    unit.userData.width = tempLength;
+                }
+                
+                // Update userData position (stays the same, just dimensions change)
+                unit.userData.position = {
+                    x: unit.position.x,
+                    y: unit.position.y,
+                    z: unit.position.z
+                };
+            });
+            
+            // Notify about changes
+            if (this.onCargoMoved) {
+                this.onCargoMoved(entireStack.map(m => m.userData));
+            }
+            return;
+        }
+        
+        // Find a valid position for the rotated stack (only for units inside container)
+        const result = this.findValidPositionForRotatedStack(testPositions, entireStack);
+        
+        // Check if we found a valid position or need to move outside
+        if (result.shouldMoveOutside) {
+            // First apply the rotation to the units
+            entireStack.forEach((unit, index) => {
+                // Update rotation
+                unit.rotation.y += radians;
+                
+                // Update dimensions in userData
+                if (Math.abs(angle) === 90) {
+                    const tempLength = unit.userData.length;
+                    unit.userData.length = unit.userData.width;
+                    unit.userData.width = tempLength;
+                }
+            });
+            
+            // Then move the entire stack outside the container
+            // Use the bottom unit as the reference for moving outside
+            this.moveOutsideContainer(bottomUnit);
+            
+            console.warn('No valid position found for rotation - units moved outside container');
+            return;
+        }
+        
+        const adjustedPositions = result.positions || result;
         
         // Apply the rotation and adjusted positions
         adjustedPositions.forEach(test => {
@@ -1932,7 +2222,7 @@ class Scene3D {
     findValidPositionForRotatedStack(testPositions, entireStack) {
         // Check if current position is valid
         if (this.isValidStackPosition(testPositions, entireStack)) {
-            return testPositions;
+            return { positions: testPositions, shouldMoveOutside: false };
         }
         
         // Find the bounding box of the rotated stack
@@ -1954,7 +2244,12 @@ class Scene3D {
         const centerZ = (minZ + maxZ) / 2;
         
         // Try different offsets to find a valid position
-        const searchRadius = 5; // Search within 5 meters
+        // Calculate search radius based on container dimensions to cover entire space
+        const containerLength = this.containerBounds ? 
+            (this.containerBounds.max.x - this.containerBounds.min.x) : 20;
+        const containerWidth = this.containerBounds ? 
+            (this.containerBounds.max.z - this.containerBounds.min.z) : 10;
+        const searchRadius = Math.max(containerLength, containerWidth); // Search entire container space
         const searchStep = 0.1; // 10cm steps
         let bestPosition = null;
         let minDistance = Infinity;
@@ -1983,23 +2278,20 @@ class Scene3D {
                     
                     // If we found a very close position, use it immediately
                     if (distance < 0.2) {
-                        return bestPosition;
+                        return { positions: bestPosition, shouldMoveOutside: false };
                     }
                 }
             }
             
             // If we found any valid position within current radius, use it
             if (bestPosition) {
-                return bestPosition;
+                return { positions: bestPosition, shouldMoveOutside: false };
             }
         }
         
-        // If no valid position found, try to at least keep it inside container
-        if (!bestPosition) {
-            bestPosition = this.adjustToContainerBounds(testPositions);
-        }
-        
-        return bestPosition || testPositions;
+        // No valid position found in the entire container space
+        // Return signal to move units outside
+        return { positions: testPositions, shouldMoveOutside: true };
     }
     
     isValidStackPosition(testPositions, entireStack) {
@@ -2700,121 +2992,6 @@ class Scene3D {
         return clamped;
     }
     
-    
-    findPyramidStackingPosition(position, halfHeight, trailerHeight, isOutside) {
-        const draggedData = this.draggedObjects[0].userData;
-        
-        // Only for vertical rolls
-        if (!draggedData.isVerticalRoll) return null;
-        
-        const rollRadius = draggedData.width / 2;
-        
-        // Find all vertical rolls at ground level
-        const groundRolls = [];
-        for (let mesh of this.cargoMeshes) {
-            if (this.draggedObjects.includes(mesh)) continue;
-            
-            const targetData = mesh.userData;
-            if (!targetData.isVerticalRoll) continue;
-            
-            // Check if at ground level
-            const expectedGroundY = isOutside ? targetData.height / 2 : (trailerHeight + targetData.height / 2);
-            if (Math.abs(mesh.position.y - expectedGroundY) < 0.1) {
-                groundRolls.push(mesh);
-            }
-        }
-        
-        // Try to find two adjacent rolls to stack between
-        for (let i = 0; i < groundRolls.length; i++) {
-            for (let j = i + 1; j < groundRolls.length; j++) {
-                const roll1 = groundRolls[i];
-                const roll2 = groundRolls[j];
-                
-                // Calculate distance between rolls
-                const distance = Math.sqrt(
-                    Math.pow(roll1.position.x - roll2.position.x, 2) +
-                    Math.pow(roll1.position.z - roll2.position.z, 2)
-                );
-                
-                // Check if rolls are adjacent (touching or nearly touching)
-                const roll1Radius = roll1.userData.width / 2;
-                const roll2Radius = roll2.userData.width / 2;
-                const expectedDistance = roll1Radius + roll2Radius + rollRadius * 2;
-                
-                if (Math.abs(distance - (roll1Radius + roll2Radius)) < rollRadius * 2.2) {
-                    // Calculate pyramid position (between the two rolls)
-                    const midX = (roll1.position.x + roll2.position.x) / 2;
-                    const midZ = (roll1.position.z + roll2.position.z) / 2;
-                    
-                    // Check if cursor is near this pyramid position
-                    const cursorDistance = Math.sqrt(
-                        Math.pow(position.x - midX, 2) +
-                        Math.pow(position.z - midZ, 2)
-                    );
-                    
-                    if (cursorDistance < rollRadius * 1.5) {
-                        // Calculate stacking height
-                        const baseHeight = Math.max(roll1.position.y, roll2.position.y);
-                        const stackHeight = Math.sqrt(Math.pow(distance/2, 2) - Math.pow((distance - rollRadius*2)/2, 2)) * 0.8;
-                        
-                        return new THREE.Vector3(
-                            midX,
-                            baseHeight + stackHeight,
-                            midZ
-                        );
-                    }
-                }
-            }
-        }
-        
-        // Also check stacking between roll and wall
-        if (this.containerBounds && !isOutside) {
-            for (let roll of groundRolls) {
-                const rollRadius = roll.userData.width / 2;
-                
-                // Check distance to walls
-                const distToLeftWall = roll.position.x - this.containerBounds.minX;
-                const distToRightWall = this.containerBounds.maxX - roll.position.x;
-                const distToFrontWall = roll.position.z - this.containerBounds.minZ;
-                const distToBackWall = this.containerBounds.maxZ - roll.position.z;
-                
-                // Check if roll is adjacent to a wall
-                let wallPosition = null;
-                let isNearWall = false;
-                
-                if (distToLeftWall < rollRadius * 1.5) {
-                    wallPosition = new THREE.Vector3(
-                        this.containerBounds.minX + rollRadius,
-                        roll.position.y,
-                        roll.position.z
-                    );
-                    isNearWall = true;
-                } else if (distToRightWall < rollRadius * 1.5) {
-                    wallPosition = new THREE.Vector3(
-                        this.containerBounds.maxX - rollRadius,
-                        roll.position.y,
-                        roll.position.z
-                    );
-                    isNearWall = true;
-                }
-                
-                if (isNearWall && wallPosition) {
-                    // Check if cursor is near this position
-                    const cursorDistance = Math.sqrt(
-                        Math.pow(position.x - wallPosition.x, 2) +
-                        Math.pow(position.z - wallPosition.z, 2)
-                    );
-                    
-                    if (cursorDistance < rollRadius * 1.5) {
-                        return wallPosition;
-                    }
-                }
-            }
-        }
-        
-        return null;
-    }
-    
     calculateDropPosition(position) {
         const draggedData = this.draggedObjects[0].userData;
         const halfHeight = draggedData.height / 2;
@@ -2860,15 +3037,6 @@ class Scene3D {
         let closestDistance = Infinity;
         // Different thresholds for different unit types
         const snapThreshold = draggedData.isVerticalRoll ? 0.15 : 0.5; // Rolls: 15cm, others: 50cm
-        
-        
-        // Special handling for vertical rolls - they can stack in pyramid formation
-        if (draggedData.isVerticalRoll) {
-            const pyramidPosition = this.findPyramidStackingPosition(position, halfHeight, trailerHeight, isOutside);
-            if (pyramidPosition) {
-                return pyramidPosition;
-            }
-        }
         
         // Check all cargo meshes for stacking or side snapping
         for (let mesh of this.cargoMeshes) {
@@ -3373,10 +3541,18 @@ class Scene3D {
         if (!this.containerBounds || !this.draggedObjects[0]) return false;
         
         // Check if we're dragging a group (including units stacked on the group)
-        // We're dragging a group if we have a selected group and the first dragged object belongs to it
+        // We're dragging a group if:
+        // 1. We have a selected group
+        // 2. We're dragging multiple objects from that group (not just a single unit)
+        // A single unit from a group dragged from outside should use single validation
+        const groupObjectsCount = this.draggedObjects.filter(obj => 
+            obj.userData && obj.userData.groupId === this.selectedGroupId
+        ).length;
+        
         const isDraggingGroup = this.selectedGroupId && 
                                 this.draggedObjects[0].userData &&
-                                this.draggedObjects[0].userData.groupId === this.selectedGroupId;
+                                this.draggedObjects[0].userData.groupId === this.selectedGroupId &&
+                                groupObjectsCount > 1; // Must be dragging multiple units from the group
         
         if (isDraggingGroup) {
             return this.checkValidGroupPosition(position);
@@ -3592,13 +3768,6 @@ class Scene3D {
         }
         
         if (!targetData || !draggedData) return false;
-        
-        // Special handling for vertical rolls - they can stack in pyramid formation
-        if (draggedData.isVerticalRoll && targetData.isVerticalRoll) {
-            // Vertical rolls can stack on other vertical rolls in special patterns
-            // This is handled separately in findBestStackingPosition
-            return true;
-        }
         
         // Horizontal rolls can only stack directly on top of each other
         if (draggedData.isHorizontalRoll && targetData.isHorizontalRoll) {
