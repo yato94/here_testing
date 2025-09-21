@@ -202,6 +202,7 @@ class BinPacking3D {
         let minY = Infinity;
         let bestScore = -Infinity;
         
+        
         // Check if item can be stacked (for items that cannot stack, only floor level is allowed)
         const canStack = item.maxStack === undefined || item.maxStack !== 0;
         
@@ -302,31 +303,41 @@ class BinPacking3D {
             }
             
             // Sprawdź czy element pasuje bez obrotu
-            if (this.itemFits(item, space) && this.canPlaceItem(space.x, space.y, space.z, item.width, item.depth, item.height)) {
-                const waste = this.calculateWaste(item, space);
+            if (this.itemFits(item, space)) {
+                // Center the item if it's exactly the same size or uses tolerance
+                // This prevents floating point precision issues when units are "identical"
+                const tolerance = 0.005; // Same tolerance as in itemFits
+                const needsCenteringX = Math.abs(item.width - space.width) <= tolerance;
+                const needsCenteringZ = Math.abs(item.depth - space.depth) <= tolerance;
+                
                 const position = {
-                    x: space.x,
+                    x: needsCenteringX ? space.x + (space.width - item.width) / 2 : space.x,
                     y: space.y,
-                    z: space.z,
+                    z: needsCenteringZ ? space.z + (space.depth - item.depth) / 2 : space.z,
                     rotated: false
                 };
                 
-                // Calculate score: prioritize filling left to right, front to back, bottom to top
-                // Lower Y is always best (floor first)
-                // Then prefer lower X (left to right)
-                // Then prefer lower Z (front to back)
-                const yScore = -space.y * 1000; // Strong preference for lower Y
-                const xScore = -space.x * 10;   // Then left to right
-                const zScore = -space.z * 1;    // Then front to back
-                const wasteScore = -waste / 10000; // Less important
-                const score = yScore + xScore + zScore + wasteScore;
-                
-                // Preferuj lepszy score
-                if (score > bestScore) {
-                    bestPosition = position;
-                    minWaste = waste;
-                    minY = space.y;
-                    bestScore = score;
+                // Check if item can be placed at the calculated position
+                if (this.canPlaceItem(position.x, position.y, position.z, item.width, item.depth, item.height)) {
+                    const waste = this.calculateWaste(item, space);
+                    
+                    // Calculate score: prioritize filling left to right, front to back, bottom to top
+                    // Lower Y is always best (floor first)
+                    // Then prefer lower X (left to right)
+                    // Then prefer lower Z (front to back)
+                    const yScore = -space.y * 1000; // Strong preference for lower Y
+                    const xScore = -space.x * 10;   // Then left to right
+                    const zScore = -space.z * 1;    // Then front to back
+                    const wasteScore = -waste / 10000; // Less important
+                    const score = yScore + xScore + zScore + wasteScore;
+                    
+                    // Preferuj lepszy score
+                    if (score > bestScore) {
+                        bestPosition = position;
+                        minWaste = waste;
+                        minY = space.y;
+                        bestScore = score;
+                    }
                 }
             }
             
@@ -338,27 +349,37 @@ class BinPacking3D {
                 weight: item.weight
             };
             
-            if (this.itemFits(rotatedItem, space) && this.canPlaceItem(space.x, space.y, space.z, rotatedItem.width, rotatedItem.depth, rotatedItem.height)) {
-                const waste = this.calculateWaste(rotatedItem, space);
+            if (this.itemFits(rotatedItem, space)) {
+                // Center the rotated item if it's exactly the same size or uses tolerance
+                // This prevents floating point precision issues when units are "identical"
+                const tolerance = 0.005; // Same tolerance as in itemFits
+                const needsCenteringX = Math.abs(rotatedItem.width - space.width) <= tolerance;
+                const needsCenteringZ = Math.abs(rotatedItem.depth - space.depth) <= tolerance;
+                
                 const position = {
-                    x: space.x,
+                    x: needsCenteringX ? space.x + (space.width - rotatedItem.width) / 2 : space.x,
                     y: space.y,
-                    z: space.z,
+                    z: needsCenteringZ ? space.z + (space.depth - rotatedItem.depth) / 2 : space.z,
                     rotated: true
                 };
                 
-                // Calculate score for rotated item (same logic)
-                const yScore = -space.y * 1000;
-                const xScore = -space.x * 10;
-                const zScore = -space.z * 1;
-                const wasteScore = -waste / 10000;
-                const score = yScore + xScore + zScore + wasteScore;
-                
-                if (score > bestScore) {
-                    bestPosition = position;
-                    minWaste = waste;
-                    minY = space.y;
-                    bestScore = score;
+                // Check if rotated item can be placed at the calculated position
+                if (this.canPlaceItem(position.x, position.y, position.z, rotatedItem.width, rotatedItem.depth, rotatedItem.height)) {
+                    const waste = this.calculateWaste(rotatedItem, space);
+                    
+                    // Calculate score for rotated item (same logic)
+                    const yScore = -space.y * 1000;
+                    const xScore = -space.x * 10;
+                    const zScore = -space.z * 1;
+                    const wasteScore = -waste / 10000;
+                    const score = yScore + xScore + zScore + wasteScore;
+                    
+                    if (score > bestScore) {
+                        bestPosition = position;
+                        minWaste = waste;
+                        minY = space.y;
+                        bestScore = score;
+                    }
                 }
             }
         }
@@ -367,9 +388,13 @@ class BinPacking3D {
     }
     
     itemFits(item, space) {
-        return item.width <= space.width &&
-               item.depth <= space.depth &&
-               item.height <= space.height;
+        // Add tolerance for floating point errors (5mm)
+        const tolerance = 0.005;
+        const fits = item.width <= space.width + tolerance &&
+               item.depth <= space.depth + tolerance &&
+               item.height <= space.height + tolerance;
+        
+        return fits;
     }
     
     calculateWaste(item, space) {
@@ -429,16 +454,41 @@ class BinPacking3D {
             });
         }
         
-        // Przestrzeń z przodu - cała wysokość od poziomu przestrzeni
+        // Przestrzeń z przodu - rozdzielona na części
         if (position.z + item.depth < space.z + space.depth) {
+            // Przestrzeń bezpośrednio przed elementem
             subspaces.push({
-                x: space.x,
+                x: position.x,
                 y: space.y,
                 z: position.z + item.depth,
-                width: space.width,
+                width: item.width,
                 depth: space.z + space.depth - (position.z + item.depth),
                 height: space.height
             });
+            
+            // Przestrzeń z przodu po lewej stronie elementu
+            if (space.x < position.x) {
+                subspaces.push({
+                    x: space.x,
+                    y: space.y,
+                    z: position.z + item.depth,
+                    width: position.x - space.x,
+                    depth: space.z + space.depth - (position.z + item.depth),
+                    height: space.height
+                });
+            }
+            
+            // Przestrzeń z przodu po prawej stronie elementu
+            if (position.x + item.width < space.x + space.width) {
+                subspaces.push({
+                    x: position.x + item.width,
+                    y: space.y,
+                    z: position.z + item.depth,
+                    width: space.x + space.width - (position.x + item.width),
+                    depth: space.z + space.depth - (position.z + item.depth),
+                    height: space.height
+                });
+            }
         }
         
         // Przestrzeń na górze - tylko jeśli jednostka może być piętrowana

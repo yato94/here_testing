@@ -9,7 +9,7 @@ const CONFIG = {
             axles: {
                 kingPin: { position: 1.7 },  // a: czop siodła 1.7m od przodu naczepy
                 trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },  // 13.6-4.2=9.4m od przodu (4.2m od końca)
-                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },  // 1.7-3.1=-1.4m od przodu (3.1m przed siodłem)
+                front: { position: -1.4, maxLoad: 10000, emptyWeight: 5800 },  // 1.7-3.1=-1.4m od przodu (3.1m przed siodłem)
                 rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }  // 1.7+0.5=2.2m od przodu (0.5m ZA siodłem)
             },
             trailerHeight: 1.2  // wysokość podłogi naczepy nad ziemią
@@ -23,7 +23,7 @@ const CONFIG = {
             axles: {
                 kingPin: { position: 1.7 },
                 trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
-                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                front: { position: -1.4, maxLoad: 10000, emptyWeight: 5800 },
                 rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
             },
             trailerHeight: 1.2
@@ -31,18 +31,20 @@ const CONFIG = {
         jumbo: {
             name: 'JUMBO',
             sections: [
-                { length: 7.7, width: 2.48, height: 3.0 },
-                { length: 7.7, width: 2.48, height: 3.0 }
+                { length: 7.7, width: 2.48, height: 3.0 },  // Truck section
+                { length: 7.7, width: 2.48, height: 3.0 }   // Trailer section
             ],
             length: 15.9,  // 7.7 + 0.5 gap + 7.7
             width: 2.48,
             height: 3.0,
-            maxLoad: 24000,
+            maxLoad: 22000,  // 22 tons max load for JUMBO
+            isJumbo: true,  // Flag to identify JUMBO type (truck + trailer)
             axles: {
-                kingPin: { position: 1.7 },
-                trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
-                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
-                rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
+                // Truck axles (similar to SOLO, positions from section 1 start)
+                front: { position: -1.0, maxLoad: 10000, emptyWeight: 5800 },  // 1.0m before section 1 start
+                rear: { position: 5.5, maxLoad: 11500, emptyWeight: 3600 },   // 5.5m from section 1 start
+                // Trailer axles (positions from section 2 start)
+                trailer: { position: 5.5, maxLoad: 18000, emptyWeight: 4200, count: 2 }  // 5.5m from section 2 start, 2 axles
             },
             trailerHeight: 1.2
         },
@@ -55,7 +57,7 @@ const CONFIG = {
             axles: {
                 kingPin: { position: 1.7 },
                 trailer: { position: 5.0, maxLoad: 24000, emptyWeight: 5200 },
-                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                front: { position: -1.4, maxLoad: 10000, emptyWeight: 5800 },
                 rear: { position: 1.2, maxLoad: 11500, emptyWeight: 3600 }
             },
             trailerHeight: 1.2
@@ -69,7 +71,7 @@ const CONFIG = {
             axles: {
                 kingPin: { position: 1.7 },
                 trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
-                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                front: { position: -1.4, maxLoad: 10000, emptyWeight: 5800 },
                 rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
             },
             trailerHeight: 1.2
@@ -83,7 +85,7 @@ const CONFIG = {
             axles: {
                 kingPin: { position: 1.7 },
                 trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
-                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                front: { position: -1.4, maxLoad: 10000, emptyWeight: 5800 },
                 rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
             },
             trailerHeight: 1.2
@@ -102,7 +104,7 @@ const CONFIG = {
             axles: {
                 kingPin: { position: 1.7 },
                 trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
-                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                front: { position: -1.4, maxLoad: 10000, emptyWeight: 5800 },
                 rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
             },
             trailerHeight: 1.2
@@ -121,10 +123,24 @@ const CONFIG = {
             axles: {
                 kingPin: { position: 1.7 },
                 trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
-                front: { position: -1.4, maxLoad: 7500, emptyWeight: 5800 },
+                front: { position: -1.4, maxLoad: 10000, emptyWeight: 5800 },
                 rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
             },
             trailerHeight: 1.2
+        },
+        solo: {
+            name: 'SOLO',
+            length: 7.7,
+            width: 2.48,
+            height: 3.0,
+            maxLoad: 18000,
+            isSolo: true,  // Flag to identify SOLO type
+            axles: {
+                // For SOLO: positions are from cargo space start
+                front: { position: -1.0, maxLoad: 10000, emptyWeight: 5800 },  // 1.0m before cargo start
+                rear: { position: 5.5, maxLoad: 11500, emptyWeight: 3600 }   // 5.5m from cargo start
+            },
+            trailerHeight: 1.2  // Same floor height as trailer
         }
     },
     

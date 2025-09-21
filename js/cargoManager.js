@@ -471,6 +471,7 @@ class CargoManager {
                 
                 const result = this.packers[sectionIndex].packItems(remainingItems);
                 
+                
                 result.packed.forEach(packedItem => {
                     const stack = packedItem.userData;
                     const baseX = xOffset + packedItem.position.x;
@@ -789,18 +790,7 @@ class CargoManager {
             }
         }
         
-        // Create a temporary packer with occupied spaces
-        const tempPacker = new BinPacking3D(
-            this.containerDimensions.length,
-            this.containerDimensions.width,
-            this.containerDimensions.height,
-            this.containerDimensions
-        );
-        
-        // Mark occupied spaces BEFORE packing
-        tempPacker.setOccupiedSpaces(occupiedSpaces);
-        
-        // Pack the new group items
+        // Prepare items for packing
         const itemsForPacking = stacks.map(stack => ({
             width: stack.sample.length,
             depth: stack.sample.width,
@@ -816,43 +806,171 @@ class CargoManager {
             fixedDiameter: stack.sample.fixedDiameter
         }));
         
-        const result = tempPacker.packItems(itemsForPacking, true); // Skip reset to preserve occupied spaces
+        let result;
         
-        // Place packed items
-        result.packed.forEach(packedItem => {
-            const stack = packedItem.userData;
-            const baseX = packedItem.position.x - (this.containerDimensions.length / 2);
-            const baseY = packedItem.position.y;
-            const baseZ = (stack.sample.isRoll && stack.sample.fixedDiameter) ? packedItem.position.z : 
-                        packedItem.position.z - (this.containerDimensions.width / 2);
-            
-            stack.items.forEach((item, index) => {
-                // Use actual item dimensions (which may have been rotated) instead of stack.sample
-                const itemLength = packedItem.rotated ? item.width : item.length;
-                const itemWidth = packedItem.rotated ? item.length : item.width;
-                
-                item.position = {
-                    x: baseX + (itemLength / 2),
-                    y: trailerHeight + baseY + (index * item.height) + (item.height / 2),
-                    z: baseZ + ((item.isRoll && item.fixedDiameter) ? 0 : itemWidth / 2)
-                };
-                
-                const meshData = {
-                    ...item,
-                    x: item.position.x,
-                    y: item.position.y,
-                    z: item.position.z,
-                    // Override dimensions for non-roll items (they don't need rotation)
-                    ...(item.type !== 'roll' && item.type !== 'steel-coil' ? {
-                        length: itemLength,
-                        width: itemWidth,
-                        height: item.height
-                    } : {})
-                };
-                
-                item.mesh = this.scene3d.addCargo(meshData);
+        // Handle JUMBO with sections
+        if (this.packers && this.sections) {
+            // Create temporary packers for each section with occupied spaces
+            const tempPackers = [];
+            this.sections.forEach(section => {
+                const tempPacker = new BinPacking3D(
+                    section.length,
+                    section.width,
+                    section.height
+                );
+                tempPackers.push(tempPacker);
             });
-        });
+            
+            // Convert occupied spaces to section-relative coordinates
+            const gap = 0.5; // 50cm gap between sections
+            let xOffset = -this.containerDimensions.length / 2;
+            const sectionOccupiedSpaces = [];
+            
+            this.sections.forEach((section, sectionIndex) => {
+                if (sectionIndex > 0) xOffset += gap;
+                const sectionStart = xOffset;
+                const sectionEnd = xOffset + section.length;
+                
+                // Filter occupied spaces for this section
+                const spacesInSection = occupiedSpaces.filter(space => {
+                    const spaceStart = space.x;
+                    const spaceEnd = space.x + space.width;
+                    // Check if space overlaps with this section
+                    return spaceStart < sectionEnd && spaceEnd > sectionStart;
+                }).map(space => {
+                    // Convert to section-local coordinates
+                    return {
+                        x: space.x - sectionStart,
+                        y: space.y,
+                        z: space.z + (section.width / 2), // Adjust for section coordinate system
+                        width: space.width,
+                        depth: space.depth,
+                        height: space.height,
+                        isRoll: space.isRoll || false,
+                        isVerticalRoll: space.isVerticalRoll || false,
+                        isHorizontalRoll: space.isHorizontalRoll || false
+                    };
+                });
+                
+                sectionOccupiedSpaces.push(spacesInSection);
+                tempPackers[sectionIndex].setOccupiedSpaces(spacesInSection);
+                
+                xOffset += section.length;
+            });
+            
+            // Pack items into sections sequentially
+            xOffset = -this.containerDimensions.length / 2;
+            let remainingItems = [...itemsForPacking];
+            const allPacked = [];
+            const allUnpacked = [];
+            
+            this.sections.forEach((section, sectionIndex) => {
+                if (remainingItems.length === 0) return;
+                
+                if (sectionIndex > 0) xOffset += gap;
+                
+                const sectionResult = tempPackers[sectionIndex].packItems(remainingItems, true);
+                
+                // Transform packed items to global coordinates and place them
+                sectionResult.packed.forEach(packedItem => {
+                    const stack = packedItem.userData;
+                    const baseX = xOffset + packedItem.position.x;
+                    const baseY = packedItem.position.y;
+                    const baseZ = packedItem.position.z - (section.width / 2);
+                    
+                    // Place each item in the stack
+                    stack.items.forEach((item, index) => {
+                        // Adjust position based on rotation
+                        const itemLength = packedItem.rotated ? stack.sample.width : stack.sample.length;
+                        const itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
+                        
+                        item.position = {
+                            x: baseX + (itemLength / 2),
+                            y: trailerHeight + baseY + (index * stack.sample.height) + (stack.sample.height / 2),
+                            z: baseZ + (itemWidth / 2)
+                        };
+                        
+                        const meshData = {
+                            ...item,
+                            x: item.position.x,
+                            y: item.position.y,
+                            z: item.position.z,
+                            // Only override dimensions for non-roll items
+                            ...(item.type !== 'roll' && item.type !== 'steel-coil' ? {
+                                length: itemLength,
+                                width: itemWidth,
+                                height: stack.sample.height
+                            } : {})
+                        };
+                        
+                        item.mesh = this.scene3d.addCargo(meshData);
+                    });
+                });
+                
+                allPacked.push(...sectionResult.packed);
+                
+                // Update remaining items for next section
+                remainingItems = sectionResult.unpacked;
+                xOffset += section.length;
+            });
+            
+            // Any remaining items are unpacked
+            allUnpacked.push(...remainingItems);
+            
+            result = {
+                packed: allPacked,
+                unpacked: allUnpacked
+            };
+        } else {
+            // Regular single container packing
+            const tempPacker = new BinPacking3D(
+                this.containerDimensions.length,
+                this.containerDimensions.width,
+                this.containerDimensions.height,
+                this.containerDimensions
+            );
+            
+            // Mark occupied spaces BEFORE packing
+            tempPacker.setOccupiedSpaces(occupiedSpaces);
+            
+            result = tempPacker.packItems(itemsForPacking, true); // Skip reset to preserve occupied spaces
+            
+            // Place packed items
+            result.packed.forEach(packedItem => {
+                const stack = packedItem.userData;
+                const baseX = packedItem.position.x - (this.containerDimensions.length / 2);
+                const baseY = packedItem.position.y;
+                const baseZ = (stack.sample.isRoll && stack.sample.fixedDiameter) ? packedItem.position.z : 
+                            packedItem.position.z - (this.containerDimensions.width / 2);
+                
+                stack.items.forEach((item, index) => {
+                    // Use actual item dimensions (which may have been rotated) instead of stack.sample
+                    const itemLength = packedItem.rotated ? item.width : item.length;
+                    const itemWidth = packedItem.rotated ? item.length : item.width;
+                    
+                    item.position = {
+                        x: baseX + (itemLength / 2),
+                        y: trailerHeight + baseY + (index * item.height) + (item.height / 2),
+                        z: baseZ + ((item.isRoll && item.fixedDiameter) ? 0 : itemWidth / 2)
+                    };
+                    
+                    const meshData = {
+                        ...item,
+                        x: item.position.x,
+                        y: item.position.y,
+                        z: item.position.z,
+                        // Override dimensions for non-roll items (they don't need rotation)
+                        ...(item.type !== 'roll' && item.type !== 'steel-coil' ? {
+                            length: itemLength,
+                            width: itemWidth,
+                            height: item.height
+                        } : {})
+                    };
+                    
+                    item.mesh = this.scene3d.addCargo(meshData);
+                });
+            });
+        }
         
         // Place unpacked items outside instead of removing
         let totalUnpacked = 0;

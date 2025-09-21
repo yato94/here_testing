@@ -76,6 +76,24 @@ class UI {
         const customDimensions = document.getElementById('customDimensions');
         const maxLoadInput = document.getElementById('maxLoadInput');
         
+        // SOLO dimension sliders
+        const soloDimensionSliders = document.getElementById('soloDimensionSliders');
+        const soloLengthSlider = document.getElementById('soloLengthSlider');
+        const soloHeightSlider = document.getElementById('soloHeightSlider');
+        const soloLengthValue = document.getElementById('soloLengthValue');
+        const soloHeightValue = document.getElementById('soloHeightValue');
+        
+        // JUMBO dimension sliders
+        const jumboDimensionSliders = document.getElementById('jumboDimensionSliders');
+        const jumboSection1LengthSlider = document.getElementById('jumboSection1LengthSlider');
+        const jumboSection1HeightSlider = document.getElementById('jumboSection1HeightSlider');
+        const jumboSection2LengthSlider = document.getElementById('jumboSection2LengthSlider');
+        const jumboSection2HeightSlider = document.getElementById('jumboSection2HeightSlider');
+        const jumboSection1LengthValue = document.getElementById('jumboSection1LengthValue');
+        const jumboSection1HeightValue = document.getElementById('jumboSection1HeightValue');
+        const jumboSection2LengthValue = document.getElementById('jumboSection2LengthValue');
+        const jumboSection2HeightValue = document.getElementById('jumboSection2HeightValue');
+        
         // Setup max load input handler
         maxLoadInput.addEventListener('change', () => {
             const maxLoadTons = parseFloat(maxLoadInput.value) || 24;
@@ -125,10 +143,67 @@ class UI {
                 
                 if (value === 'custom') {
                     customDimensions.classList.remove('hidden');
+                    soloDimensionSliders.classList.add('hidden');
+                    jumboDimensionSliders.classList.add('hidden');
                     this.currentVehicle = value;
                     // Axle configuration will be updated in loadCustomVehicle
+                } else if (value === 'solo') {
+                    customDimensions.classList.add('hidden');
+                    soloDimensionSliders.classList.remove('hidden');
+                    jumboDimensionSliders.classList.add('hidden');
+                    
+                    // Load saved SOLO dimensions from localStorage
+                    const savedDimensions = localStorage.getItem('soloDimensions');
+                    if (savedDimensions) {
+                        const dims = JSON.parse(savedDimensions);
+                        soloLengthSlider.value = dims.length;
+                        soloHeightSlider.value = dims.height;
+                        soloLengthValue.textContent = `${dims.length.toFixed(2)}m`;
+                        soloHeightValue.textContent = `${dims.height.toFixed(1)}m`;
+                    }
+                    
+                    // Pass previous vehicle type to loadVehicle
+                    this.loadVehicle(value, previousVehicleType);
+                    this.currentVehicle = value;
+                    // Axle configuration is updated in loadVehicle via axleCalculator.setVehicle
+                } else if (value === 'jumbo') {
+                    customDimensions.classList.add('hidden');
+                    soloDimensionSliders.classList.add('hidden');
+                    jumboDimensionSliders.classList.remove('hidden');
+                    
+                    // Load saved JUMBO dimensions from localStorage
+                    const savedDimensions = localStorage.getItem('jumboDimensions');
+                    if (savedDimensions) {
+                        try {
+                            const dims = JSON.parse(savedDimensions);
+                            // Validate structure before using
+                            if (dims && dims.section1 && dims.section2 && 
+                                typeof dims.section1.length === 'number' && 
+                                typeof dims.section1.height === 'number' &&
+                                typeof dims.section2.length === 'number' && 
+                                typeof dims.section2.height === 'number') {
+                                
+                                jumboSection1LengthSlider.value = dims.section1.length;
+                                jumboSection1HeightSlider.value = dims.section1.height;
+                                jumboSection2LengthSlider.value = dims.section2.length;
+                                jumboSection2HeightSlider.value = dims.section2.height;
+                                jumboSection1LengthValue.textContent = `${dims.section1.length.toFixed(2)}m`;
+                                jumboSection1HeightValue.textContent = `${dims.section1.height.toFixed(1)}m`;
+                                jumboSection2LengthValue.textContent = `${dims.section2.length.toFixed(2)}m`;
+                                jumboSection2HeightValue.textContent = `${dims.section2.height.toFixed(1)}m`;
+                            }
+                        } catch (e) {
+                            console.log('Invalid JUMBO dimensions in localStorage, using defaults');
+                        }
+                    }
+                    
+                    // Pass previous vehicle type to loadVehicle
+                    this.loadVehicle(value, previousVehicleType);
+                    this.currentVehicle = value;
                 } else {
                     customDimensions.classList.add('hidden');
+                    soloDimensionSliders.classList.add('hidden');
+                    jumboDimensionSliders.classList.add('hidden');
                     // Pass previous vehicle type to loadVehicle
                     this.loadVehicle(value, previousVehicleType);
                     this.currentVehicle = value;
@@ -152,6 +227,120 @@ class UI {
             });
         });
         
+        // Setup SOLO dimension sliders
+        if (soloLengthSlider && soloHeightSlider) {
+            // Load saved dimensions if they exist
+            const savedDimensions = localStorage.getItem('soloDimensions');
+            if (savedDimensions) {
+                const dims = JSON.parse(savedDimensions);
+                soloLengthSlider.value = dims.length;
+                soloHeightSlider.value = dims.height;
+                soloLengthValue.textContent = `${dims.length.toFixed(2)}m`;
+                soloHeightValue.textContent = `${dims.height.toFixed(1)}m`;
+                
+                // Update dropdown display for SOLO with saved dimensions
+                const soloOption = customSelect.querySelector('.custom-option[data-value="solo"]');
+                if (soloOption) {
+                    const dimensionText = `${dims.length.toFixed(1)}m × 2.48m × ${dims.height.toFixed(1)}m`;
+                    soloOption.querySelector('.option-dimensions').textContent = dimensionText;
+                }
+            }
+            
+            soloLengthSlider.addEventListener('input', () => {
+                const length = parseFloat(soloLengthSlider.value);
+                soloLengthValue.textContent = `${length.toFixed(2)}m`;
+                if (this.currentVehicle === 'solo') {
+                    this.updateSoloDimensions(length, parseFloat(soloHeightSlider.value));
+                }
+            });
+            
+            soloHeightSlider.addEventListener('input', () => {
+                const height = parseFloat(soloHeightSlider.value);
+                soloHeightValue.textContent = `${height.toFixed(1)}m`;
+                if (this.currentVehicle === 'solo') {
+                    this.updateSoloDimensions(parseFloat(soloLengthSlider.value), height);
+                }
+            });
+            
+            // JUMBO slider event listeners
+            if (jumboSection1LengthSlider && jumboSection1HeightSlider && 
+                jumboSection2LengthSlider && jumboSection2HeightSlider) {
+                
+                const updateJumboIfActive = () => {
+                    if (this.currentVehicle === 'jumbo') {
+                        this.updateJumboDimensions(
+                            parseFloat(jumboSection1LengthSlider.value),
+                            parseFloat(jumboSection1HeightSlider.value),
+                            parseFloat(jumboSection2LengthSlider.value),
+                            parseFloat(jumboSection2HeightSlider.value)
+                        );
+                    }
+                };
+                
+                jumboSection1LengthSlider.addEventListener('input', () => {
+                    const length = parseFloat(jumboSection1LengthSlider.value);
+                    jumboSection1LengthValue.textContent = `${length.toFixed(2)}m`;
+                    updateJumboIfActive();
+                });
+                
+                jumboSection1HeightSlider.addEventListener('input', () => {
+                    const height = parseFloat(jumboSection1HeightSlider.value);
+                    jumboSection1HeightValue.textContent = `${height.toFixed(1)}m`;
+                    updateJumboIfActive();
+                });
+                
+                jumboSection2LengthSlider.addEventListener('input', () => {
+                    const length = parseFloat(jumboSection2LengthSlider.value);
+                    jumboSection2LengthValue.textContent = `${length.toFixed(2)}m`;
+                    updateJumboIfActive();
+                });
+                
+                jumboSection2HeightSlider.addEventListener('input', () => {
+                    const height = parseFloat(jumboSection2HeightSlider.value);
+                    jumboSection2HeightValue.textContent = `${height.toFixed(1)}m`;
+                    updateJumboIfActive();
+                });
+            }
+            
+            // Load saved JUMBO dimensions on startup
+            if (jumboSection1LengthSlider && jumboSection1HeightSlider && 
+                jumboSection2LengthSlider && jumboSection2HeightSlider) {
+                const savedJumboDimensions = localStorage.getItem('jumboDimensions');
+                if (savedJumboDimensions) {
+                    try {
+                        const dims = JSON.parse(savedJumboDimensions);
+                        // Validate structure
+                        if (dims && dims.section1 && dims.section2 && 
+                            typeof dims.section1.length === 'number' && 
+                            typeof dims.section1.height === 'number' &&
+                            typeof dims.section2.length === 'number' && 
+                            typeof dims.section2.height === 'number') {
+                            
+                            jumboSection1LengthSlider.value = dims.section1.length;
+                            jumboSection1HeightSlider.value = dims.section1.height;
+                            jumboSection2LengthSlider.value = dims.section2.length;
+                            jumboSection2HeightSlider.value = dims.section2.height;
+                            jumboSection1LengthValue.textContent = `${dims.section1.length.toFixed(1)}m`;
+                            jumboSection1HeightValue.textContent = `${dims.section1.height.toFixed(1)}m`;
+                            jumboSection2LengthValue.textContent = `${dims.section2.length.toFixed(1)}m`;
+                            jumboSection2HeightValue.textContent = `${dims.section2.height.toFixed(1)}m`;
+                            
+                            // Update dropdown display for JUMBO with saved dimensions
+                            const jumboOption = customSelect.querySelector('.custom-option[data-value="jumbo"]');
+                            if (jumboOption) {
+                                const totalLength = dims.section1.length + dims.section2.length + 0.5;
+                                const maxHeight = Math.max(dims.section1.height, dims.section2.height);
+                                const dimensionText = `${totalLength.toFixed(1)}m × 2.48m × ${maxHeight.toFixed(1)}m`;
+                                jumboOption.querySelector('.option-dimensions').textContent = dimensionText;
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Invalid JUMBO dimensions in localStorage, using defaults');
+                    }
+                }
+            }
+        }
+        
         // Set initial selection
         options[0].classList.add('selected');
         this.currentVehicle = 'standard';
@@ -159,8 +348,30 @@ class UI {
     }
     
     loadVehicle(vehicleType, previousVehicleType = null) {
-        const vehicle = CONFIG.vehicles[vehicleType];
+        let vehicle = CONFIG.vehicles[vehicleType];
         if (!vehicle) return;
+        
+        // If SOLO, check for saved dimensions
+        if (vehicleType === 'solo') {
+            const savedDimensions = localStorage.getItem('soloDimensions');
+            if (savedDimensions) {
+                const dims = JSON.parse(savedDimensions);
+                // Create modified vehicle config with saved dimensions
+                const rawRearAxlePosition = dims.length * (5.5 / 7.7);
+                const rearAxlePosition = Math.round(rawRearAxlePosition * 10) / 10;
+                
+                vehicle = {
+                    ...vehicle,
+                    length: dims.length,
+                    height: dims.height,
+                    axles: {
+                        ...vehicle.axles,
+                        front: { ...vehicle.axles.front, position: -1.0 },
+                        rear: { ...vehicle.axles.rear, position: rearAxlePosition }
+                    }
+                };
+            }
+        }
         
         // Check if we're switching from Coilmulde to non-Coilmulde
         const previousVehicle = previousVehicleType ? CONFIG.vehicles[previousVehicleType] : null;
@@ -194,6 +405,19 @@ class UI {
             width: vehicle.width,
             height: vehicle.height
         };
+        
+        // Add SOLO flag if present
+        if (vehicle.isSolo) {
+            containerDimensions.isSolo = vehicle.isSolo;
+        }
+        
+        // Store current vehicle config for modal
+        this.currentVehicleConfig = vehicle;
+        
+        // Add JUMBO flag if present
+        if (vehicle.isJumbo) {
+            containerDimensions.isJumbo = vehicle.isJumbo;
+        }
         
         // Add sections if it's a JUMBO
         if (vehicle.sections) {
@@ -230,6 +454,163 @@ class UI {
         }
     }
     
+    updateSoloDimensions(length, height) {
+        // Save SOLO dimensions to localStorage
+        localStorage.setItem('soloDimensions', JSON.stringify({
+            length: length,
+            height: height
+        }));
+        
+        // Update SOLO vehicle with new dimensions
+        const vehicle = CONFIG.vehicles.solo;
+        
+        // Calculate proportional axle position adjustment
+        // Original SOLO length is 7.7m with rear axle at 5.5m from cargo start
+        // We need to maintain the proportion: rear axle should be at ~71.4% of cargo length
+        const rawRearAxlePosition = length * (5.5 / 7.7); // Maintain same proportion
+        // Round to nearest 0.1m
+        const rearAxlePosition = Math.round(rawRearAxlePosition * 10) / 10;
+        
+        const updatedVehicle = {
+            ...vehicle,
+            length: length,
+            height: height,
+            axles: {
+                ...vehicle.axles,
+                front: { ...vehicle.axles.front, position: -1.0 }, // Front stays 1m before cargo
+                rear: { ...vehicle.axles.rear, position: rearAxlePosition } // Adjust proportionally
+            }
+        };
+        
+        const containerDimensions = {
+            length: length,
+            width: vehicle.width,
+            height: height,
+            isSolo: true
+        };
+        
+        // Update the scene and cargo manager
+        this.cargoManager.setContainer(containerDimensions, vehicle.maxLoad);
+        
+        // Update UI info
+        document.getElementById('dimensionsInfo').textContent = `${length.toFixed(1)} × ${vehicle.width} × ${height.toFixed(1)} m`;
+        const volume = (length * vehicle.width * height).toFixed(1);
+        document.getElementById('volumeInfo').textContent = `${volume} m³`;
+        
+        // Update dropdown display for SOLO
+        const customSelect = document.getElementById('vehicleSelect');
+        const customSelectTrigger = customSelect.querySelector('.custom-select-trigger');
+        const soloOption = customSelect.querySelector('.custom-option[data-value="solo"]');
+        
+        if (soloOption) {
+            const dimensionText = `${length.toFixed(1)}m × ${vehicle.width}m × ${height.toFixed(1)}m`;
+            soloOption.querySelector('.option-dimensions').textContent = dimensionText;
+            
+            // If SOLO is currently selected, update the trigger display too
+            if (this.currentVehicle === 'solo') {
+                customSelectTrigger.querySelector('.option-dimensions').textContent = dimensionText;
+            }
+        }
+        
+        // Update axle configuration with new dimensions
+        this.axleCalculator.setVehicle(updatedVehicle);
+        console.log('Updated SOLO axle positions:', {
+            length: length,
+            rearAxlePosition: rearAxlePosition,
+            distCargoStartToDrive: this.axleCalculator.axleConfig.distCargoStartToDrive
+        });
+        this.updateAxleIndicators();
+        
+        // Auto arrange cargo if there are items
+        if (this.cargoManager.cargoItems.length > 0) {
+            this.autoArrangeCargo();
+        }
+        
+        this.updateStatistics();
+    }
+    
+    updateJumboDimensions(section1Length, section1Height, section2Length, section2Height) {
+        // Save JUMBO dimensions to localStorage
+        localStorage.setItem('jumboDimensions', JSON.stringify({
+            section1: { length: section1Length, height: section1Height },
+            section2: { length: section2Length, height: section2Height }
+        }));
+        
+        // Update JUMBO vehicle with new dimensions
+        const vehicle = CONFIG.vehicles.jumbo;
+        
+        // Calculate proportional axle position adjustments
+        // For truck section (similar to SOLO)
+        const truckRearAxlePosition = Math.round((section1Length * (5.5 / 7.7)) * 10) / 10;
+        // For trailer section
+        const trailerAxlePosition = Math.round((section2Length * (5.5 / 7.7)) * 10) / 10;
+        
+        const updatedVehicle = {
+            ...vehicle,
+            sections: [
+                { length: section1Length, width: vehicle.width, height: section1Height },
+                { length: section2Length, width: vehicle.width, height: section2Height }
+            ],
+            length: section1Length + 0.5 + section2Length, // 0.5m gap between sections
+            height: Math.max(section1Height, section2Height), // Use max height for overall
+            axles: {
+                ...vehicle.axles,
+                front: { ...vehicle.axles.front, position: -1.0 }, // Front stays 1m before section 1
+                rear: { ...vehicle.axles.rear, position: truckRearAxlePosition }, // Adjust proportionally
+                trailer: { ...vehicle.axles.trailer, position: trailerAxlePosition } // Adjust proportionally
+            }
+        };
+        
+        const containerDimensions = {
+            length: updatedVehicle.length,
+            width: vehicle.width,
+            height: updatedVehicle.height,
+            isJumbo: true,
+            sections: updatedVehicle.sections
+        };
+        
+        // Update the scene and cargo manager
+        this.cargoManager.setContainer(containerDimensions, vehicle.maxLoad);
+        
+        // Update UI info
+        const totalLength = section1Length + section2Length + 0.5; // Include gap
+        document.getElementById('dimensionsInfo').textContent = `${totalLength.toFixed(1)} × ${vehicle.width} × ${updatedVehicle.height.toFixed(1)} m`;
+        const volume = (section1Length * vehicle.width * section1Height + section2Length * vehicle.width * section2Height).toFixed(1);
+        document.getElementById('volumeInfo').textContent = `${volume} m³`;
+        
+        // Update dropdown display for JUMBO
+        const customSelect = document.getElementById('vehicleSelect');
+        const customSelectTrigger = customSelect.querySelector('.custom-select-trigger');
+        const jumboOption = customSelect.querySelector('.custom-option[data-value="jumbo"]');
+        
+        if (jumboOption) {
+            const dimensionText = `${totalLength.toFixed(1)}m × ${vehicle.width}m × ${updatedVehicle.height.toFixed(1)}m`;
+            jumboOption.querySelector('.option-dimensions').textContent = dimensionText;
+            
+            // If JUMBO is currently selected, update the trigger display too
+            if (this.currentVehicle === 'jumbo') {
+                customSelectTrigger.querySelector('.option-dimensions').textContent = dimensionText;
+            }
+        }
+        
+        // Update axle configuration with new dimensions
+        this.axleCalculator.setVehicle(updatedVehicle);
+        console.log('Updated JUMBO axle positions:', {
+            section1Length: section1Length,
+            section2Length: section2Length,
+            truckRearAxlePosition: truckRearAxlePosition,
+            trailerAxlePosition: trailerAxlePosition
+        });
+        this.updateAxleIndicators();
+        
+        // Auto arrange cargo if there are items
+        if (this.cargoManager.cargoItems.length > 0) {
+            this.autoArrangeCargo();
+        }
+        
+        this.updateStatistics();
+    }
+    
     loadCustomVehicle() {
         const length = parseFloat(document.getElementById('customLength').value);
         const width = parseFloat(document.getElementById('customWidth').value);
@@ -246,6 +627,9 @@ class UI {
                 rear: { position: length * 0.85, maxLoad: 24000 }
             }
         };
+        
+        // Store current vehicle config for modal
+        this.currentVehicleConfig = customVehicle;
         
         // Update Steel Coil availability (custom vehicles don't have groove)
         this.updateSteelCoilAvailability(false);
@@ -713,7 +1097,7 @@ class UI {
         let weightPerUnit = parseFloat(weightInput?.value || 100);
         if (isWeightTotal && amount > 1) {
             // If weight mode is "total", divide by amount to get weight per unit
-            weightPerUnit = weightPerUnit / amount;
+            weightPerUnit = Math.round((weightPerUnit / amount) * 100) / 100;  // Round to 2 decimal places
         }
         
         // Handle Roll type with diameter and height
@@ -2199,58 +2583,76 @@ class UI {
         const frontAxleElement = document.querySelector('.front-axle');
         const rearAxleElement = document.querySelector('.rear-axle');
         const trailerAxleElement = document.querySelector('.trailer-axle');
+        const trailerAxleItem = document.querySelector('.axle-item:nth-child(4)');
+        
+        // Handle JUMBO structure (frontAxle, driveAxles, trailerAxles) vs standard (front, drive, trailer)
+        const isJumbo = axleLoads.isJumbo || false;
+        const front = isJumbo ? axleLoads.frontAxle : axleLoads.front;
+        const drive = isJumbo ? axleLoads.driveAxles : axleLoads.drive;
+        const trailer = isJumbo ? axleLoads.trailerAxles : axleLoads.trailer;
         
         // Front axle (truck)
-        frontAxleElement.style.width = `${Math.min(axleLoads.front.percentage, 100)}%`;
+        frontAxleElement.style.width = `${Math.min(front.percentage, 100)}%`;
         frontAxleElement.classList.remove('warning', 'danger');
-        if (axleLoads.front.status === 'warning') {
+        if (front.status === 'warning' || front.warning) {
             frontAxleElement.classList.add('warning');
-        } else if (axleLoads.front.status === 'danger') {
+        } else if (front.status === 'danger' || front.overloaded) {
             frontAxleElement.classList.add('danger');
         }
         
         // Drive axles (truck drive axles)
-        rearAxleElement.style.width = `${Math.min(axleLoads.drive.percentage, 100)}%`;
+        rearAxleElement.style.width = `${Math.min(drive.percentage, 100)}%`;
         rearAxleElement.classList.remove('warning', 'danger');
-        if (axleLoads.drive.status === 'warning') {
+        if (drive.status === 'warning' || drive.warning) {
             rearAxleElement.classList.add('warning');
-        } else if (axleLoads.drive.status === 'danger') {
+        } else if (drive.status === 'danger' || drive.overloaded) {
             rearAxleElement.classList.add('danger');
         }
         
-        // Trailer axles
-        trailerAxleElement.style.width = `${Math.min(axleLoads.trailer.percentage, 100)}%`;
-        trailerAxleElement.classList.remove('warning', 'danger');
-        if (axleLoads.trailer.status === 'warning') {
-            trailerAxleElement.classList.add('warning');
-        } else if (axleLoads.trailer.status === 'danger') {
-            trailerAxleElement.classList.add('danger');
+        // Check if SOLO (no trailer axles)
+        const isSolo = axleLoads.isSolo || false;
+        
+        if (isSolo) {
+            // Hide trailer axle display for SOLO
+            trailerAxleItem.style.display = 'none';
+        } else {
+            // Show trailer axle display
+            trailerAxleItem.style.display = '';
+            
+            // Trailer axles
+            trailerAxleElement.style.width = `${Math.min(trailer.percentage, 100)}%`;
+            trailerAxleElement.classList.remove('warning', 'danger');
+            if (trailer.status === 'warning' || trailer.warning) {
+                trailerAxleElement.classList.add('warning');
+            } else if (trailer.status === 'danger' || trailer.overloaded) {
+                trailerAxleElement.classList.add('danger');
+            }
+            
+            document.querySelector('.axle-item:nth-child(4) .axle-value').textContent = 
+                `${trailer.load} / ${trailer.max || trailer.percentage} kg`;
         }
         
         // Update text values
         document.querySelector('.axle-item:nth-child(2) .axle-value').textContent = 
-            `${axleLoads.front.load} / ${axleLoads.front.max} kg`;
+            `${front.load} / ${front.max || front.percentage} kg`;
         
         // Drive axle with percentage info
-        const driveValueText = `${axleLoads.drive.load} / ${axleLoads.drive.max} kg`;
-        const drivePercentText = axleLoads.drive.percentageOfTotal ? 
-            ` (${axleLoads.drive.percentageOfTotal.toFixed(1)}%)` : '';
+        const driveValueText = `${drive.load} / ${drive.max || drive.percentage} kg`;
+        const drivePercentText = drive.percentageOfTotal ? 
+            ` (${drive.percentageOfTotal.toFixed(1)}%)` : '';
         document.querySelector('.axle-item:nth-child(3) .axle-value').textContent = 
             driveValueText + drivePercentText;
         
         // Add warning class if below minimum
         const driveItem = document.querySelector('.axle-item:nth-child(3)');
-        if (axleLoads.drive.warning) {
+        if (drive.warning || drive.belowMinimum) {
             driveItem.classList.add('warning-min');
             // Show warning tooltip or message
-            driveItem.title = axleLoads.drive.warning;
+            driveItem.title = drive.warning || 'Obciążenie osi napędowej poniżej minimum';
         } else {
             driveItem.classList.remove('warning-min');
             driveItem.title = '';
         }
-        
-        document.querySelector('.axle-item:nth-child(4) .axle-value').textContent = 
-            `${axleLoads.trailer.load} / ${axleLoads.trailer.max} kg`;
     }
     
     async exportToPNG() {
@@ -2398,6 +2800,7 @@ class UI {
         // Open modal
         openBtn.addEventListener('click', () => {
             this.loadAxleSettings();
+            this.updateAxleModalForVehicleType();
             modal.style.display = 'block';
         });
         
@@ -2430,58 +2833,115 @@ class UI {
     
     loadAxleSettings() {
         const config = this.axleCalculator.axleConfig;
+        const isSolo = this.currentVehicleConfig?.isSolo || false;
+        const isJumbo = this.currentVehicleConfig?.isJumbo || false;
         
         // Set radio buttons
         document.querySelector(`input[name="tractorAxles"][value="${config.tractorAxles}"]`).checked = true;
-        document.querySelector(`input[name="trailerAxles"][value="${config.trailerAxles}"]`).checked = true;
+        if (!isSolo && config.trailerAxles) {
+            document.querySelector(`input[name="trailerAxles"][value="${config.trailerAxles}"]`).checked = true;
+        }
         
-        // Set distances
-        document.getElementById('distFrontToKingpin').value = config.distFrontToKingpin;
-        document.getElementById('distKingpinToTrailer').value = config.distKingpinToTrailer;
-        document.getElementById('distTrailerToEnd').value = config.distTrailerToEnd;
-        document.getElementById('distFrontAxleToKingpin').value = config.distFrontAxleToKingpin;
-        document.getElementById('distKingpinToDrive').value = config.distKingpinToDrive;
+        // Set distances based on vehicle type
+        if (isSolo) {
+            // SOLO distances
+            if (document.getElementById('distCargoStartToFront')) {
+                document.getElementById('distCargoStartToFront').value = config.distCargoStartToFront || 1.0;
+            }
+            if (document.getElementById('distCargoStartToDrive')) {
+                // Round to 1 decimal place for display
+                const value = config.distCargoStartToDrive || 5.5;
+                document.getElementById('distCargoStartToDrive').value = (Math.round(value * 10) / 10).toFixed(1);
+            }
+        } else if (isJumbo) {
+            // JUMBO distances (truck + trailer)
+            if (document.getElementById('distSection1StartToFront')) {
+                document.getElementById('distSection1StartToFront').value = config.distSection1StartToFront || 1.0;
+            }
+            if (document.getElementById('distSection1StartToDrive')) {
+                const value = config.distSection1StartToDrive || 5.5;
+                document.getElementById('distSection1StartToDrive').value = (Math.round(value * 10) / 10).toFixed(1);
+            }
+            if (document.getElementById('distSection2StartToTrailerAxles')) {
+                const value = config.distSection2StartToTrailerAxles || 5.5;
+                document.getElementById('distSection2StartToTrailerAxles').value = (Math.round(value * 10) / 10).toFixed(1);
+            }
+        } else {
+            // Trailer distances
+            if (document.getElementById('distFrontToKingpin')) {
+                document.getElementById('distFrontToKingpin').value = config.distFrontToKingpin || 1.7;
+            }
+            if (document.getElementById('distKingpinToTrailer')) {
+                document.getElementById('distKingpinToTrailer').value = config.distKingpinToTrailer || 7.7;
+            }
+            if (document.getElementById('distTrailerToEnd')) {
+                document.getElementById('distTrailerToEnd').value = config.distTrailerToEnd || 4.2;
+            }
+            if (document.getElementById('distFrontAxleToKingpin')) {
+                document.getElementById('distFrontAxleToKingpin').value = config.distFrontAxleToKingpin || 3.1;
+            }
+            if (document.getElementById('distKingpinToDrive')) {
+                document.getElementById('distKingpinToDrive').value = config.distKingpinToDrive || 0.5;
+            }
+        }
         
         // Set empty weights
         document.getElementById('emptyFrontAxle').value = config.emptyFrontAxle;
         document.getElementById('emptyDriveAxles').value = config.emptyDriveAxles;
-        document.getElementById('emptyTrailerAxles').value = config.emptyTrailerAxles;
+        if (!isSolo) {
+            document.getElementById('emptyTrailerAxles').value = config.emptyTrailerAxles || 5200;
+        }
         
         // Set max loads
         document.getElementById('maxFrontAxle').value = config.maxFrontAxle;
         document.getElementById('maxDriveAxles').value = config.maxDriveAxles;
-        document.getElementById('maxTrailerAxles').value = config.maxTrailerAxles;
+        if (!isSolo) {
+            document.getElementById('maxTrailerAxles').value = config.maxTrailerAxles || 24000;
+        }
         
         // Set minimum drive axle load
         document.getElementById('minDriveAxleLoad').value = config.minDriveAxleLoad || 25;
     }
     
     saveAxleSettings() {
+        const isSolo = this.currentVehicleConfig?.isSolo || false;
+        const isJumbo = this.currentVehicleConfig?.isJumbo || false;
+        
         const config = {
             // Get axle counts
             tractorAxles: parseInt(document.querySelector('input[name="tractorAxles"]:checked').value),
-            trailerAxles: parseInt(document.querySelector('input[name="trailerAxles"]:checked').value),
-            
-            // Get distances
-            distFrontToKingpin: parseFloat(document.getElementById('distFrontToKingpin').value),
-            distKingpinToTrailer: parseFloat(document.getElementById('distKingpinToTrailer').value),
-            distTrailerToEnd: parseFloat(document.getElementById('distTrailerToEnd').value),
-            distFrontAxleToKingpin: parseFloat(document.getElementById('distFrontAxleToKingpin').value),
-            distKingpinToDrive: parseFloat(document.getElementById('distKingpinToDrive').value),
-            
-            // Get empty weights
-            emptyFrontAxle: parseFloat(document.getElementById('emptyFrontAxle').value),
-            emptyDriveAxles: parseFloat(document.getElementById('emptyDriveAxles').value),
-            emptyTrailerAxles: parseFloat(document.getElementById('emptyTrailerAxles').value),
-            
-            // Get max loads
-            maxFrontAxle: parseFloat(document.getElementById('maxFrontAxle').value),
-            maxDriveAxles: parseFloat(document.getElementById('maxDriveAxles').value),
-            maxTrailerAxles: parseFloat(document.getElementById('maxTrailerAxles').value),
-            
-            // Get minimum drive axle load
-            minDriveAxleLoad: parseFloat(document.getElementById('minDriveAxleLoad').value)
         };
+        
+        if (isSolo) {
+            // SOLO-specific settings
+            config.distCargoStartToFront = parseFloat(document.getElementById('distCargoStartToFront').value);
+            config.distCargoStartToDrive = parseFloat(document.getElementById('distCargoStartToDrive').value);
+        } else if (isJumbo) {
+            // JUMBO-specific settings (truck + trailer)
+            config.trailerAxles = parseInt(document.querySelector('input[name="trailerAxles"]:checked').value);
+            config.distSection1StartToFront = parseFloat(document.getElementById('distSection1StartToFront').value);
+            config.distSection1StartToDrive = parseFloat(document.getElementById('distSection1StartToDrive').value);
+            config.distSection2StartToTrailerAxles = parseFloat(document.getElementById('distSection2StartToTrailerAxles').value);
+            config.emptyTrailerAxles = parseFloat(document.getElementById('emptyTrailerAxles').value);
+            config.maxTrailerAxles = parseFloat(document.getElementById('maxTrailerAxles').value);
+        } else {
+            // Trailer settings
+            config.trailerAxles = parseInt(document.querySelector('input[name="trailerAxles"]:checked').value);
+            config.distFrontToKingpin = parseFloat(document.getElementById('distFrontToKingpin').value);
+            config.distKingpinToTrailer = parseFloat(document.getElementById('distKingpinToTrailer').value);
+            config.distTrailerToEnd = parseFloat(document.getElementById('distTrailerToEnd').value);
+            config.distFrontAxleToKingpin = parseFloat(document.getElementById('distFrontAxleToKingpin').value);
+            config.distKingpinToDrive = parseFloat(document.getElementById('distKingpinToDrive').value);
+            config.emptyTrailerAxles = parseFloat(document.getElementById('emptyTrailerAxles').value);
+            config.maxTrailerAxles = parseFloat(document.getElementById('maxTrailerAxles').value);
+        }
+        
+        // Common settings
+        config.emptyFrontAxle = parseFloat(document.getElementById('emptyFrontAxle').value);
+        config.emptyDriveAxles = parseFloat(document.getElementById('emptyDriveAxles').value);
+        config.maxFrontAxle = parseFloat(document.getElementById('maxFrontAxle').value);
+        config.maxDriveAxles = parseFloat(document.getElementById('maxDriveAxles').value);
+        config.minDriveAxleLoad = parseFloat(document.getElementById('minDriveAxleLoad').value);
         
         // Update axle calculator configuration
         this.axleCalculator.updateAxleConfiguration(config);
@@ -2506,5 +2966,62 @@ class UI {
     onGroupSelectionChanged(selectedGroupId) {
         // Update UI to reflect group selection state
         this.updateLoadedUnitsList();
+    }
+    
+    updateAxleModalForVehicleType() {
+        const isSolo = this.currentVehicleConfig?.isSolo || false;
+        const isJumbo = this.currentVehicleConfig?.isJumbo || false;
+        
+        // Get all elements to show/hide
+        const trailerAxlesGroup = document.getElementById('trailerAxlesGroup');
+        const trailerDistances = document.querySelectorAll('.trailer-distance');
+        const soloDistances = document.querySelectorAll('.solo-distance');
+        const jumboDistances = document.querySelectorAll('.jumbo-distance');
+        const trailerWeights = document.querySelectorAll('.trailer-weight');
+        
+        // Get trailer axle radio buttons
+        const trailerAxle3Option = document.querySelector('input[name="trailerAxles"][value="3"]');
+        const trailerAxle3Label = trailerAxle3Option ? trailerAxle3Option.parentElement : null;
+        
+        if (isSolo) {
+            // Hide trailer-specific and JUMBO-specific elements
+            if (trailerAxlesGroup) trailerAxlesGroup.style.display = 'none';
+            trailerDistances.forEach(el => el.style.display = 'none');
+            trailerWeights.forEach(el => el.style.display = 'none');
+            jumboDistances.forEach(el => el.style.display = 'none');
+            // Show SOLO-specific elements
+            soloDistances.forEach(el => el.style.display = '');
+        } else if (isJumbo) {
+            // Show trailer axles group for JUMBO (has trailer section)
+            if (trailerAxlesGroup) trailerAxlesGroup.style.display = '';
+            trailerWeights.forEach(el => el.style.display = '');
+            
+            // Hide 3-axle option for JUMBO (max 2 axles)
+            if (trailerAxle3Label) trailerAxle3Label.style.display = 'none';
+            
+            // If 3 axles was selected, switch to 2 axles
+            if (trailerAxle3Option && trailerAxle3Option.checked) {
+                const trailerAxle2Option = document.querySelector('input[name="trailerAxles"][value="2"]');
+                if (trailerAxle2Option) trailerAxle2Option.checked = true;
+            }
+            
+            // Hide standard trailer and SOLO elements
+            trailerDistances.forEach(el => el.style.display = 'none');
+            soloDistances.forEach(el => el.style.display = 'none');
+            // Show JUMBO-specific elements
+            jumboDistances.forEach(el => el.style.display = '');
+        } else {
+            // Show trailer-specific elements
+            if (trailerAxlesGroup) trailerAxlesGroup.style.display = '';
+            trailerDistances.forEach(el => el.style.display = '');
+            trailerWeights.forEach(el => el.style.display = '');
+            
+            // Show 3-axle option for standard trailers
+            if (trailerAxle3Label) trailerAxle3Label.style.display = '';
+            
+            // Hide SOLO and JUMBO-specific elements
+            soloDistances.forEach(el => el.style.display = 'none');
+            jumboDistances.forEach(el => el.style.display = 'none');
+        }
     }
 }

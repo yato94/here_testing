@@ -427,6 +427,119 @@ body {
     font-size: 0.875rem;
 }
 
+/* SOLO Dimension Sliders */
+.solo-sliders {
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    margin: 0.5rem 0;
+}
+
+.solo-sliders.hidden {
+    display: none;
+}
+
+/* JUMBO Dimension Sliders */
+.jumbo-sliders {
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    margin: 0.5rem 0;
+}
+
+.jumbo-sliders.hidden {
+    display: none;
+}
+
+.jumbo-section {
+    margin: 0;
+    padding: 0;
+    background: none;
+    border-radius: 0;
+}
+
+.jumbo-section .section-title {
+    margin: 0 0 0.25rem 0;
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.slider-group-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.slider-group-inline:last-child {
+    margin-bottom: 0;
+}
+
+/* Reduce margin between sliders in JUMBO sections */
+.jumbo-section .slider-group-inline {
+    margin-bottom: 0.3rem;
+}
+
+.slider-group-inline label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    min-width: 65px;
+    flex-shrink: 0;
+}
+
+.slider-value {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+    min-width: 45px;
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.dimension-slider {
+    flex: 1;
+    min-width: 0;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--border-color);
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.dimension-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.dimension-slider::-webkit-slider-thumb:hover {
+    background: var(--text-secondary);
+}
+
+.dimension-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.dimension-slider::-moz-range-thumb:hover {
+    background: var(--text-secondary);
+}
+
 .info-label {
     color: var(--text-secondary);
 }

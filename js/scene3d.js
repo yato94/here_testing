@@ -471,23 +471,41 @@ class Scene3D {
     }
     
     addTruckAndWheels(containerGroup, dimensions, trailerHeight, axleConfig = null) {
+        // Check if this is a SOLO or JUMBO vehicle
+        const isSolo = dimensions.isSolo || false;
+        const isJumbo = dimensions.isJumbo || false;
+        
         // Use provided config or get from axleCalculator if available
         const config = axleConfig || (window.axleCalculator?.axleConfig ? {
-            tractorAxles: window.axleCalculator.axleConfig.tractorAxles,
-            trailerAxles: window.axleCalculator.axleConfig.trailerAxles,
-            distFrontToKingpin: window.axleCalculator.axleConfig.distFrontToKingpin,
-            distKingpinToTrailer: window.axleCalculator.axleConfig.distKingpinToTrailer,
-            distTrailerToEnd: window.axleCalculator.axleConfig.distTrailerToEnd,
-            distFrontAxleToKingpin: window.axleCalculator.axleConfig.distFrontAxleToKingpin,
-            distKingpinToDrive: window.axleCalculator.axleConfig.distKingpinToDrive
+            isSolo: isSolo,
+            isJumbo: isJumbo,
+            tractorAxles: window.axleCalculator.axleConfig.tractorAxles || 1,
+            trailerAxles: isSolo ? 0 : (window.axleCalculator.axleConfig.trailerAxles || 3),
+            distFrontToKingpin: window.axleCalculator.axleConfig.distFrontToKingpin || 1.7,
+            distKingpinToTrailer: window.axleCalculator.axleConfig.distKingpinToTrailer || 7.7,
+            distTrailerToEnd: window.axleCalculator.axleConfig.distTrailerToEnd || 4.2,
+            distFrontAxleToKingpin: window.axleCalculator.axleConfig.distFrontAxleToKingpin || 3.1,
+            distKingpinToDrive: window.axleCalculator.axleConfig.distKingpinToDrive || 0.5,
+            distCargoStartToFront: window.axleCalculator.axleConfig.distCargoStartToFront || 1.0,
+            distCargoStartToDrive: window.axleCalculator.axleConfig.distCargoStartToDrive || 5.5,
+            distSection1StartToFront: window.axleCalculator.axleConfig.distSection1StartToFront || 1.0,
+            distSection1StartToDrive: window.axleCalculator.axleConfig.distSection1StartToDrive || 5.5,
+            distSection2StartToTrailerAxles: window.axleCalculator.axleConfig.distSection2StartToTrailerAxles || 5.5
         } : {
+            isSolo: isSolo,
+            isJumbo: isJumbo,
             tractorAxles: 1,
-            trailerAxles: 3,
+            trailerAxles: isSolo ? 0 : 3,
             distFrontToKingpin: 1.7,
             distKingpinToTrailer: 7.7,
             distTrailerToEnd: 4.2,
             distFrontAxleToKingpin: 3.1,
-            distKingpinToDrive: 0.5
+            distKingpinToDrive: 0.5,
+            distCargoStartToFront: 1.0,
+            distCargoStartToDrive: 5.5,
+            distSection1StartToFront: 1.0,
+            distSection1StartToDrive: 5.5,
+            distSection2StartToTrailerAxles: 5.5
         });
         
         // Store reference to truck visualization group
@@ -507,43 +525,78 @@ class Scene3D {
         });
         
         // Calculate positions based on provided distances
-        // a) 1.7m from front of loading space to kingpin
-        // b) 7.7m from kingpin to center of trailer axles
-        // c) 4.2m from center of trailer axles to end of loading space
-        // d) 3.1m from front axle to kingpin
-        // e) 0.5m from drive axle BEHIND kingpin
-        
         const containerFront = -dimensions.length / 2;
         const containerEnd = dimensions.length / 2;
-        const kingPinX = containerFront + config.distFrontToKingpin;
-        const trailerAxlesX = containerFront + config.distFrontToKingpin + config.distKingpinToTrailer;
-        const frontAxleX = kingPinX - config.distFrontAxleToKingpin;
-        const driveAxlesCenter = kingPinX + config.distKingpinToDrive
         
-        // Trailer wheels (3 axles with more spacing)
+        let kingPinX, trailerAxlesX, frontAxleX, driveAxlesCenter;
+        
+        if (isSolo) {
+            // For SOLO: positions are relative to cargo space start
+            // distCargoStartToFront is positive distance, so subtract to go before cargo start
+            const distToFront = config.distCargoStartToFront || 1.0;
+            const distToDrive = config.distCargoStartToDrive || 5.5;
+            frontAxleX = containerFront - distToFront;
+            driveAxlesCenter = containerFront + distToDrive;
+            // No kingpin or trailer axles for SOLO
+            kingPinX = null;
+            trailerAxlesX = null;
+        } else if (isJumbo) {
+            // For JUMBO: two independent sections
+            const sections = dimensions.sections || [];
+            const section1Length = sections[0]?.length || 7.7;
+            const section2Length = sections[1]?.length || 7.7;
+            const gap = 0.5; // 50cm gap between sections
+            
+            // Section 1 (truck) - positions relative to section 1 start
+            const section1Start = containerFront;
+            const section1End = section1Start + section1Length;
+            
+            // Section 2 (trailer) - positions relative to section 2 start  
+            const section2Start = section1End + gap;
+            
+            // Truck axles for section 1
+            frontAxleX = section1Start - (config.distSection1StartToFront || 1.0);
+            driveAxlesCenter = section1Start + (config.distSection1StartToDrive || 5.5);
+            
+            // Trailer axles for section 2
+            trailerAxlesX = section2Start + (config.distSection2StartToTrailerAxles || 5.5);
+            
+            // No kingpin for JUMBO
+            kingPinX = null;
+        } else {
+            // For trailers: standard positioning with kingpin
+            kingPinX = containerFront + config.distFrontToKingpin;
+            trailerAxlesX = containerFront + config.distFrontToKingpin + config.distKingpinToTrailer;
+            frontAxleX = kingPinX - config.distFrontAxleToKingpin;
+            driveAxlesCenter = kingPinX + config.distKingpinToDrive;
+        }
+        
+        // Wheels configuration
         const wheelRadius = 0.546;  // Zmniejszone o 4mm aby nie nachodziły na podłogę
         const wheelWidth = 0.35;   // Zwiększone z 0.3 na 0.35 - szersze opony
         
-        // Trailer axles based on configuration
-        if (config.trailerAxles === 1) {
-            // Single axle
-            this.addWheel(this.truckVisualizationGroup, trailerAxlesX, wheelRadius, -1.0, wheelRadius, wheelWidth);
-            this.addWheel(this.truckVisualizationGroup, trailerAxlesX, wheelRadius, 1.0, wheelRadius, wheelWidth);
-        } else if (config.trailerAxles === 2) {
-            // Tandem (2 axles)
-            const spacing = 1.31;
-            for (let i = -0.5; i <= 0.5; i += 1) {
-                const axleX = trailerAxlesX + i * spacing;
-                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, -1.0, wheelRadius, wheelWidth);
-                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, 1.0, wheelRadius, wheelWidth);
-            }
-        } else if (config.trailerAxles === 3) {
-            // Tridem (3 axles)
-            const spacing = 1.31;
-            for (let i = -1; i <= 1; i++) {
-                const axleX = trailerAxlesX + i * spacing;
-                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, -1.0, wheelRadius, wheelWidth);
-                this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, 1.0, wheelRadius, wheelWidth);
+        // Trailer axles based on configuration (skip for SOLO, but include for JUMBO)
+        if (!isSolo || isJumbo) {
+            if (config.trailerAxles === 1) {
+                // Single axle
+                this.addWheel(this.truckVisualizationGroup, trailerAxlesX, wheelRadius, -1.0, wheelRadius, wheelWidth);
+                this.addWheel(this.truckVisualizationGroup, trailerAxlesX, wheelRadius, 1.0, wheelRadius, wheelWidth);
+            } else if (config.trailerAxles === 2) {
+                // Tandem (2 axles)
+                const spacing = 1.31;
+                for (let i = -0.5; i <= 0.5; i += 1) {
+                    const axleX = trailerAxlesX + i * spacing;
+                    this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, -1.0, wheelRadius, wheelWidth);
+                    this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, 1.0, wheelRadius, wheelWidth);
+                }
+            } else if (config.trailerAxles === 3) {
+                // Tridem (3 axles)
+                const spacing = 1.31;
+                for (let i = -1; i <= 1; i++) {
+                    const axleX = trailerAxlesX + i * spacing;
+                    this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, -1.0, wheelRadius, wheelWidth);
+                    this.addWheel(this.truckVisualizationGroup, axleX, wheelRadius, 1.0, wheelRadius, wheelWidth);
+                }
             }
         }
         
@@ -578,7 +631,19 @@ class Scene3D {
         // Add chassis rectangle under the cabin first to calculate its position
         const cabinX = frontAxleX - 0.2; // Moved 10cm closer to reduce gap to 45cm
         const cabinFrontX = cabinX - cabinLength/2; // Front of both cabin and chassis align
-        const chassisEndX = driveAxlesCenter + 1.0;
+        // For SOLO, extend chassis to the end of cargo space
+        // For JUMBO, extend chassis to the end of first section
+        let chassisEndX;
+        if (isSolo) {
+            chassisEndX = containerEnd;
+        } else if (isJumbo) {
+            // For JUMBO, extend to end of first section
+            const sections = dimensions.sections || [];
+            const section1Length = sections[0]?.length || 7.7;
+            chassisEndX = containerFront + section1Length;
+        } else {
+            chassisEndX = driveAxlesCenter + 1.0;
+        }
         const chassisHeight = 0.7; // Increased to be above wheels
         const chassisWidth = cabinWidth; // Same width as cabin
         const chassisTopY = 1.09; // Lowered by 1cm to avoid overlapping with floor
@@ -2005,6 +2070,69 @@ class Scene3D {
                 // Reset rotation since we're changing orientation
                 unit.rotation.y = 0;
                 
+                // Remove old outline (LineLoop children)
+                const lineLoops = [];
+                unit.children.forEach(child => {
+                    if (child instanceof THREE.LineLoop) {
+                        lineLoops.push(child);
+                    }
+                });
+                lineLoops.forEach(loop => {
+                    if (loop.geometry) loop.geometry.dispose();
+                    if (loop.material) loop.material.dispose();
+                    unit.remove(loop);
+                });
+                
+                // Add new outline based on new orientation
+                if (this.cargoMeshes.length < 100) {
+                    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
+                    
+                    if (unit.userData.isVerticalRoll) {
+                        // Vertical cylinder - add circles at top and bottom
+                        const radius = unit.userData.width / 2;
+                        const height = unit.userData.height;
+                        
+                        // Top circle
+                        const topCircle = new THREE.EllipseCurve(0, 0, radius, radius, 0, 2 * Math.PI, false);
+                        const topPoints = topCircle.getPoints(32);
+                        const topGeometry = new THREE.BufferGeometry().setFromPoints(topPoints);
+                        const topLine = new THREE.LineLoop(topGeometry, lineMaterial);
+                        topLine.position.y = height / 2;
+                        topLine.rotation.x = Math.PI / 2;
+                        unit.add(topLine);
+                        
+                        // Bottom circle
+                        const bottomLine = new THREE.LineLoop(topGeometry.clone(), lineMaterial);
+                        bottomLine.position.y = -height / 2;
+                        bottomLine.rotation.x = Math.PI / 2;
+                        unit.add(bottomLine);
+                    } else {
+                        // Horizontal cylinder - add circles at the ends
+                        const diameter = unit.userData.diameter || unit.userData.width;
+                        const radius = diameter / 2;
+                        const cylinderLength = unit.userData.diameter ? 
+                            Math.max(unit.userData.length, unit.userData.width) : 
+                            unit.userData.length;
+                        
+                        // Create circle curve
+                        const circle = new THREE.EllipseCurve(0, 0, radius, radius, 0, 2 * Math.PI, false);
+                        const points = circle.getPoints(32);
+                        const circleGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                        
+                        // Front circle
+                        const frontLine = new THREE.LineLoop(circleGeometry, lineMaterial);
+                        frontLine.position.x = cylinderLength / 2;
+                        frontLine.rotation.y = Math.PI / 2;
+                        unit.add(frontLine);
+                        
+                        // Back circle
+                        const backLine = new THREE.LineLoop(circleGeometry.clone(), lineMaterial);
+                        backLine.position.x = -cylinderLength / 2;
+                        backLine.rotation.y = Math.PI / 2;
+                        unit.add(backLine);
+                    }
+                }
+                
                 // Update userData position
                 unit.userData.position = {
                     x: unit.position.x,
@@ -2340,8 +2468,8 @@ class Scene3D {
                     
                     // Units are overlapping if distance is less than sum of half-dimensions
                     // Allow exact touching (distance == sum) with small tolerance
-                    const xOverlapping = xDistance < (xSum - 0.001);
-                    const zOverlapping = zDistance < (zSum - 0.001);
+                    const xOverlapping = xDistance < xSum;
+                    const zOverlapping = zDistance < zSum;
                     
                     if (xOverlapping && zOverlapping) {
                         return false; // Units are overlapping
@@ -3107,8 +3235,8 @@ class Scene3D {
                         targetY = stackY;
                         
                         // Only snap if we had to adjust the position
-                        if (Math.abs(clampedX - adjustedPosition.x) > 0.01 || 
-                            Math.abs(clampedZ - adjustedPosition.z) > 0.01) {
+                        if (Math.abs(clampedX - adjustedPosition.x) > 0 || 
+                            Math.abs(clampedZ - adjustedPosition.z) > 0) {
                             snapPosition = {
                                 x: clampedX,
                                 z: clampedZ
@@ -3139,8 +3267,8 @@ class Scene3D {
                                 const xDist = Math.abs(clampedX - otherMesh.position.x);
                                 const zDist = Math.abs(clampedZ - otherMesh.position.z);
                                 
-                                if (xDist < (halfLength + otherHalfLength - 0.001) &&
-                                    zDist < (halfWidth + otherHalfWidth - 0.001)) {
+                                if (xDist < (halfLength + otherHalfLength) &&
+                                    zDist < (halfWidth + otherHalfWidth)) {
                                     hasCollisionOnSameFloor = true;
                                     break;
                                 }
@@ -3312,10 +3440,9 @@ class Scene3D {
         const targetMaxZ = targetPosition.z + targetHalfWidth;
         
         // Check if dragged unit is completely within target unit bounds
-        // Use very small tolerance to prevent units from extending beyond edges
-        const tolerance = 0.01; // 1cm tolerance - strict but allows for floating point errors
-        const fitsInX = draggedMinX >= targetMinX - tolerance && draggedMaxX <= targetMaxX + tolerance;
-        const fitsInZ = draggedMinZ >= targetMinZ - tolerance && draggedMaxZ <= targetMaxZ + tolerance;
+        // No tolerance - unit must fit completely within bounds
+        const fitsInX = draggedMinX >= targetMinX && draggedMaxX <= targetMaxX;
+        const fitsInZ = draggedMinZ >= targetMinZ && draggedMaxZ <= targetMaxZ;
         
         return fitsInX && fitsInZ;
     }
@@ -3418,13 +3545,13 @@ class Scene3D {
         const draggedBottomY = proposedPosition.y - draggedData.height / 2;
         
         // Ensure the unit is actually on top (not floating or embedded)
-        if (Math.abs(draggedBottomY - targetTopY) > 0.01) {
+        if (Math.abs(draggedBottomY - targetTopY) > 0) {
             // Silently reject - not properly on top
             return false;
         }
         
         // Check for collisions with other units at the same Y level
-        const tolerance = 0.01;
+        const tolerance = 0;
         const draggedHalfLength = draggedData.length / 2;
         const draggedHalfWidth = draggedData.width / 2;
         const draggedHalfHeight = draggedData.height / 2;
@@ -3461,8 +3588,8 @@ class Scene3D {
                     
                     // Units are overlapping if distance is less than sum of half-dimensions
                     // Allow exact touching (distance == sum) with small tolerance for floating point
-                    const xOverlapping = xDistance < (xSum - 0.001);
-                    const zOverlapping = zDistance < (zSum - 0.001);
+                    const xOverlapping = xDistance < xSum;
+                    const zOverlapping = zDistance < zSum;
                     
                     if (xOverlapping && zOverlapping) {
                         return false; // Units are overlapping
@@ -3610,9 +3737,9 @@ class Scene3D {
                 const otherMaxY = mesh.position.y + otherHalfHeight;
                 
                 // Check for collision (bounding boxes overlap)
-                const overlapX = !(coilMaxX <= otherMinX + 0.01 || coilMinX >= otherMaxX - 0.01);
-                const overlapZ = !(coilMaxZ <= otherMinZ + 0.01 || coilMinZ >= otherMaxZ - 0.01);
-                const overlapY = !(coilMaxY <= otherMinY + 0.01 || coilMinY >= otherMaxY - 0.01);
+                const overlapX = !(coilMaxX <= otherMinX || coilMinX >= otherMaxX);
+                const overlapZ = !(coilMaxZ <= otherMinZ || coilMinZ >= otherMaxZ);
+                const overlapY = !(coilMaxY <= otherMinY || coilMinY >= otherMaxY);
                 
                 if (overlapX && overlapZ && overlapY) {
                     return false; // Collision detected
@@ -3683,7 +3810,7 @@ class Scene3D {
                         const dz = objectPosition.z - mesh.position.z;
                         const distance = Math.sqrt(dx * dx + dz * dz);
                         
-                        if (distance < minDistance - 0.01) {
+                        if (distance < minDistance) {
                             return false; // Circular collision detected
                         }
                     }
@@ -3696,13 +3823,13 @@ class Scene3D {
                     const zSum = halfWidth + targetHalfWidth;
                     
                     // Check for actual overlap (not just touching)
-                    const overlapX = xDistance < (xSum - 0.001);
-                    const overlapZ = zDistance < (zSum - 0.001);
+                    const overlapX = xDistance < xSum;
+                    const overlapZ = zDistance < zSum;
                     
                     
                     if (overlapX && overlapZ) {
                         // Check if we're at the same height level (collision)
-                        const heightOverlap = Math.abs(objectPosition.y - mesh.position.y) < (halfHeight + targetHalfHeight - 0.01);
+                        const heightOverlap = Math.abs(objectPosition.y - mesh.position.y) < (halfHeight + targetHalfHeight);
                         
                         if (heightOverlap) {
                             // Check if units are at the same floor level (same Y position)
@@ -5648,7 +5775,7 @@ class Scene3D {
     }
     
     objectsWouldCollide(pos1, data1, pos2, data2) {
-        const tolerance = 0.01; // 1cm tolerance - pozwala na stykanie się, ale zapobiega nakładaniu
+        const tolerance = 0; // No tolerance - same as bin packing
         
         // Calculate bounding boxes
         const halfLength1 = data1.length / 2;
