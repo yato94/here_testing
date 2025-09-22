@@ -2,7 +2,7 @@ const CONFIG = {
     vehicles: {
         standard: {
             name: 'Naczepa standardowa',
-            length: 13.6,
+            length: 13.62,
             width: 2.48,
             height: 2.7,
             maxLoad: 24000,
@@ -16,7 +16,7 @@ const CONFIG = {
         },
         mega: {
             name: 'Mega trailer',
-            length: 13.6,
+            length: 13.62,
             width: 2.48,
             height: 3.0,
             maxLoad: 24000,
@@ -44,7 +44,7 @@ const CONFIG = {
                 front: { position: -1.0, maxLoad: 10000, emptyWeight: 5800 },  // 1.0m before section 1 start
                 rear: { position: 5.5, maxLoad: 11500, emptyWeight: 3600 },   // 5.5m from section 1 start
                 // Trailer axles (positions from section 2 start)
-                trailer: { position: 5.5, maxLoad: 18000, emptyWeight: 4200, count: 2 }  // 5.5m from section 2 start, 2 axles
+                trailer: { position: 4.2, maxLoad: 18000, emptyWeight: 4200, count: 2 }  // 4.2m from section 2 start, 2 axles
             },
             trailerHeight: 1.2
         },
@@ -92,7 +92,7 @@ const CONFIG = {
         },
         coilmuldeStandard: {
             name: 'Coilmulde Standard',
-            length: 13.6,
+            length: 13.62,
             width: 2.48,
             height: 2.7,
             maxLoad: 24000,
@@ -111,7 +111,7 @@ const CONFIG = {
         },
         coilmuldeMega: {
             name: 'Coilmulde Mega',
-            length: 13.6,
+            length: 13.62,
             width: 2.48,
             height: 3.0,
             maxLoad: 24000,

@@ -490,6 +490,9 @@ class CargoManager {
                             z: baseZ + (itemWidth / 2)
                         };
                         
+                        // Mark item as inside the container
+                        item.isOutside = false;
+                        
                         const meshData = {
                             ...item,
                             x: item.position.x,
@@ -605,6 +608,9 @@ class CargoManager {
                         y: trailerHeight + baseY + (index * stack.sample.height) + (stack.sample.height / 2),
                         z: baseZ + ((stack.sample.isRoll && stack.sample.fixedDiameter) ? 0 : itemWidth / 2)
                     };
+                    
+                    // Mark item as inside the container
+                    item.isOutside = false;
                     
                     const meshData = {
                         ...item,
@@ -871,46 +877,88 @@ class CargoManager {
                 
                 const sectionResult = tempPackers[sectionIndex].packItems(remainingItems, true);
                 
-                // Transform packed items to global coordinates and place them
+                // Calculate section boundaries for gap validation
+                const sectionStartX = xOffset;
+                const sectionEndX = xOffset + section.length;
+                
+                // Transform packed items to global coordinates and validate they don't overlap gap
+                const validPackedItems = [];
+                const invalidPackedItems = [];
+                
                 sectionResult.packed.forEach(packedItem => {
                     const stack = packedItem.userData;
                     const baseX = xOffset + packedItem.position.x;
-                    const baseY = packedItem.position.y;
-                    const baseZ = packedItem.position.z - (section.width / 2);
+                    const itemLength = packedItem.rotated ? stack.sample.width : stack.sample.length;
                     
-                    // Place each item in the stack
-                    stack.items.forEach((item, index) => {
-                        // Adjust position based on rotation
-                        const itemLength = packedItem.rotated ? stack.sample.width : stack.sample.length;
-                        const itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
+                    // Check if item would overlap with gap area or exceed section bounds
+                    const itemStartX = baseX;
+                    const itemEndX = baseX + itemLength;
+                    
+                    // For section 0, ensure item doesn't extend into gap
+                    // For section 1, ensure item starts after gap
+                    const isValidPosition = (itemStartX >= sectionStartX && itemEndX <= sectionEndX);
+                    
+                    if (!isValidPosition) {
+                        // Item would overlap gap or exceed section bounds - mark as unpacked
+                        invalidPackedItems.push(packedItem);
+                    } else {
+                        validPackedItems.push(packedItem);
                         
-                        item.position = {
-                            x: baseX + (itemLength / 2),
-                            y: trailerHeight + baseY + (index * stack.sample.height) + (stack.sample.height / 2),
-                            z: baseZ + (itemWidth / 2)
-                        };
+                        const baseY = packedItem.position.y;
+                        const baseZ = packedItem.position.z - (section.width / 2);
                         
-                        const meshData = {
-                            ...item,
-                            x: item.position.x,
-                            y: item.position.y,
-                            z: item.position.z,
-                            // Only override dimensions for non-roll items
-                            ...(item.type !== 'roll' && item.type !== 'steel-coil' ? {
-                                length: itemLength,
-                                width: itemWidth,
-                                height: stack.sample.height
-                            } : {})
-                        };
-                        
-                        item.mesh = this.scene3d.addCargo(meshData);
-                    });
+                        // Place each item in the stack
+                        stack.items.forEach((item, index) => {
+                            // Adjust position based on rotation
+                            const itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
+                            
+                            item.position = {
+                                x: baseX + (itemLength / 2),
+                                y: trailerHeight + baseY + (index * stack.sample.height) + (stack.sample.height / 2),
+                                z: baseZ + (itemWidth / 2)
+                            };
+                            
+                            // Mark item as inside the container
+                            item.isOutside = false;
+                            
+                            const meshData = {
+                                ...item,
+                                x: item.position.x,
+                                y: item.position.y,
+                                z: item.position.z,
+                                // Only override dimensions for non-roll items
+                                ...(item.type !== 'roll' && item.type !== 'steel-coil' ? {
+                                    length: itemLength,
+                                    width: itemWidth,
+                                    height: stack.sample.height
+                                } : {})
+                            };
+                            
+                            item.mesh = this.scene3d.addCargo(meshData);
+                        });
+                    }
                 });
                 
-                allPacked.push(...sectionResult.packed);
+                allPacked.push(...validPackedItems);
                 
-                // Update remaining items for next section
-                remainingItems = sectionResult.unpacked;
+                // Add invalid items back to unpacked list as itemsForPacking format
+                const invalidItemsForPacking = invalidPackedItems.map(packed => ({
+                    width: packed.width,
+                    depth: packed.depth,
+                    height: packed.height,
+                    weight: packed.weight,
+                    userData: packed.userData,
+                    maxStack: packed.maxStack,
+                    maxStackWeight: packed.maxStackWeight,
+                    isRoll: packed.isRoll,
+                    isVerticalRoll: packed.isVerticalRoll,
+                    isHorizontalRoll: packed.isHorizontalRoll,
+                    diameter: packed.diameter,
+                    fixedDiameter: packed.fixedDiameter
+                }));
+                
+                // Update remaining items for next section (include invalid items)
+                remainingItems = [...sectionResult.unpacked, ...invalidItemsForPacking];
                 xOffset += section.length;
             });
             
@@ -953,6 +1001,9 @@ class CargoManager {
                         y: trailerHeight + baseY + (index * item.height) + (item.height / 2),
                         z: baseZ + ((item.isRoll && item.fixedDiameter) ? 0 : itemWidth / 2)
                     };
+                    
+                    // Mark item as inside the container
+                    item.isOutside = false;
                     
                     const meshData = {
                         ...item,
@@ -1102,6 +1153,7 @@ class CargoManager {
     
     exportConfiguration() {
         return {
+            vehicleType: this.currentVehicleType || 'custom',
             container: this.containerDimensions,
             maxLoad: this.maxLoad,
             cargoItems: this.cargoItems.map(item => ({
@@ -1113,7 +1165,18 @@ class CargoManager {
                     height: item.height
                 },
                 weight: item.weight,
-                position: item.position
+                position: item.position,
+                maxStack: item.maxStack,
+                maxStackWeight: item.maxStackWeight,
+                loadingMethods: item.loadingMethods,
+                unloadingMethods: item.unloadingMethods,
+                groupId: item.groupId,
+                isOutside: item.isOutside,
+                rotation: item.rotation,
+                isRoll: item.isRoll,
+                diameter: item.diameter,
+                isVerticalRoll: item.isVerticalRoll,
+                fixedDiameter: item.fixedDiameter
             })),
             statistics: this.getStatistics()
         };
@@ -1122,23 +1185,86 @@ class CargoManager {
     importConfiguration(config) {
         this.clearAllCargo();
         
-        if (config.container) {
+        // Store the vehicle type to return it
+        const vehicleType = config.vehicleType || 'custom';
+        this.currentVehicleType = vehicleType;
+        
+        // Don't set container here - it should be set by UI before calling this method
+        // Only set if container dimensions are different (for safety)
+        if (config.container && (!this.containerDimensions || 
+            this.containerDimensions.length !== config.container.length ||
+            this.containerDimensions.width !== config.container.width ||
+            this.containerDimensions.height !== config.container.height)) {
             this.setContainer(config.container, config.maxLoad);
         }
         
         if (config.cargoItems) {
             config.cargoItems.forEach(item => {
-                const cargoItem = this.addCargoUnit(item.type, {
-                    weight: item.weight
-                });
+                // Prepare custom parameters with all properties
+                const customParams = {
+                    weight: item.weight,
+                    maxStack: item.maxStack,
+                    maxStackWeight: item.maxStackWeight,
+                    loadingMethods: item.loadingMethods,
+                    unloadingMethods: item.unloadingMethods,
+                    name: item.name,
+                    groupKey: `import_${item.groupId}`, // Preserve group during import
+                    rotation: item.rotation,
+                    isRoll: item.isRoll,
+                    diameter: item.diameter,
+                    isVerticalRoll: item.isVerticalRoll,
+                    fixedDiameter: item.fixedDiameter
+                };
                 
+                // If dimensions are provided, add them
+                if (item.dimensions) {
+                    customParams.dimensions = {
+                        length: item.dimensions.length,
+                        width: item.dimensions.width,
+                        height: item.dimensions.height
+                    };
+                }
+                
+                const cargoItem = this.addCargoUnit(item.type, customParams);
+                
+                // Restore the original groupId
+                if (item.groupId) {
+                    cargoItem.groupId = item.groupId;
+                }
+                
+                // Set position and isOutside flag
                 if (item.position) {
-                    this.manualPlaceCargo(cargoItem, item.position);
+                    cargoItem.position = item.position;
+                }
+                if (item.isOutside !== undefined) {
+                    cargoItem.isOutside = item.isOutside;
+                }
+            });
+            
+            // After all items are added, create meshes with proper positions
+            this.cargoItems.forEach(item => {
+                if (item.position) {
+                    const meshData = {
+                        ...item,
+                        x: item.position.x,
+                        y: item.position.y,
+                        z: item.position.z
+                    };
+                    
+                    item.mesh = this.scene3d.addCargo(meshData);
+                    
+                    // If item was outside, move it outside
+                    if (item.isOutside) {
+                        this.scene3d.moveOutsideContainer(item.mesh);
+                    }
                 }
             });
         }
         
         this.updateCenterOfGravity();
+        
+        // Return the vehicle type so UI can update
+        return { vehicleType };
     }
     
     updateCargoPositions(movedCargo) {

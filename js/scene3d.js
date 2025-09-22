@@ -1080,9 +1080,9 @@ class Scene3D {
         
         mesh.userData = cargoData;
         
-        // Add wireframe only if less than 100 items (performance)
+        // Add wireframe only if less than 1000 items (performance)
         // For steel coils, don't add wireframe as it looks better without edge lines
-        if (this.cargoMeshes.length < 100 && cargoData.type !== 'steel-coil') {
+        if (this.cargoMeshes.length < 1000 && cargoData.type !== 'steel-coil') {
             // For Roll units, only add circular edges at the bases
             if (cargoData.isRoll && !cargoData.fixedDiameter) {
                 const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
@@ -1318,13 +1318,11 @@ class Scene3D {
                 }
                 // Show grab cursor
                 document.body.style.cursor = 'grab';
-                // Show ruler and dimension labels for hovered cargo only if inside container
+                // Show dimension labels for all hovered cargo
+                this.createDimensionLabels(this.hoveredObject);
+                // Show ruler only for cargo inside container
                 if (!this.isPositionOutsideContainer(this.hoveredObject.position)) {
                     this.showRulerForCargo(this.hoveredObject);
-                    this.createDimensionLabels(this.hoveredObject);
-                } else {
-                    // Hide dimension labels for units outside container
-                    this.hideDimensionLabels();
                 }
             } else {
                 // Not hovering over cargo - enable OrbitControls
@@ -2435,6 +2433,29 @@ class Scene3D {
                     test.newZ + halfWidth > this.containerBounds.max.z) {
                     return false;
                 }
+                
+                // Additional check for JUMBO - ensure units don't overlap the gap
+                if (this.containerBounds.isJumbo && this.containerBounds.sections) {
+                    const gap = 0.5; // 50cm gap between sections
+                    const section1Start = this.containerBounds.min.x;
+                    const section1End = section1Start + this.containerBounds.sections[0].length;
+                    const section2Start = section1End + gap;
+                    
+                    const unitStart = test.newX - halfLength;
+                    const unitEnd = test.newX + halfLength;
+                    
+                    // Check if unit overlaps with gap area
+                    // Unit is invalid if it starts before section2 and ends after section1
+                    // (i.e., it spans the gap)
+                    if (unitStart < section2Start && unitEnd > section1End) {
+                        return false; // Unit would overlap the gap
+                    }
+                    
+                    // Also check if unit is completely within the gap
+                    if (unitStart >= section1End && unitEnd <= section2Start) {
+                        return false; // Unit would be entirely in the gap
+                    }
+                }
             }
         }
         
@@ -2468,8 +2489,8 @@ class Scene3D {
                     
                     // Units are overlapping if distance is less than sum of half-dimensions
                     // Allow exact touching (distance == sum) with small tolerance
-                    const xOverlapping = xDistance < xSum;
-                    const zOverlapping = zDistance < zSum;
+                    const xOverlapping = xDistance < (xSum - 0.001);
+                    const zOverlapping = zDistance < (zSum - 0.001);
                     
                     if (xOverlapping && zOverlapping) {
                         return false; // Units are overlapping
@@ -3104,12 +3125,76 @@ class Scene3D {
         
         const clamped = position.clone();
         
-        // Clamp X position to keep ALL units inside container
-        const minX = this.containerBounds.min.x + halfLength;
-        const maxX = this.containerBounds.max.x - halfLength;
-        clamped.x = Math.max(minX, Math.min(maxX, position.x));
+        // Special handling for JUMBO - magnetic snapping to section boundary
+        if (this.containerBounds.isJumbo && this.containerBounds.sections) {
+            const gap = 0.5; // 50cm gap between sections
+            const section1Start = this.containerBounds.min.x;
+            const section1End = section1Start + this.containerBounds.sections[0].length;
+            const section2Start = section1End + gap;
+            
+            // Define magnetic snapping zone (30cm before the wall)
+            const snapDistance = 0.3; // 30cm snap zone
+            const snapStrength = 0.15; // How far from wall to snap (15cm)
+            
+            const unitEnd = position.x + halfLength;
+            const unitStart = position.x - halfLength;
+            
+            // Check if unit is in Section 2 and approaching the wall from the right
+            if (unitStart >= section2Start) {
+                // Calculate distance from unit's left edge to wall (section2 start)
+                const distanceToWall = unitStart - section2Start;
+                
+                // If within snap zone, apply magnetic effect
+                if (distanceToWall < snapDistance) {
+                    // Calculate snap position (unit touches the wall with small gap)
+                    const snapX = section2Start + halfLength + snapStrength;
+                    
+                    // Apply progressive resistance - the closer to wall, the stronger the snap
+                    const snapFactor = 1 - (distanceToWall / snapDistance);
+                    
+                    // Blend between desired position and snap position based on proximity
+                    clamped.x = position.x * (1 - snapFactor * 0.7) + snapX * (snapFactor * 0.7);
+                    
+                    // If very close to snap position, fully snap to it
+                    if (Math.abs(clamped.x - snapX) < 0.05) {
+                        clamped.x = snapX;
+                    }
+                }
+            }
+            
+            // Still apply normal bounds checking to prevent going into the gap
+            const minX = this.containerBounds.min.x + halfLength;
+            const maxX = this.containerBounds.max.x - halfLength;
+            
+            // Additional check - prevent unit from entering the gap area
+            const clampedUnitStart = clamped.x - halfLength;
+            const clampedUnitEnd = clamped.x + halfLength;
+            
+            // If unit would overlap the gap, push it to the nearest valid section
+            if (clampedUnitStart < section2Start && clampedUnitEnd > section1End) {
+                // Unit spans the gap - determine which section it's closer to
+                const distToSection1 = Math.abs(position.x - (section1End - halfLength));
+                const distToSection2 = Math.abs(position.x - (section2Start + halfLength));
+                
+                if (distToSection1 < distToSection2) {
+                    // Closer to section 1 - place at section 1 boundary
+                    clamped.x = Math.min(section1End - halfLength, clamped.x);
+                } else {
+                    // Closer to section 2 - place at section 2 boundary
+                    clamped.x = Math.max(section2Start + halfLength, clamped.x);
+                }
+            }
+            
+            // Final bounds check
+            clamped.x = Math.max(minX, Math.min(maxX, clamped.x));
+        } else {
+            // Regular container - standard clamping
+            const minX = this.containerBounds.min.x + halfLength;
+            const maxX = this.containerBounds.max.x - halfLength;
+            clamped.x = Math.max(minX, Math.min(maxX, position.x));
+        }
         
-        // Clamp Z position to keep ALL units inside container
+        // Clamp Z position to keep ALL units inside container (same for all container types)
         const minZ = this.containerBounds.min.z + halfWidth;
         const maxZ = this.containerBounds.max.z - halfWidth;
         clamped.z = Math.max(minZ, Math.min(maxZ, position.z));
@@ -3235,8 +3320,8 @@ class Scene3D {
                         targetY = stackY;
                         
                         // Only snap if we had to adjust the position
-                        if (Math.abs(clampedX - adjustedPosition.x) > 0 || 
-                            Math.abs(clampedZ - adjustedPosition.z) > 0) {
+                        if (Math.abs(clampedX - adjustedPosition.x) > 0.01 || 
+                            Math.abs(clampedZ - adjustedPosition.z) > 0.01) {
                             snapPosition = {
                                 x: clampedX,
                                 z: clampedZ
@@ -3267,8 +3352,8 @@ class Scene3D {
                                 const xDist = Math.abs(clampedX - otherMesh.position.x);
                                 const zDist = Math.abs(clampedZ - otherMesh.position.z);
                                 
-                                if (xDist < (halfLength + otherHalfLength) &&
-                                    zDist < (halfWidth + otherHalfWidth)) {
+                                if (xDist < (halfLength + otherHalfLength - 0.001) &&
+                                    zDist < (halfWidth + otherHalfWidth - 0.001)) {
                                     hasCollisionOnSameFloor = true;
                                     break;
                                 }
@@ -3440,9 +3525,10 @@ class Scene3D {
         const targetMaxZ = targetPosition.z + targetHalfWidth;
         
         // Check if dragged unit is completely within target unit bounds
-        // No tolerance - unit must fit completely within bounds
-        const fitsInX = draggedMinX >= targetMinX && draggedMaxX <= targetMaxX;
-        const fitsInZ = draggedMinZ >= targetMinZ && draggedMaxZ <= targetMaxZ;
+        // Use very small tolerance to prevent units from extending beyond edges
+        const tolerance = 0.01; // 1cm tolerance - strict but allows for floating point errors
+        const fitsInX = draggedMinX >= targetMinX - tolerance && draggedMaxX <= targetMaxX + tolerance;
+        const fitsInZ = draggedMinZ >= targetMinZ - tolerance && draggedMaxZ <= targetMaxZ + tolerance;
         
         return fitsInX && fitsInZ;
     }
@@ -3545,13 +3631,13 @@ class Scene3D {
         const draggedBottomY = proposedPosition.y - draggedData.height / 2;
         
         // Ensure the unit is actually on top (not floating or embedded)
-        if (Math.abs(draggedBottomY - targetTopY) > 0) {
+        if (Math.abs(draggedBottomY - targetTopY) > 0.01) {
             // Silently reject - not properly on top
             return false;
         }
         
         // Check for collisions with other units at the same Y level
-        const tolerance = 0;
+        const tolerance = 0.01;
         const draggedHalfLength = draggedData.length / 2;
         const draggedHalfWidth = draggedData.width / 2;
         const draggedHalfHeight = draggedData.height / 2;
@@ -3588,8 +3674,8 @@ class Scene3D {
                     
                     // Units are overlapping if distance is less than sum of half-dimensions
                     // Allow exact touching (distance == sum) with small tolerance for floating point
-                    const xOverlapping = xDistance < xSum;
-                    const zOverlapping = zDistance < zSum;
+                    const xOverlapping = xDistance < (xSum - 0.001);
+                    const zOverlapping = zDistance < (zSum - 0.001);
                     
                     if (xOverlapping && zOverlapping) {
                         return false; // Units are overlapping
@@ -3737,9 +3823,9 @@ class Scene3D {
                 const otherMaxY = mesh.position.y + otherHalfHeight;
                 
                 // Check for collision (bounding boxes overlap)
-                const overlapX = !(coilMaxX <= otherMinX || coilMinX >= otherMaxX);
-                const overlapZ = !(coilMaxZ <= otherMinZ || coilMinZ >= otherMaxZ);
-                const overlapY = !(coilMaxY <= otherMinY || coilMinY >= otherMaxY);
+                const overlapX = !(coilMaxX <= otherMinX + 0.01 || coilMinX >= otherMaxX - 0.01);
+                const overlapZ = !(coilMaxZ <= otherMinZ + 0.01 || coilMinZ >= otherMaxZ - 0.01);
+                const overlapY = !(coilMaxY <= otherMinY + 0.01 || coilMinY >= otherMaxY - 0.01);
                 
                 if (overlapX && overlapZ && overlapY) {
                     return false; // Collision detected
@@ -3810,7 +3896,7 @@ class Scene3D {
                         const dz = objectPosition.z - mesh.position.z;
                         const distance = Math.sqrt(dx * dx + dz * dz);
                         
-                        if (distance < minDistance) {
+                        if (distance < minDistance - 0.01) {
                             return false; // Circular collision detected
                         }
                     }
@@ -3823,13 +3909,13 @@ class Scene3D {
                     const zSum = halfWidth + targetHalfWidth;
                     
                     // Check for actual overlap (not just touching)
-                    const overlapX = xDistance < xSum;
-                    const overlapZ = zDistance < zSum;
+                    const overlapX = xDistance < (xSum - 0.001);
+                    const overlapZ = zDistance < (zSum - 0.001);
                     
                     
                     if (overlapX && overlapZ) {
                         // Check if we're at the same height level (collision)
-                        const heightOverlap = Math.abs(objectPosition.y - mesh.position.y) < (halfHeight + targetHalfHeight);
+                        const heightOverlap = Math.abs(objectPosition.y - mesh.position.y) < (halfHeight + targetHalfHeight - 0.01);
                         
                         if (heightOverlap) {
                             // Check if units are at the same floor level (same Y position)
@@ -5775,7 +5861,7 @@ class Scene3D {
     }
     
     objectsWouldCollide(pos1, data1, pos2, data2) {
-        const tolerance = 0; // No tolerance - same as bin packing
+        const tolerance = 0.01; // 1cm tolerance - pozwala na stykanie się, ale zapobiega nakładaniu
         
         // Calculate bounding boxes
         const halfLength1 = data1.length / 2;

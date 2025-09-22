@@ -7,6 +7,9 @@ class UI {
         this.unitCounts = {};
         this.unitParameters = {};
         
+        // Maximum number of configurations to store in localStorage
+        this.MAX_STORED_CONFIGS = 50;
+        
         this.init();
     }
     
@@ -18,8 +21,13 @@ class UI {
         this.setupModalHandlers();
         this.setupMobileToggles();
         this.setupAxleSettingsModal();
+        this.setupSaveConfigModal();
+        this.setupLoadConfigModal();
         this.setupGroupSelectionCallbacks();
         this.updateStatistics();
+        
+        // Store reference for global access
+        window.uiInstance = this;
     }
     
     setupMobileToggles() {
@@ -328,7 +336,7 @@ class UI {
                             // Update dropdown display for JUMBO with saved dimensions
                             const jumboOption = customSelect.querySelector('.custom-option[data-value="jumbo"]');
                             if (jumboOption) {
-                                const totalLength = dims.section1.length + dims.section2.length + 0.5;
+                                const totalLength = dims.section1.length + dims.section2.length;
                                 const maxHeight = Math.max(dims.section1.height, dims.section2.height);
                                 const dimensionText = `${totalLength.toFixed(1)}m × 2.48m × ${maxHeight.toFixed(1)}m`;
                                 jumboOption.querySelector('.option-dimensions').textContent = dimensionText;
@@ -441,8 +449,16 @@ class UI {
         
         this.cargoManager.setContainer(containerDimensions, vehicle.maxLoad);
         
-        document.getElementById('dimensionsInfo').textContent = `${vehicle.length} × ${vehicle.width} × ${vehicle.height} m`;
-        const volume = (vehicle.length * vehicle.width * vehicle.height).toFixed(1);
+        // For JUMBO, show actual cargo length without gap
+        const displayLength = vehicle.isJumbo && vehicle.sections 
+            ? vehicle.sections[0].length + vehicle.sections[1].length 
+            : vehicle.length;
+        
+        document.getElementById('dimensionsInfo').textContent = `${displayLength} × ${vehicle.width} × ${vehicle.height} m`;
+        const volume = vehicle.isJumbo && vehicle.sections
+            ? (vehicle.sections[0].length * vehicle.sections[0].width * vehicle.sections[0].height + 
+               vehicle.sections[1].length * vehicle.sections[1].width * vehicle.sections[1].height).toFixed(1)
+            : (vehicle.length * vehicle.width * vehicle.height).toFixed(1);
         document.getElementById('volumeInfo').textContent = `${volume} m³`;
         document.getElementById('maxLoadInput').value = (vehicle.maxLoad / 1000).toFixed(2);
         
@@ -573,7 +589,7 @@ class UI {
         this.cargoManager.setContainer(containerDimensions, vehicle.maxLoad);
         
         // Update UI info
-        const totalLength = section1Length + section2Length + 0.5; // Include gap
+        const totalLength = section1Length + section2Length; // Without gap
         document.getElementById('dimensionsInfo').textContent = `${totalLength.toFixed(1)} × ${vehicle.width} × ${updatedVehicle.height.toFixed(1)} m`;
         const volume = (section1Length * vehicle.width * section1Height + section2Length * vehicle.width * section2Height).toFixed(1);
         document.getElementById('volumeInfo').textContent = `${volume} m³`;
@@ -1097,7 +1113,7 @@ class UI {
         let weightPerUnit = parseFloat(weightInput?.value || 100);
         if (isWeightTotal && amount > 1) {
             // If weight mode is "total", divide by amount to get weight per unit
-            weightPerUnit = Math.round((weightPerUnit / amount) * 100) / 100;  // Round to 2 decimal places
+            weightPerUnit = weightPerUnit / amount;
         }
         
         // Handle Roll type with diameter and height
@@ -1654,7 +1670,7 @@ class UI {
                             </div>
                             <div class="unit-item">
                                 <div class="unit-item-label">Waga jedn.</div>
-                                <input type="text" class="unit-editable-input edit-weight" value="${group.sample.weight} kg" data-group-id="${group.groupId}" />
+                                <input type="text" class="unit-editable-input edit-weight" value="${parseFloat(group.sample.weight.toFixed(2))} kg" data-group-id="${group.groupId}" />
                             </div>
                             <div class="unit-item">
                                 <div class="unit-item-label">
@@ -2669,49 +2685,272 @@ class UI {
     }
     
     saveConfiguration() {
+        const modal = document.getElementById('saveConfigModal');
+        const nameInput = document.getElementById('configNameInput');
+        const preview = document.getElementById('configPreview');
+        
+        // Generate default name and set it
+        const defaultName = this.generateDefaultName();
+        nameInput.value = defaultName;
+        
+        // Generate preview
+        const stats = this.cargoManager.getStatistics();
+        const vehicleName = CONFIG.vehicles[this.currentVehicle]?.name || 'Własne wymiary';
+        
+        preview.innerHTML = `
+            <div><strong>Przestrzeń:</strong> ${vehicleName}</div>
+            <div><strong>Liczba jednostek:</strong> ${stats.totalItems} ${stats.outsideItems > 0 ? `(+${stats.outsideItems} poza)` : ''}</div>
+            <div><strong>Waga całkowita:</strong> ${stats.totalWeight} kg</div>
+            <div><strong>Wykorzystanie przestrzeni:</strong> ${stats.volumeUsage.toFixed(1)}%</div>
+            <div><strong>Wykorzystanie ładowności:</strong> ${stats.weightUsage.toFixed(1)}%</div>
+        `;
+        
+        // Show modal
+        modal.style.display = 'block';
+        
+        // Select all text in input for easy replacement
+        setTimeout(() => {
+            nameInput.select();
+            nameInput.focus();
+        }, 100);
+    }
+    
+    confirmSave(configName) {
         const config = this.cargoManager.exportConfiguration();
+        config.vehicleType = this.currentVehicle;
+        
         const json = JSON.stringify(config, null, 2);
         
-        const blob = new Blob([json], { type: 'application/json' });
+        // Save to localStorage
+        const savedToStorage = this.saveToLocalStorage(configName, config);
+        
+        // Download file
+        const blob = new Blob([json], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
         
         const a = document.createElement('a');
         a.href = url;
-        a.download = `konfiguracja-ladunku-${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `${configName}.transportnomad`;
         a.click();
         
         URL.revokeObjectURL(url);
         
-        localStorage.setItem('lastCargoConfiguration', json);
-        this.showNotification('Konfiguracja zapisana', 'success');
+        // Hide modal
+        document.getElementById('saveConfigModal').style.display = 'none';
+        
+        // Show notification
+        if (savedToStorage) {
+            this.showNotification('Konfiguracja zapisana do pliku i pamięci przeglądarki', 'success');
+        } else {
+            this.showNotification('Konfiguracja zapisana do pliku', 'success');
+        }
     }
     
     loadConfiguration() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
+        const modal = document.getElementById('loadConfigModal');
         
-        input.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+        // Load and display saved configurations
+        this.refreshSavedConfigsList();
+        
+        // Show modal
+        modal.style.display = 'block';
+    }
+    
+    refreshSavedConfigsList() {
+        const listContainer = document.getElementById('savedConfigsList');
+        const noConfigsMsg = document.getElementById('noConfigsMessage');
+        const configs = this.getStoredConfigurations();
+        
+        if (configs.length === 0) {
+            listContainer.style.display = 'none';
+            noConfigsMsg.style.display = 'block';
+            return;
+        }
+        
+        listContainer.style.display = 'block';
+        noConfigsMsg.style.display = 'none';
+        
+        // Build HTML for configs
+        listContainer.innerHTML = configs.map(config => {
+            const date = new Date(config.date);
+            const dateStr = date.toLocaleDateString('pl-PL');
+            const timeStr = date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+            const vehicleName = CONFIG.vehicles[config.vehicleType]?.name || 'Własne';
             
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    const config = JSON.parse(event.target.result);
-                    this.cargoManager.importConfiguration(config);
-                    this.updateLoadedUnitsList();
-                    this.updateStatistics();
-                    this.updateAxleIndicators();
-                    this.showNotification('Konfiguracja wczytana', 'success');
-                } catch (error) {
-                    this.showNotification('Błąd wczytywania konfiguracji', 'error');
-                }
-            };
-            reader.readAsText(file);
-        });
+            // Show groups summary or use stats
+            const groupsInfo = config.groupsSummary || 
+                (config.stats.totalItems > 0 ? `${config.stats.totalItems} jednostek` : 'Brak ładunku');
+            
+            return `
+                <div class="config-item" data-config-id="${config.id}">
+                    <div class="config-item-info" onclick="window.uiInstance.loadStoredConfiguration('${config.id}')">
+                        <div class="config-item-name">${config.name}</div>
+                        <div class="config-item-details">
+                            <span class="config-item-detail" style="font-weight: 500;">${vehicleName}</span>
+                            <span class="config-item-detail">${config.stats.totalWeight} kg</span>
+                            <span class="config-item-detail">${dateStr} ${timeStr}</span>
+                        </div>
+                        <div class="config-item-groups" style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                            ${groupsInfo}
+                        </div>
+                    </div>
+                    <div class="config-item-actions">
+                        <button class="config-delete-btn" onclick="event.stopPropagation(); window.uiInstance.deleteAndRefresh('${config.id}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    loadStoredConfiguration(configId) {
+        const configs = this.getStoredConfigurations();
+        const config = configs.find(c => c.id === configId);
         
-        input.click();
+        if (config) {
+            this.applyConfiguration(config.data);
+            document.getElementById('loadConfigModal').style.display = 'none';
+            this.showNotification('Konfiguracja wczytana', 'success');
+        }
+    }
+    
+    deleteAndRefresh(configId) {
+        if (confirm('Czy na pewno chcesz usunąć tę konfigurację?')) {
+            this.deleteStoredConfiguration(configId);
+            this.refreshSavedConfigsList();
+        }
+    }
+    
+    loadFromFile(file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const config = JSON.parse(event.target.result);
+                this.applyConfiguration(config);
+                document.getElementById('loadConfigModal').style.display = 'none';
+                this.showNotification('Konfiguracja wczytana z pliku', 'success');
+            } catch (error) {
+                console.error('Error loading configuration:', error);
+                this.showNotification('Błąd wczytywania konfiguracji', 'error');
+            }
+        };
+        reader.readAsText(file);
+    }
+    
+    applyConfiguration(config) {
+        try {
+            // THEN: Change vehicle type BEFORE importing configuration
+            const vehicleType = config.vehicleType || 'custom';
+            const customSelect = document.getElementById('vehicleSelect');
+            const customDimensions = document.getElementById('customDimensions');
+            const soloDimensionSliders = document.getElementById('soloDimensionSliders');
+            const jumboDimensionSliders = document.getElementById('jumboDimensionSliders');
+            
+            if (vehicleType !== 'custom') {
+                // Update dropdown visual
+                const option = customSelect.querySelector(`.custom-option[data-value="${vehicleType}"]`);
+                if (option) {
+                    const name = option.querySelector('.option-name').textContent;
+                    const dimensions = option.querySelector('.option-dimensions').textContent;
+                    
+                    customSelect.querySelector('.custom-select-trigger .option-name').textContent = name;
+                    customSelect.querySelector('.custom-select-trigger .option-dimensions').textContent = dimensions;
+                    
+                    // Update all options selected state
+                    customSelect.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
+                    option.classList.add('selected');
+                }
+                
+                // Show/hide appropriate dimension controls
+                if (vehicleType === 'solo') {
+                    customDimensions.classList.add('hidden');
+                    soloDimensionSliders.classList.remove('hidden');
+                    jumboDimensionSliders.classList.add('hidden');
+                    
+                    // Update SOLO sliders if container dimensions are saved
+                    if (config.container) {
+                        const soloLengthSlider = document.getElementById('soloLengthSlider');
+                        const soloHeightSlider = document.getElementById('soloHeightSlider');
+                        const soloLengthValue = document.getElementById('soloLengthValue');
+                        const soloHeightValue = document.getElementById('soloHeightValue');
+                        
+                        if (soloLengthSlider && config.container.length) {
+                            soloLengthSlider.value = config.container.length;
+                            soloLengthValue.textContent = `${config.container.length.toFixed(2)}m`;
+                        }
+                        if (soloHeightSlider && config.container.height) {
+                            soloHeightSlider.value = config.container.height;
+                            soloHeightValue.textContent = `${config.container.height.toFixed(1)}m`;
+                        }
+                    }
+                } else if (vehicleType === 'jumbo') {
+                    customDimensions.classList.add('hidden');
+                    soloDimensionSliders.classList.add('hidden');
+                    jumboDimensionSliders.classList.remove('hidden');
+                    
+                    // Update JUMBO sliders if sections are saved
+                    if (config.container && config.container.sections) {
+                        const jumboSection1LengthSlider = document.getElementById('jumboSection1LengthSlider');
+                        const jumboSection1HeightSlider = document.getElementById('jumboSection1HeightSlider');
+                        const jumboSection2LengthSlider = document.getElementById('jumboSection2LengthSlider');
+                        const jumboSection2HeightSlider = document.getElementById('jumboSection2HeightSlider');
+                        const jumboSection1LengthValue = document.getElementById('jumboSection1LengthValue');
+                        const jumboSection1HeightValue = document.getElementById('jumboSection1HeightValue');
+                        const jumboSection2LengthValue = document.getElementById('jumboSection2LengthValue');
+                        const jumboSection2HeightValue = document.getElementById('jumboSection2HeightValue');
+                        
+                        if (jumboSection1LengthSlider && config.container.sections[0]) {
+                            jumboSection1LengthSlider.value = config.container.sections[0].length;
+                            jumboSection1LengthValue.textContent = `${config.container.sections[0].length.toFixed(2)}m`;
+                            jumboSection1HeightSlider.value = config.container.sections[0].height;
+                            jumboSection1HeightValue.textContent = `${config.container.sections[0].height.toFixed(1)}m`;
+                        }
+                        if (jumboSection2LengthSlider && config.container.sections[1]) {
+                            jumboSection2LengthSlider.value = config.container.sections[1].length;
+                            jumboSection2LengthValue.textContent = `${config.container.sections[1].length.toFixed(2)}m`;
+                            jumboSection2HeightSlider.value = config.container.sections[1].height;
+                            jumboSection2HeightValue.textContent = `${config.container.sections[1].height.toFixed(1)}m`;
+                        }
+                    }
+                } else {
+                    // Standard vehicles - hide all dimension controls
+                    customDimensions.classList.add('hidden');
+                    soloDimensionSliders.classList.add('hidden');
+                    jumboDimensionSliders.classList.add('hidden');
+                }
+                
+                // Store current vehicle before changing
+                const previousVehicle = this.currentVehicle;
+                
+                // Load the vehicle (this sets up the container)
+                this.loadVehicle(vehicleType, previousVehicle);
+                this.currentVehicle = vehicleType;
+            } else if (vehicleType === 'custom') {
+                // Show custom dimensions controls
+                customDimensions.classList.remove('hidden');
+                soloDimensionSliders.classList.add('hidden');
+                jumboDimensionSliders.classList.add('hidden');
+                
+                // For custom dimensions, just set the container directly
+                if (config.container) {
+                    this.cargoManager.setContainer(config.container, config.maxLoad);
+                }
+                this.currentVehicle = 'custom';
+            }
+            
+            // THEN: Import the cargo items (now the correct container is set)
+            const result = this.cargoManager.importConfiguration(config);
+            
+            this.updateLoadedUnitsList();
+            this.updateStatistics();
+            this.updateAxleIndicators();
+        } catch (error) {
+            console.error('Error applying configuration:', error);
+            this.showNotification('Błąd wczytywania konfiguracji', 'error');
+        }
     }
     
     generateReport() {
@@ -2961,6 +3200,240 @@ class UI {
         this.cargoManager.onGroupSelectionChanged = (groupId) => {
             this.onGroupSelectionChanged(groupId);
         };
+    }
+    
+    setupSaveConfigModal() {
+        const modal = document.getElementById('saveConfigModal');
+        const closeBtn = document.getElementById('closeSaveConfig');
+        const cancelBtn = document.getElementById('cancelSaveConfig');
+        const confirmBtn = document.getElementById('confirmSaveConfig');
+        const nameInput = document.getElementById('configNameInput');
+        
+        // Close modal handlers
+        closeBtn.onclick = () => modal.style.display = 'none';
+        cancelBtn.onclick = () => modal.style.display = 'none';
+        
+        // Confirm save
+        confirmBtn.onclick = () => {
+            const name = nameInput.value.trim();
+            if (name) {
+                this.confirmSave(name);
+            }
+        };
+        
+        // Enter to save, Escape to cancel
+        nameInput.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmBtn.click();
+            } else if (e.key === 'Escape') {
+                modal.style.display = 'none';
+            }
+        };
+        
+        // Click outside to close
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+    
+    setupLoadConfigModal() {
+        const modal = document.getElementById('loadConfigModal');
+        const closeBtn = document.getElementById('closeLoadConfig');
+        const fileInput = document.getElementById('configFileInput');
+        const browseBtn = document.getElementById('browseFileBtn');
+        const dropZone = document.getElementById('fileDropZone');
+        const searchInput = document.getElementById('configSearch');
+        
+        // Close modal
+        closeBtn.onclick = () => modal.style.display = 'none';
+        
+        // File upload handlers
+        browseBtn.onclick = () => fileInput.click();
+        
+        fileInput.onchange = (e) => {
+            if (e.target.files[0]) {
+                this.loadFromFile(e.target.files[0]);
+            }
+        };
+        
+        // Drag and drop
+        dropZone.onclick = () => fileInput.click();
+        
+        dropZone.ondragover = (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        };
+        
+        dropZone.ondragleave = () => {
+            dropZone.classList.remove('dragover');
+        };
+        
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.name.endsWith('.transportnomad') || file.name.endsWith('.json')) {
+                    this.loadFromFile(file);
+                } else {
+                    this.showNotification('Nieprawidłowy format pliku', 'error');
+                }
+            }
+        };
+        
+        // Search functionality
+        searchInput.oninput = () => {
+            const searchTerm = searchInput.value.toLowerCase();
+            const configItems = document.querySelectorAll('.config-item');
+            
+            configItems.forEach(item => {
+                const name = item.querySelector('.config-item-name').textContent.toLowerCase();
+                const details = item.querySelector('.config-item-details').textContent.toLowerCase();
+                
+                if (name.includes(searchTerm) || details.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        };
+        
+        // Click outside to close
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+    
+    // LocalStorage Configuration Manager
+    getStoredConfigurations() {
+        try {
+            const stored = localStorage.getItem('transportnomad_configurations');
+            if (stored) {
+                return JSON.parse(stored);
+            }
+        } catch (e) {
+            console.error('Error reading stored configurations:', e);
+        }
+        return [];
+    }
+    
+    saveToLocalStorage(configName, configData) {
+        try {
+            let configs = this.getStoredConfigurations();
+            
+            // Get groups summary for display
+            const groups = {};
+            const groupCounts = {};
+            this.cargoManager.cargoItems.forEach(item => {
+                if (!groups[item.groupId]) {
+                    groups[item.groupId] = item.name || item.type;
+                    groupCounts[item.groupId] = 0;
+                }
+                groupCounts[item.groupId]++;
+            });
+            
+            // Create groups summary string for display
+            const groupsList = Object.keys(groups).map(groupId => 
+                `${groups[groupId]} x${groupCounts[groupId]}`
+            ).join(', ');
+            
+            // Add metadata
+            const configWithMeta = {
+                id: Date.now().toString(),
+                name: configName,
+                date: new Date().toISOString(),
+                vehicleType: this.currentVehicle,
+                stats: this.cargoManager.getStatistics(),
+                groupsSummary: groupsList || 'Brak ładunku',
+                data: configData
+            };
+            
+            // Add to beginning of array
+            configs.unshift(configWithMeta);
+            
+            // Keep only last configurations (FIFO - oldest removed first)
+            if (configs.length > this.MAX_STORED_CONFIGS) {
+                configs = configs.slice(0, this.MAX_STORED_CONFIGS);
+            }
+            
+            localStorage.setItem('transportnomad_configurations', JSON.stringify(configs));
+            return true;
+        } catch (e) {
+            console.error('Error saving to localStorage:', e);
+            return false;
+        }
+    }
+    
+    deleteStoredConfiguration(configId) {
+        try {
+            let configs = this.getStoredConfigurations();
+            configs = configs.filter(c => c.id !== configId);
+            localStorage.setItem('transportnomad_configurations', JSON.stringify(configs));
+            return true;
+        } catch (e) {
+            console.error('Error deleting configuration:', e);
+            return false;
+        }
+    }
+    
+    generateDefaultName() {
+        const vehicleName = CONFIG.vehicles[this.currentVehicle]?.name || 'Custom';
+        const stats = this.cargoManager.getStatistics();
+        
+        // Get all cargo groups with counts
+        const groups = {};
+        const groupCounts = {};
+        this.cargoManager.cargoItems.forEach(item => {
+            if (!groups[item.groupId]) {
+                groups[item.groupId] = item.name || item.type;
+                groupCounts[item.groupId] = 0;
+            }
+            groupCounts[item.groupId]++;
+        });
+        
+        // Create group summary string
+        let groupsSummary = '';
+        Object.keys(groups).forEach((groupId, index) => {
+            if (index < 3) { // Limit to first 3 groups to avoid too long names
+                const name = groups[groupId].substring(0, 5);
+                const count = groupCounts[groupId];
+                groupsSummary += `_${name}x${count}`;
+            }
+        });
+        
+        // If more than 3 groups, add info
+        if (Object.keys(groups).length > 3) {
+            groupsSummary += '_etc';
+        }
+        
+        // Format date and time
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 10);
+        const timeStr = now.toTimeString().slice(0, 5).replace(':', '-');
+        
+        // Build name components
+        const components = [
+            vehicleName.replace(/ /g, ''),
+            groupsSummary,
+            stats.totalWeight > 0 ? `_${stats.totalWeight}kg` : '',
+            `_${dateStr}_${timeStr}`
+        ];
+        
+        let fullName = components.join('');
+        
+        // Truncate if too long
+        if (fullName.length > 230) {
+            fullName = fullName.substring(0, 230);
+        }
+        
+        return fullName;
     }
     
     onGroupSelectionChanged(selectedGroupId) {

@@ -1357,6 +1357,90 @@
         </div>
     </div>
 
+    <!-- Save Configuration Modal -->
+    <div id="saveConfigModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Zapisz konfigurację</h2>
+                <button class="modal-close" id="closeSaveConfig">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <label class="settings-label">Nazwa konfiguracji:</label>
+                    <input type="text" id="configNameInput" class="form-control" 
+                           placeholder="Wprowadź nazwę konfiguracji" maxlength="230">
+                    <small class="text-muted">Naciśnij Enter aby zapisać lub Escape aby anulować</small>
+                    <small class="text-muted" style="display: block; margin-top: 5px;">
+                        Konfiguracja zostanie zapisana w pamięci Twojej przeglądarki oraz w pliku na dysku Twojego komputera
+                    </small>
+                </div>
+                
+                <div class="settings-section config-preview">
+                    <h4>Podgląd konfiguracji:</h4>
+                    <div id="configPreview" class="config-preview-content">
+                        <!-- Will be filled dynamically -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelSaveConfig">Anuluj</button>
+                <button class="btn btn-primary" id="confirmSaveConfig">Zapisz</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Configuration Modal -->
+    <div id="loadConfigModal" class="modal">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <h2>Wczytaj konfigurację</h2>
+                <button class="modal-close" id="closeLoadConfig">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="load-config-container">
+                    <!-- Left side - Saved Configurations -->
+                    <div class="config-column saved-configs-column">
+                        <h3>Zapisane konfiguracje</h3>
+                        <div class="saved-configs-header">
+                            <input type="text" id="configSearch" class="form-control" 
+                                   placeholder="Szukaj konfiguracji...">
+                        </div>
+                        <div id="savedConfigsList" class="saved-configs-list">
+                            <!-- Will be filled dynamically -->
+                        </div>
+                        <div class="no-configs-message" id="noConfigsMessage" style="display:none;">
+                            <p>Brak zapisanych konfiguracji</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Divider -->
+                    <div class="config-divider">
+                        <div class="divider-line"></div>
+                        <div class="divider-text">lub</div>
+                        <div class="divider-line"></div>
+                    </div>
+                    
+                    <!-- Right side - File Upload -->
+                    <div class="config-column file-upload-column">
+                        <h3>Wczytaj z pliku</h3>
+                        <div class="file-upload-area">
+                            <input type="file" id="configFileInput" accept=".transportnomad,.json" style="display:none;">
+                            <div class="file-drop-zone" id="fileDropZone">
+                                <svg class="upload-icon" width="60" height="60" viewBox="0 0 24 24" fill="none">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5-5 5 5M12 15V3" 
+                                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                <h3>Przeciągnij plik tutaj</h3>
+                                <p>lub <button class="btn-link" id="browseFileBtn">wybierz plik</button></p>
+                                <small class="text-muted">Akceptowane formaty: .transportnomad, .json</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="js/scene3d.js"></script>
     <script src="js/cargoManager.js"></script>
     <script src="js/axleCalculator.js"></script>

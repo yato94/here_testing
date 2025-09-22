@@ -303,41 +303,31 @@ class BinPacking3D {
             }
             
             // Sprawdź czy element pasuje bez obrotu
-            if (this.itemFits(item, space)) {
-                // Center the item if it's exactly the same size or uses tolerance
-                // This prevents floating point precision issues when units are "identical"
-                const tolerance = 0.005; // Same tolerance as in itemFits
-                const needsCenteringX = Math.abs(item.width - space.width) <= tolerance;
-                const needsCenteringZ = Math.abs(item.depth - space.depth) <= tolerance;
-                
+            if (this.itemFits(item, space) && this.canPlaceItem(space.x, space.y, space.z, item.width, item.depth, item.height)) {
+                const waste = this.calculateWaste(item, space);
                 const position = {
-                    x: needsCenteringX ? space.x + (space.width - item.width) / 2 : space.x,
+                    x: space.x,
                     y: space.y,
-                    z: needsCenteringZ ? space.z + (space.depth - item.depth) / 2 : space.z,
+                    z: space.z,
                     rotated: false
                 };
                 
-                // Check if item can be placed at the calculated position
-                if (this.canPlaceItem(position.x, position.y, position.z, item.width, item.depth, item.height)) {
-                    const waste = this.calculateWaste(item, space);
-                    
-                    // Calculate score: prioritize filling left to right, front to back, bottom to top
-                    // Lower Y is always best (floor first)
-                    // Then prefer lower X (left to right)
-                    // Then prefer lower Z (front to back)
-                    const yScore = -space.y * 1000; // Strong preference for lower Y
-                    const xScore = -space.x * 10;   // Then left to right
-                    const zScore = -space.z * 1;    // Then front to back
-                    const wasteScore = -waste / 10000; // Less important
-                    const score = yScore + xScore + zScore + wasteScore;
-                    
-                    // Preferuj lepszy score
-                    if (score > bestScore) {
-                        bestPosition = position;
-                        minWaste = waste;
-                        minY = space.y;
-                        bestScore = score;
-                    }
+                // Calculate score: prioritize filling left to right, front to back, bottom to top
+                // Lower Y is always best (floor first)
+                // Then prefer lower X (left to right)
+                // Then prefer lower Z (front to back)
+                const yScore = -space.y * 1000; // Strong preference for lower Y
+                const xScore = -space.x * 10;   // Then left to right
+                const zScore = -space.z * 1;    // Then front to back
+                const wasteScore = -waste / 10000; // Less important
+                const score = yScore + xScore + zScore + wasteScore;
+                
+                // Preferuj lepszy score
+                if (score > bestScore) {
+                    bestPosition = position;
+                    minWaste = waste;
+                    minY = space.y;
+                    bestScore = score;
                 }
             }
             
@@ -349,37 +339,27 @@ class BinPacking3D {
                 weight: item.weight
             };
             
-            if (this.itemFits(rotatedItem, space)) {
-                // Center the rotated item if it's exactly the same size or uses tolerance
-                // This prevents floating point precision issues when units are "identical"
-                const tolerance = 0.005; // Same tolerance as in itemFits
-                const needsCenteringX = Math.abs(rotatedItem.width - space.width) <= tolerance;
-                const needsCenteringZ = Math.abs(rotatedItem.depth - space.depth) <= tolerance;
-                
+            if (this.itemFits(rotatedItem, space) && this.canPlaceItem(space.x, space.y, space.z, rotatedItem.width, rotatedItem.depth, rotatedItem.height)) {
+                const waste = this.calculateWaste(rotatedItem, space);
                 const position = {
-                    x: needsCenteringX ? space.x + (space.width - rotatedItem.width) / 2 : space.x,
+                    x: space.x,
                     y: space.y,
-                    z: needsCenteringZ ? space.z + (space.depth - rotatedItem.depth) / 2 : space.z,
+                    z: space.z,
                     rotated: true
                 };
                 
-                // Check if rotated item can be placed at the calculated position
-                if (this.canPlaceItem(position.x, position.y, position.z, rotatedItem.width, rotatedItem.depth, rotatedItem.height)) {
-                    const waste = this.calculateWaste(rotatedItem, space);
-                    
-                    // Calculate score for rotated item (same logic)
-                    const yScore = -space.y * 1000;
-                    const xScore = -space.x * 10;
-                    const zScore = -space.z * 1;
-                    const wasteScore = -waste / 10000;
-                    const score = yScore + xScore + zScore + wasteScore;
-                    
-                    if (score > bestScore) {
-                        bestPosition = position;
-                        minWaste = waste;
-                        minY = space.y;
-                        bestScore = score;
-                    }
+                // Calculate score for rotated item (same logic)
+                const yScore = -space.y * 1000;
+                const xScore = -space.x * 10;
+                const zScore = -space.z * 1;
+                const wasteScore = -waste / 10000;
+                const score = yScore + xScore + zScore + wasteScore;
+                
+                if (score > bestScore) {
+                    bestPosition = position;
+                    minWaste = waste;
+                    minY = space.y;
+                    bestScore = score;
                 }
             }
         }
