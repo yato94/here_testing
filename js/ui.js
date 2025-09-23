@@ -6,6 +6,8 @@ class UI {
         this.currentVehicle = 'standard';
         this.unitCounts = {};
         this.unitParameters = {};
+        this.currentConfigId = null;
+        this.currentConfigName = null;
         
         // Maximum number of configurations to store in localStorage
         this.MAX_STORED_CONFIGS = 50;
@@ -1307,7 +1309,7 @@ class UI {
         });
         
         document.getElementById('exportPNG').addEventListener('click', () => {
-            this.exportToPNG();
+            this.exportToPDF();
         });
         
         document.getElementById('saveConfig').addEventListener('click', () => {
@@ -1321,6 +1323,56 @@ class UI {
         document.getElementById('generateReport').addEventListener('click', () => {
             this.generateReport();
         });
+        
+        // Config name input
+        const configNameInput = document.getElementById('currentConfigName');
+        if (configNameInput) {
+            // Check name on input
+            configNameInput.addEventListener('input', (e) => {
+                const name = e.target.value.trim();
+                this.checkConfigNameExists(name);
+            });
+            
+            // Handle Enter key - save config
+            configNameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.quickSave();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    configNameInput.blur();
+                }
+            });
+            
+            // Focus behavior - select all text
+            configNameInput.addEventListener('focus', (e) => {
+                e.target.select();
+            });
+            
+            // Blur behavior - restore current name if empty
+            configNameInput.addEventListener('blur', (e) => {
+                if (!e.target.value.trim() && this.currentConfigName) {
+                    e.target.value = this.currentConfigName;
+                    this.checkConfigNameExists(this.currentConfigName);
+                }
+            });
+        }
+        
+        // Quick save button
+        const quickSaveBtn = document.getElementById('quickSaveBtn');
+        if (quickSaveBtn) {
+            quickSaveBtn.addEventListener('click', () => {
+                this.quickSave();
+            });
+        }
+        
+        // Quick save and download button
+        const quickSaveDownloadBtn = document.getElementById('quickSaveDownloadBtn');
+        if (quickSaveDownloadBtn) {
+            quickSaveDownloadBtn.addEventListener('click', () => {
+                this.quickSaveAndDownload();
+            });
+        }
     }
     
     setupViewControls() {
@@ -1428,6 +1480,12 @@ class UI {
     
     clearAllCargo() {
         this.cargoManager.clearAllCargo();
+        
+        // Clear current config tracking
+        this.currentConfigId = null;
+        this.currentConfigName = null;
+        this.updateCurrentConfigDisplay();
+        
         this.updateLoadedUnitsList();
         this.updateStatistics();
         this.updateAxleIndicators();
@@ -2671,23 +2729,324 @@ class UI {
         }
     }
     
-    async exportToPNG() {
-        const blob = await this.scene3d.exportToPNG();
-        const url = URL.createObjectURL(blob);
+    async exportToPDF() {
+        try {
+            // Show loading indicator
+            this.showNotification('Generating PDF...', 'info');
+            
+            // Get cargo groups for annotations
+            const cargoGroups = this.getCargoGroups();
+            
+            // Get multiple views from 3D scene with annotations
+            const views = await this.scene3d.getMultipleViews(cargoGroups);
+            
+            // Initialize jsPDF (landscape A4)
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('landscape', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            
+            // Page 1: Perspective View
+            pdf.setFontSize(16);
+            pdf.text('Load Plan - Perspective View', pageWidth / 2, 15, { align: 'center' });
+            
+            // Add date
+            pdf.setFontSize(10);
+            const date = new Date().toLocaleString('en-US');
+            pdf.text(`Date: ${date}`, pageWidth - 10, 10, { align: 'right' });
+            
+            // Calculate full page image dimensions
+            const imgMargin = 15;
+            const availableWidth = pageWidth - (imgMargin * 2);
+            const maxHeight = pageHeight - 35; // Leave space for title
+            
+            // Maintain aspect ratio (16:9 for our canvas)
+            const aspectRatio = 16 / 9;
+            let imgWidth = availableWidth;
+            let imgHeight = imgWidth / aspectRatio;
+            
+            // Check if height exceeds max, then scale down
+            if (imgHeight > maxHeight) {
+                imgHeight = maxHeight;
+                imgWidth = imgHeight * aspectRatio;
+            }
+            
+            // Center the image
+            const xPos = (pageWidth - imgWidth) / 2;
+            const yPos = 25;
+            
+            // Find perspective view
+            const perspectiveView = views.find(v => v.name === 'default');
+            
+            if (perspectiveView) {
+                // Add border around image
+                pdf.setDrawColor(226, 232, 240);
+                pdf.setLineWidth(0.5);
+                pdf.rect(xPos - 1, yPos - 1, imgWidth + 2, imgHeight + 2);
+                
+                // Add perspective view image
+                pdf.addImage(perspectiveView.image, 'PNG', xPos, yPos, imgWidth, imgHeight);
+            }
+            
+            // Page 2: Top View
+            pdf.addPage();
+            pdf.setFontSize(16);
+            pdf.text('Load Plan - Top View', pageWidth / 2, 15, { align: 'center' });
+            
+            // Find top view
+            const topView = views.find(v => v.name === 'top');
+            
+            if (topView) {
+                // Add border around image
+                pdf.setDrawColor(226, 232, 240);
+                pdf.setLineWidth(0.5);
+                pdf.rect(xPos - 1, yPos - 1, imgWidth + 2, imgHeight + 2);
+                
+                // Add top view image
+                pdf.addImage(topView.image, 'PNG', xPos, yPos, imgWidth, imgHeight);
+            }
+            
+            // Page 3: Cargo Summary
+            pdf.addPage();
+            pdf.setFontSize(16);
+            pdf.text('Cargo Summary', pageWidth / 2, 15, { align: 'center' });
+            
+            // Add vehicle info
+            pdf.setFontSize(12);
+            let yPosition = 25;
+            
+            // Get vehicle name from dropdown
+            const vehicleDropdown = document.querySelector('.custom-select-trigger .option-name');
+            const vehicleName = vehicleDropdown ? vehicleDropdown.textContent : 'Unknown';
+            
+            const dimensionsInfo = document.getElementById('dimensionsInfo')?.textContent || 'No data';
+            const volumeInfo = document.getElementById('volumeInfo')?.textContent || 'No data';
+            const maxLoadInput = document.getElementById('maxLoadInput');
+            const maxLoad = maxLoadInput ? `${maxLoadInput.value} tons` : 'No data';
+            
+            pdf.text(`Vehicle: ${vehicleName}`, 10, yPosition);
+            yPosition += 7;
+            pdf.text(`Dimensions: ${dimensionsInfo}`, 10, yPosition);
+            yPosition += 7;
+            pdf.text(`Volume: ${volumeInfo}`, 10, yPosition);
+            yPosition += 7;
+            pdf.text(`Max. Load: ${maxLoad}`, 10, yPosition);
+            yPosition += 12;
+            
+            // Add cargo groups as styled cards
+            if (cargoGroups.length > 0) {
+                pdf.setFontSize(14);
+                pdf.text('Cargo Groups:', 10, yPosition);
+                yPosition += 10;
+                
+                // Render each group as a card
+                cargoGroups.forEach((group, index) => {
+                    // Check if we need a new page
+                    if (yPosition > pageHeight - 45) {
+                        pdf.addPage();
+                        yPosition = 20;
+                    }
+                    
+                    // Card background
+                    pdf.setFillColor(248, 250, 252); // Light gray background
+                    pdf.roundedRect(10, yPosition - 5, pageWidth - 20, 35, 2, 2, 'F');
+                    
+                    // Card border
+                    pdf.setDrawColor(226, 232, 240);
+                    pdf.setLineWidth(0.5);
+                    pdf.roundedRect(10, yPosition - 5, pageWidth - 20, 35, 2, 2, 'S');
+                    
+                    // Group number in circle
+                    pdf.setFillColor(59, 130, 246); // Blue
+                    pdf.circle(18, yPosition + 10, 3, 'F');
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setFontSize(10);
+                    pdf.text((index + 1).toString(), 18, yPosition + 11, { align: 'center' });
+                    
+                    // Color dot
+                    if (group.color) {
+                        const rgb = this.hexToRgb(group.color);
+                        pdf.setFillColor(rgb.r, rgb.g, rgb.b);
+                        pdf.circle(28, yPosition + 10, 2, 'F');
+                    }
+                    
+                    // Quantity badge
+                    pdf.setFillColor(236, 253, 245); // Light green
+                    pdf.setDrawColor(134, 239, 172); // Green border
+                    pdf.setLineWidth(0.3);
+                    pdf.roundedRect(35, yPosition + 6, 20, 8, 1, 1, 'FD');
+                    pdf.setTextColor(22, 163, 74); // Green text
+                    pdf.setFontSize(9);
+                    pdf.text(`× ${group.count}`, 45, yPosition + 11, { align: 'center' });
+                    
+                    // Group name
+                    pdf.setTextColor(30, 41, 59); // Dark text
+                    pdf.setFontSize(11);
+                    pdf.setFont(undefined, 'bold');
+                    pdf.text(group.name || 'Unnamed', 60, yPosition + 11);
+                    
+                    // Reset font
+                    pdf.setFont(undefined, 'normal');
+                    pdf.setFontSize(9);
+                    pdf.setTextColor(100, 116, 139); // Gray text
+                    
+                    // First row of details
+                    let xPos = 15;
+                    pdf.text('Dimensions:', xPos, yPosition + 20);
+                    pdf.setTextColor(30, 41, 59);
+                    pdf.text(group.dimensions, xPos + 25, yPosition + 20);
+                    
+                    xPos = 90;
+                    pdf.setTextColor(100, 116, 139);
+                    pdf.text('Unit weight:', xPos, yPosition + 20);
+                    pdf.setTextColor(30, 41, 59);
+                    pdf.text(`${group.unitWeight} kg`, xPos + 25, yPosition + 20);
+                    
+                    xPos = 150;
+                    pdf.setTextColor(100, 116, 139);
+                    pdf.text('Total weight:', xPos, yPosition + 20);
+                    pdf.setTextColor(30, 41, 59);
+                    pdf.text(`${group.totalWeight} kg`, xPos + 28, yPosition + 20);
+                    
+                    xPos = 210;
+                    pdf.setTextColor(100, 116, 139);
+                    pdf.text('Stacking:', xPos, yPosition + 20);
+                    pdf.setTextColor(30, 41, 59);
+                    pdf.text(`${group.maxStack}/${group.maxStackWeight || 'inf'} kg`, xPos + 22, yPosition + 20);
+                    
+                    yPosition += 40;
+                });
+            }
+            
+            // Add statistics
+            yPosition += 10;
+            pdf.setFontSize(14);
+            pdf.text('Statistics:', 10, yPosition);
+            yPosition += 8;
+            
+            pdf.setFontSize(10);
+            
+            // Get statistics from the compact statistics panel
+            const statItems = document.querySelectorAll('.statistics.compact .stat-item-compact');
+            const stats = {};
+            statItems.forEach(item => {
+                const label = item.querySelector('.stat-label')?.textContent;
+                const value = item.querySelector('.stat-value, .stat-value-small')?.textContent;
+                if (label && value) {
+                    stats[label] = value;
+                }
+            });
+            
+            if (stats['Waga']) {
+                pdf.text(`Total Weight: ${stats['Waga']}`, 15, yPosition);
+                yPosition += 6;
+            }
+            if (stats['Przestrzen'] || stats['Przestrzeń']) {
+                pdf.text(`Space Usage: ${stats['Przestrzen'] || stats['Przestrzeń']}`, 15, yPosition);
+                yPosition += 6;
+            }
+            if (stats['Ladownosc'] || stats['Ładowność']) {
+                pdf.text(`Load Capacity: ${stats['Ladownosc'] || stats['Ładowność']}`, 15, yPosition);
+                yPosition += 6;
+            }
+            if (stats['Liczba']) {
+                pdf.text(`Unit Count: ${stats['Liczba']}`, 15, yPosition);
+                yPosition += 6;
+            }
+            const cogStat = stats['Srodek ciezkosci'] || stats['Środek ciężkości'];
+            if (cogStat) {
+                pdf.text(`Center of Gravity: ${cogStat}`, 15, yPosition);
+                yPosition += 6;
+            }
+            
+            // Add axle loads if available
+            const axleIndicators = document.querySelectorAll('.axle-indicator');
+            if (axleIndicators.length > 0) {
+                yPosition += 10;
+                pdf.setFontSize(14);
+                pdf.text('Axle Loads:', 10, yPosition);
+                yPosition += 8;
+                
+                pdf.setFontSize(10);
+                axleIndicators.forEach(indicator => {
+                    const label = indicator.querySelector('.axle-label').textContent;
+                    const value = indicator.querySelector('.axle-value').textContent;
+                    const percentage = indicator.querySelector('.axle-percentage').textContent;
+                    
+                    pdf.text(`${label}: ${value} (${percentage})`, 15, yPosition);
+                    yPosition += 6;
+                });
+            }
+            
+            // Save PDF
+            const filename = `load_plan_${new Date().toISOString().split('T')[0]}.pdf`;
+            pdf.save(filename);
+            
+            this.showNotification('PDF has been generated', 'success');
+            
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            this.showNotification('Error generating PDF', 'error');
+        }
+    }
+    
+    getCargoGroups() {
+        const groups = {};
         
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `planer-ladunku-${new Date().toISOString().slice(0, 10)}.png`;
-        a.click();
+        // Group cargo items by groupId
+        this.cargoManager.cargoItems.forEach(item => {
+            if (item.isOutside) return; // Skip items outside container
+            
+            const groupId = item.groupId || 'default';
+            if (!groups[groupId]) {
+                // Format dimensions based on unit type
+                let dimensions;
+                if (item.isRoll || item.type === 'steel-coil') {
+                    // For cylindrical units
+                    const diameter = item.diameter || Math.max(item.width, item.length);
+                    const height = item.height;
+                    dimensions = `Ø${diameter.toFixed(2)}×${height.toFixed(2)}m`;
+                } else {
+                    dimensions = `${item.length.toFixed(2)}×${item.width.toFixed(2)}×${item.height.toFixed(2)}m`;
+                }
+                
+                groups[groupId] = {
+                    name: item.name || item.type,
+                    count: 0,
+                    unitWeight: item.weight,
+                    totalWeight: 0,
+                    dimensions: dimensions,
+                    maxStack: item.maxStack || 0,
+                    maxStackWeight: item.maxStackWeight || 0,
+                    color: item.color || null,
+                    items: []
+                };
+            }
+            groups[groupId].count++;
+            groups[groupId].totalWeight += item.weight;
+            groups[groupId].items.push(item);
+        });
         
-        URL.revokeObjectURL(url);
-        this.showNotification('Wyeksportowano do PNG', 'success');
+        // Convert to array and sort by count
+        return Object.values(groups).sort((a, b) => b.count - a.count);
+    }
+    
+    hexToRgb(hex) {
+        // Convert hex color to RGB
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 128, g: 128, b: 128 };
     }
     
     saveConfiguration() {
         const modal = document.getElementById('saveConfigModal');
         const nameInput = document.getElementById('configNameInput');
         const preview = document.getElementById('configPreview');
+        const existingList = document.getElementById('existingConfigsList');
+        const noExisting = document.getElementById('noExistingConfigs');
         
         // Generate default name and set it
         const defaultName = this.generateDefaultName();
@@ -2705,6 +3064,48 @@ class UI {
             <div><strong>Wykorzystanie ładowności:</strong> ${stats.weightUsage.toFixed(1)}%</div>
         `;
         
+        // Load existing configurations for selection
+        const configs = this.getStoredConfigurations();
+        if (configs.length > 0) {
+            existingList.style.display = 'block';
+            noExisting.style.display = 'none';
+            
+            existingList.innerHTML = configs.map(config => {
+                const date = new Date(config.date);
+                const dateStr = date.toLocaleDateString('pl-PL');
+                const timeStr = date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+                const isCurrentConfig = config.id === this.currentConfigId;
+                
+                return `
+                    <div class="existing-config-item ${isCurrentConfig ? 'current-config' : ''}" data-config-id="${config.id}" data-config-name="${config.name}">
+                        <div class="config-main-info">
+                            <div class="config-name">${config.name} ${isCurrentConfig ? '<span class="current-badge">(Aktualny)</span>' : ''}</div>
+                            <div class="config-meta">${dateStr} ${timeStr}</div>
+                        </div>
+                        <div class="config-details">
+                            ${config.vehicleType ? `<span class="config-vehicle">${CONFIG.vehicles[config.vehicleType]?.name || config.vehicleType}</span>` : ''}
+                            ${config.stats?.insideWeight ? `<span class="config-weight">${config.stats.insideWeight} kg</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            existingList.style.display = 'none';
+            noExisting.style.display = 'block';
+        }
+        
+        // Reset selected config
+        this.selectedConfigToOverwrite = null;
+        this.selectedConfigOriginalName = null;
+        document.getElementById('saveConfigText').textContent = 'Zapisz jako nową';
+        document.getElementById('saveDownloadConfigText').textContent = 'Zapisz i pobierz';
+        const saveButtonsGroup = document.querySelector('.save-buttons-group');
+        const overwriteButtonsGroup = document.querySelector('.overwrite-buttons-group');
+        if (saveButtonsGroup && overwriteButtonsGroup) {
+            saveButtonsGroup.style.display = 'flex';
+            overwriteButtonsGroup.style.display = 'none';
+        }
+        
         // Show modal
         modal.style.display = 'block';
         
@@ -2715,34 +3116,47 @@ class UI {
         }, 100);
     }
     
-    confirmSave(configName) {
+    confirmSave(configName, overwriteId = null, downloadFile = true) {
         const config = this.cargoManager.exportConfiguration();
         config.vehicleType = this.currentVehicle;
         
-        const json = JSON.stringify(config, null, 2);
+        // Save to localStorage with optional overwrite
+        const savedId = this.saveToLocalStorage(configName, config, overwriteId);
         
-        // Save to localStorage
-        const savedToStorage = this.saveToLocalStorage(configName, config);
-        
-        // Download file
-        const blob = new Blob([json], { type: 'application/octet-stream' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${configName}.transportnomad`;
-        a.click();
-        
-        URL.revokeObjectURL(url);
+        // Download file only if requested
+        if (downloadFile) {
+            const json = JSON.stringify(config, null, 2);
+            const blob = new Blob([json], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            
+            const filename = `${configName.replace(/[^a-z0-9_\-]/gi, '_')}.transportnomad`;
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            
+            URL.revokeObjectURL(url);
+        }
         
         // Hide modal
         document.getElementById('saveConfigModal').style.display = 'none';
         
         // Show notification
-        if (savedToStorage) {
-            this.showNotification('Konfiguracja zapisana do pliku i pamięci przeglądarki', 'success');
+        if (savedId) {
+            let message;
+            if (overwriteId && downloadFile) {
+                message = 'Konfiguracja nadpisana i pobrana';
+            } else if (overwriteId) {
+                message = 'Konfiguracja nadpisana w pamięci przeglądarki';
+            } else if (downloadFile) {
+                message = 'Konfiguracja zapisana do pliku i pamięci przeglądarki';
+            } else {
+                message = 'Konfiguracja zapisana w pamięci przeglądarki';
+            }
+            this.showNotification(message, 'success');
         } else {
-            this.showNotification('Konfiguracja zapisana do pliku', 'success');
+            this.showNotification(downloadFile ? 'Konfiguracja zapisana do pliku' : 'Błąd zapisu', 'error');
         }
     }
     
@@ -2812,6 +3226,12 @@ class UI {
         
         if (config) {
             this.applyConfiguration(config.data);
+            
+            // Update current config tracking
+            this.currentConfigId = config.id;
+            this.currentConfigName = config.name;
+            this.updateCurrentConfigDisplay();
+            
             document.getElementById('loadConfigModal').style.display = 'none';
             this.showNotification('Konfiguracja wczytana', 'success');
         }
@@ -2830,8 +3250,33 @@ class UI {
             try {
                 const config = JSON.parse(event.target.result);
                 this.applyConfiguration(config);
+                
+                // Extract config name from filename
+                const configName = file.name.replace(/\.(transportnomad|json)$/, '');
+                
+                // Check if config with same name exists in localStorage
+                const existingConfigs = this.getStoredConfigurations();
+                const existingConfig = existingConfigs.find(c => c.name === configName);
+                
+                // Save to localStorage (will overwrite if exists)
+                const savedId = this.saveToLocalStorage(
+                    configName, 
+                    config, 
+                    existingConfig ? existingConfig.id : null
+                );
+                
+                // Update current config tracking
+                this.currentConfigId = savedId;
+                this.currentConfigName = configName;
+                this.updateCurrentConfigDisplay();
+                
                 document.getElementById('loadConfigModal').style.display = 'none';
-                this.showNotification('Konfiguracja wczytana z pliku', 'success');
+                
+                if (existingConfig) {
+                    this.showNotification('Konfiguracja wczytana z pliku i zaktualizowana w pamięci', 'success');
+                } else {
+                    this.showNotification('Konfiguracja wczytana z pliku i zapisana w pamięci', 'success');
+                }
             } catch (error) {
                 console.error('Error loading configuration:', error);
                 this.showNotification('Błąd wczytywania konfiguracji', 'error');
@@ -3207,27 +3652,118 @@ class UI {
         const closeBtn = document.getElementById('closeSaveConfig');
         const cancelBtn = document.getElementById('cancelSaveConfig');
         const confirmBtn = document.getElementById('confirmSaveConfig');
+        const confirmDownloadBtn = document.getElementById('confirmSaveDownloadConfig');
+        const overwriteBtn = document.getElementById('overwriteSaveConfig');
+        const overwriteDownloadBtn = document.getElementById('overwriteSaveDownloadConfig');
         const nameInput = document.getElementById('configNameInput');
+        const existingList = document.getElementById('existingConfigsList');
+        const saveButtonsGroup = document.querySelector('.save-buttons-group');
+        const overwriteButtonsGroup = document.querySelector('.overwrite-buttons-group');
+        
+        // Variable to track selected config to overwrite
+        this.selectedConfigToOverwrite = null;
+        this.selectedConfigOriginalName = null;
         
         // Close modal handlers
         closeBtn.onclick = () => modal.style.display = 'none';
         cancelBtn.onclick = () => modal.style.display = 'none';
         
-        // Confirm save
+        // Confirm save (new config) - only to localStorage
         confirmBtn.onclick = () => {
             const name = nameInput.value.trim();
             if (name) {
-                this.confirmSave(name);
+                // Always ensure unique name when saving as new
+                const uniqueName = this.ensureUniqueConfigName(name);
+                this.confirmSave(uniqueName, null, false); // false = no download
             }
         };
+        
+        // Confirm save with download (new config)
+        if (confirmDownloadBtn) {
+            confirmDownloadBtn.onclick = () => {
+                const name = nameInput.value.trim();
+                if (name) {
+                    // Always ensure unique name when saving as new
+                    const uniqueName = this.ensureUniqueConfigName(name);
+                    this.confirmSave(uniqueName, null, true); // true = download
+                }
+            };
+        }
+        
+        // Overwrite existing config - only to localStorage
+        if (overwriteBtn) {
+            overwriteBtn.onclick = () => {
+                // Use original name when overwriting
+                if (this.selectedConfigOriginalName && this.selectedConfigToOverwrite) {
+                    this.confirmSave(this.selectedConfigOriginalName, this.selectedConfigToOverwrite, false); // false = no download
+                }
+            };
+        }
+        
+        // Overwrite existing config with download
+        if (overwriteDownloadBtn) {
+            overwriteDownloadBtn.onclick = () => {
+                // Use original name when overwriting
+                if (this.selectedConfigOriginalName && this.selectedConfigToOverwrite) {
+                    this.confirmSave(this.selectedConfigOriginalName, this.selectedConfigToOverwrite, true); // true = download
+                }
+            };
+        }
+        
+        // Handle clicking on existing config items
+        existingList.addEventListener('click', (e) => {
+            const item = e.target.closest('.existing-config-item');
+            if (item) {
+                // Remove previous selection
+                existingList.querySelectorAll('.existing-config-item').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                
+                // Select clicked item
+                item.classList.add('selected');
+                this.selectedConfigToOverwrite = item.dataset.configId;
+                this.selectedConfigOriginalName = item.dataset.configName;
+                
+                // Update input with selected config name - add suffix for new save
+                const originalName = item.dataset.configName;
+                nameInput.value = this.generateUniqueConfigName(originalName);
+                
+                // Show/hide appropriate buttons
+                document.getElementById('saveConfigText').textContent = 'Zapisz jako nową';
+                document.getElementById('saveDownloadConfigText').textContent = 'Zapisz jako nową i pobierz';
+                if (saveButtonsGroup && overwriteButtonsGroup) {
+                    saveButtonsGroup.style.display = 'none';
+                    overwriteButtonsGroup.style.display = 'flex';
+                }
+            }
+        });
         
         // Enter to save, Escape to cancel
         nameInput.onkeydown = (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                confirmBtn.click();
+                if (this.selectedConfigToOverwrite && overwriteBtn) {
+                    overwriteBtn.click();
+                } else {
+                    confirmBtn.click();
+                }
             } else if (e.key === 'Escape') {
                 modal.style.display = 'none';
+            }
+        };
+        
+        // Reset selection when typing in input
+        nameInput.oninput = () => {
+            existingList.querySelectorAll('.existing-config-item').forEach(el => {
+                el.classList.remove('selected');
+            });
+            this.selectedConfigToOverwrite = null;
+            this.selectedConfigOriginalName = null;
+            document.getElementById('saveConfigText').textContent = 'Zapisz jako nową';
+            document.getElementById('saveDownloadConfigText').textContent = 'Zapisz i pobierz';
+            if (saveButtonsGroup && overwriteButtonsGroup) {
+                saveButtonsGroup.style.display = 'flex';
+                overwriteButtonsGroup.style.display = 'none';
             }
         };
         
@@ -3251,16 +3787,26 @@ class UI {
         closeBtn.onclick = () => modal.style.display = 'none';
         
         // File upload handlers
-        browseBtn.onclick = () => fileInput.click();
+        browseBtn.onclick = (e) => {
+            e.stopPropagation();  // Prevent event bubbling to dropZone
+            fileInput.click();
+        };
         
         fileInput.onchange = (e) => {
             if (e.target.files[0]) {
                 this.loadFromFile(e.target.files[0]);
+                // Reset the input value to allow selecting the same file again
+                e.target.value = '';
             }
         };
         
-        // Drag and drop
-        dropZone.onclick = () => fileInput.click();
+        // Drag and drop - click on drop zone (but not on button)
+        dropZone.onclick = (e) => {
+            // Only trigger if clicking directly on dropZone, not on child elements like button
+            if (e.target === dropZone || e.target.closest('.upload-icon') || e.target.tagName === 'H3' || (e.target.tagName === 'P' && !e.target.querySelector('button'))) {
+                fileInput.click();
+            }
+        };
         
         dropZone.ondragover = (e) => {
             e.preventDefault();
@@ -3324,7 +3870,7 @@ class UI {
         return [];
     }
     
-    saveToLocalStorage(configName, configData) {
+    saveToLocalStorage(configName, configData, overwriteId = null) {
         try {
             let configs = this.getStoredConfigurations();
             
@@ -3344,9 +3890,8 @@ class UI {
                 `${groups[groupId]} x${groupCounts[groupId]}`
             ).join(', ');
             
-            // Add metadata
             const configWithMeta = {
-                id: Date.now().toString(),
+                id: overwriteId || Date.now().toString(),
                 name: configName,
                 date: new Date().toISOString(),
                 vehicleType: this.currentVehicle,
@@ -3355,16 +3900,42 @@ class UI {
                 data: configData
             };
             
-            // Add to beginning of array
-            configs.unshift(configWithMeta);
+            if (overwriteId) {
+                // Find and update existing config
+                const existingIndex = configs.findIndex(c => c.id === overwriteId);
+                if (existingIndex !== -1) {
+                    // Replace existing config
+                    configs[existingIndex] = configWithMeta;
+                    
+                    // Move to beginning if not already there
+                    if (existingIndex !== 0) {
+                        const updatedConfig = configs.splice(existingIndex, 1)[0];
+                        configs.unshift(updatedConfig);
+                    }
+                } else {
+                    // If ID not found, add as new
+                    configs.unshift(configWithMeta);
+                }
+            } else {
+                // Add new config to beginning of array
+                configs.unshift(configWithMeta);
+            }
             
             // Keep only last configurations (FIFO - oldest removed first)
             if (configs.length > this.MAX_STORED_CONFIGS) {
                 configs = configs.slice(0, this.MAX_STORED_CONFIGS);
             }
             
+            // Update current config tracking
+            this.currentConfigId = configWithMeta.id;
+            this.currentConfigName = configName;
+            
             localStorage.setItem('transportnomad_configurations', JSON.stringify(configs));
-            return true;
+            
+            // Update UI to show current config
+            this.updateCurrentConfigDisplay();
+            
+            return configWithMeta.id;
         } catch (e) {
             console.error('Error saving to localStorage:', e);
             return false;
@@ -3376,11 +3947,232 @@ class UI {
             let configs = this.getStoredConfigurations();
             configs = configs.filter(c => c.id !== configId);
             localStorage.setItem('transportnomad_configurations', JSON.stringify(configs));
+            
+            // If deleting current config, clear tracking
+            if (this.currentConfigId === configId) {
+                this.currentConfigId = null;
+                this.currentConfigName = null;
+                this.updateCurrentConfigDisplay();
+            }
+            
             return true;
         } catch (e) {
             console.error('Error deleting configuration:', e);
             return false;
         }
+    }
+    
+    updateCurrentConfigDisplay() {
+        const display = document.getElementById('currentConfigDisplay');
+        const nameInput = document.getElementById('currentConfigName');
+        
+        if (this.currentConfigName) {
+            nameInput.value = this.currentConfigName;
+        } else {
+            // Generate default name if no config is loaded
+            nameInput.value = '';
+            nameInput.placeholder = this.generateDefaultName();
+        }
+        
+        // Always show the display
+        display.style.display = 'flex';
+        
+        // Check if name exists and update button styles
+        this.checkConfigNameExists(nameInput.value || nameInput.placeholder);
+    }
+    
+    quickSave() {
+        const nameInput = document.getElementById('currentConfigName');
+        let configName = nameInput.value.trim();
+        const userTypedName = configName !== ''; // Check if user explicitly typed a name
+        
+        // If no name provided, generate default name
+        if (!configName) {
+            configName = this.generateDefaultName();
+        }
+        
+        const config = this.cargoManager.exportConfiguration();
+        
+        // Check if config with this name exists
+        const existingConfig = this.getStoredConfigurations().find(c => c.name === configName);
+        
+        // Handle name conflicts
+        let finalName = configName;
+        let overwriteId = null;
+        
+        if (existingConfig) {
+            if (userTypedName) {
+                // User explicitly typed an existing name - allow overwrite
+                overwriteId = existingConfig.id;
+            } else {
+                // Auto-generated name conflict - make it unique
+                finalName = this.ensureUniqueConfigName(configName);
+            }
+        } else if (this.currentConfigId && configName === this.currentConfigName) {
+            // Saving current config with same name
+            overwriteId = this.currentConfigId;
+        }
+        
+        const savedId = this.saveToLocalStorage(finalName, config, overwriteId);
+        
+        if (savedId) {
+            // Update current config tracking
+            this.currentConfigId = savedId;
+            this.currentConfigName = finalName;
+            nameInput.value = finalName;
+            
+            const message = overwriteId ? 'Konfiguracja nadpisana' : 'Konfiguracja zapisana';
+            this.showNotification(message + ' w pamięci tej przeglądarki', 'success');
+            this.checkConfigNameExists(finalName);
+        } else {
+            this.showNotification('Błąd zapisu konfiguracji', 'error');
+        }
+    }
+    
+    quickSaveAndDownload() {
+        const nameInput = document.getElementById('currentConfigName');
+        let configName = nameInput.value.trim();
+        const userTypedName = configName !== ''; // Check if user explicitly typed a name
+        
+        // If no name provided, generate default name
+        if (!configName) {
+            configName = this.generateDefaultName();
+        }
+        
+        const config = this.cargoManager.exportConfiguration();
+        
+        // Check if config with this name exists
+        const existingConfig = this.getStoredConfigurations().find(c => c.name === configName);
+        
+        // Handle name conflicts
+        let finalName = configName;
+        let overwriteId = null;
+        
+        if (existingConfig) {
+            if (userTypedName) {
+                // User explicitly typed an existing name - allow overwrite
+                overwriteId = existingConfig.id;
+            } else {
+                // Auto-generated name conflict - make it unique
+                finalName = this.ensureUniqueConfigName(configName);
+            }
+        } else if (this.currentConfigId && configName === this.currentConfigName) {
+            // Saving current config with same name
+            overwriteId = this.currentConfigId;
+        }
+        
+        const savedId = this.saveToLocalStorage(finalName, config, overwriteId);
+        
+        if (savedId) {
+            // Update current config tracking
+            this.currentConfigId = savedId;
+            this.currentConfigName = finalName;
+            nameInput.value = finalName;
+            
+            // Also download the file
+            const json = JSON.stringify(config, null, 2);
+            const blob = new Blob([json], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            
+            const filename = `${finalName.replace(/[^a-z0-9_\-]/gi, '_')}.transportnomad`;
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            
+            const message = overwriteId ? 'Konfiguracja nadpisana i pobrana' : 'Konfiguracja zapisana i pobrana';
+            this.showNotification(message, 'success');
+            this.checkConfigNameExists(finalName);
+        } else {
+            this.showNotification('Błąd zapisu konfiguracji', 'error');
+        }
+    }
+    
+    generateUniqueConfigName(baseName) {
+        const configs = this.getStoredConfigurations();
+        const existingNames = configs.map(c => c.name);
+        
+        // If base name doesn't exist, suggest with (kopia)
+        if (!existingNames.includes(baseName)) {
+            return baseName + ' (kopia)';
+        }
+        
+        // Find a unique suffix number
+        let counter = 2;
+        let newName = `${baseName} (kopia)`;
+        
+        while (existingNames.includes(newName)) {
+            newName = `${baseName} (kopia ${counter})`;
+            counter++;
+        }
+        
+        return newName;
+    }
+    
+    ensureUniqueConfigName(name) {
+        const configs = this.getStoredConfigurations();
+        const existingNames = configs.map(c => c.name);
+        
+        // If name is already unique, return it
+        if (!existingNames.includes(name)) {
+            return name;
+        }
+        
+        // First try adding "(kopia)"
+        let uniqueName = `${name} (kopia)`;
+        if (!existingNames.includes(uniqueName)) {
+            return uniqueName;
+        }
+        
+        // If "(kopia)" exists, add numbers
+        let counter = 2;
+        uniqueName = `${name} (kopia ${counter})`;
+        
+        while (existingNames.includes(uniqueName)) {
+            counter++;
+            uniqueName = `${name} (kopia ${counter})`;
+        }
+        
+        return uniqueName;
+    }
+    
+    checkConfigNameExists(name) {
+        if (!name || !name.trim()) {
+            // Disable buttons if no name
+            document.getElementById('quickSaveBtn').disabled = true;
+            document.getElementById('quickSaveDownloadBtn').disabled = true;
+            return false;
+        }
+        
+        // Enable buttons
+        document.getElementById('quickSaveBtn').disabled = false;
+        document.getElementById('quickSaveDownloadBtn').disabled = false;
+        
+        // Check if name exists
+        const exists = this.getStoredConfigurations().some(c => c.name === name);
+        
+        // Update button styles based on whether config exists
+        const saveBtn = document.getElementById('quickSaveBtn');
+        const saveDownloadBtn = document.getElementById('quickSaveDownloadBtn');
+        
+        if (exists) {
+            // Orange color for overwrite
+            saveBtn.classList.add('btn-overwrite');
+            saveDownloadBtn.classList.add('btn-overwrite');
+            saveBtn.title = 'Nadpisz w pamięci';
+            saveDownloadBtn.title = 'Nadpisz i pobierz';
+        } else {
+            // Normal colors
+            saveBtn.classList.remove('btn-overwrite');
+            saveDownloadBtn.classList.remove('btn-overwrite');
+            saveBtn.title = 'Zapisz w pamięci';
+            saveDownloadBtn.title = 'Zapisz i pobierz';
+        }
+        
+        return exists;
     }
     
     generateDefaultName() {

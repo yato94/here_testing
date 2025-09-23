@@ -962,7 +962,7 @@
                             <svg class="icon" viewBox="0 0 24 24">
                                 <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                             </svg>
-                            Eksportuj
+                            Eksport PDF
                         </button>
                     </div>
                 </div>
@@ -1084,6 +1084,29 @@
 
                     <!-- Akcje -->
                     <section class="panel-section actions-section">
+                        <!-- Current configuration display -->
+                        <div id="currentConfigDisplay" class="current-config-display">
+                            <span class="config-label">Konfiguracja:</span>
+                            <input type="text" id="currentConfigName" class="config-name-input" 
+                                   placeholder="Wprowadź nazwę konfiguracji..." 
+                                   autocomplete="off" 
+                                   spellcheck="false">
+                            <button id="quickSaveBtn" class="btn-quick-save" title="Zapisz w pamięci">
+                                <svg viewBox="0 0 24 24" width="16" height="16">
+                                    <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
+                                </svg>
+                            </button>
+                            <button id="quickSaveDownloadBtn" class="btn-quick-save btn-quick-save-download" title="Zapisz i pobierz">
+                                <div class="btn-icons-group">
+                                    <svg viewBox="0 0 24 24" width="16" height="16">
+                                        <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
+                                    </svg>
+                                    <svg viewBox="0 0 24 24" width="16" height="16" style="margin-left: -2px;">
+                                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/>
+                                    </svg>
+                                </div>
+                            </button>
+                        </div>
                         <div class="action-buttons compact">
                             <button id="saveConfig" class="btn btn-small" title="Zapisz konfigurację">
                                 <svg class="icon" viewBox="0 0 24 24">
@@ -1142,6 +1165,7 @@
     <!-- Skrypty -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- Biblioteka bin packing będzie zaimplementowana lokalnie -->
     <script src="js/binPacking.js"></script>
     <script src="js/config.js"></script>
@@ -1359,32 +1383,81 @@
 
     <!-- Save Configuration Modal -->
     <div id="saveConfigModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content modal-content-wide">
             <div class="modal-header">
                 <h2>Zapisz konfigurację</h2>
                 <button class="modal-close" id="closeSaveConfig">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="settings-section">
-                    <label class="settings-label">Nazwa konfiguracji:</label>
-                    <input type="text" id="configNameInput" class="form-control" 
-                           placeholder="Wprowadź nazwę konfiguracji" maxlength="230">
-                    <small class="text-muted">Naciśnij Enter aby zapisać lub Escape aby anulować</small>
-                    <small class="text-muted" style="display: block; margin-top: 5px;">
-                        Konfiguracja zostanie zapisana w pamięci Twojej przeglądarki oraz w pliku na dysku Twojego komputera
-                    </small>
-                </div>
-                
-                <div class="settings-section config-preview">
-                    <h4>Podgląd konfiguracji:</h4>
-                    <div id="configPreview" class="config-preview-content">
-                        <!-- Will be filled dynamically -->
+                <div class="save-config-container">
+                    <!-- Left side - Save form -->
+                    <div class="save-config-main">
+                        <div class="settings-section">
+                            <label class="settings-label">Nazwa konfiguracji:</label>
+                            <input type="text" id="configNameInput" class="form-control" 
+                                   placeholder="Wprowadź nazwę konfiguracji" maxlength="230">
+                            <small class="text-muted">Naciśnij Enter aby zapisać lub Escape aby anulować</small>
+                            <small class="text-muted" style="display: block; margin-top: 5px;">
+                                Konfiguracja zostanie zapisana w pamięci Twojej przeglądarki oraz w pliku na dysku Twojego komputera
+                            </small>
+                        </div>
+                        
+                        <div class="settings-section config-preview">
+                            <h4>Podgląd konfiguracji:</h4>
+                            <div id="configPreview" class="config-preview-content">
+                                <!-- Will be filled dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right side - Existing configurations -->
+                    <div class="save-config-sidebar">
+                        <h4>Nadpisz istniejącą konfigurację:</h4>
+                        <div class="existing-configs-list" id="existingConfigsList">
+                            <!-- Will be filled dynamically -->
+                        </div>
+                        <div class="no-existing-configs" id="noExistingConfigs" style="display:none;">
+                            <p>Brak zapisanych konfiguracji</p>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancelSaveConfig">Anuluj</button>
-                <button class="btn btn-primary" id="confirmSaveConfig">Zapisz</button>
+                <div class="save-buttons-group">
+                    <button class="btn btn-primary" id="confirmSaveConfig" title="Zapisz tylko w pamięci przeglądarki">
+                        <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px;">
+                            <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
+                        </svg>
+                        <span id="saveConfigText">Zapisz jako nową</span>
+                    </button>
+                    <button class="btn btn-success" id="confirmSaveDownloadConfig" title="Zapisz w pamięci i pobierz plik">
+                        <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px;">
+                            <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
+                        </svg>
+                        <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px; margin-left: -6px;">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/>
+                        </svg>
+                        <span id="saveDownloadConfigText">Zapisz i pobierz</span>
+                    </button>
+                </div>
+                <div class="overwrite-buttons-group" style="display:none;">
+                    <button class="btn btn-warning" id="overwriteSaveConfig" title="Nadpisz tylko w pamięci">
+                        <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px;">
+                            <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
+                        </svg>
+                        Nadpisz wybraną
+                    </button>
+                    <button class="btn btn-warning" id="overwriteSaveDownloadConfig" title="Nadpisz w pamięci i pobierz plik">
+                        <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px;">
+                            <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
+                        </svg>
+                        <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px; margin-left: -6px;">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/>
+                        </svg>
+                        Nadpisz i pobierz
+                    </button>
+                </div>
             </div>
         </div>
     </div>

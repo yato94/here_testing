@@ -5698,6 +5698,490 @@ class Scene3D {
         });
     }
     
+    createInfoBoxSprite(group, position) {
+        // Create canvas for the info box - matching UI card style
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        // Use higher resolution for better quality (3x scale for sharper text)
+        const scale = 3;
+        canvas.width = 280 * scale;
+        canvas.height = 150 * scale;
+        
+        // Enable better text rendering
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        
+        // Scale context for drawing
+        context.scale(scale, scale);
+        
+        // White background with slight shadow
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, 280, 150);
+        
+        // Draw border
+        context.strokeStyle = 'rgba(0,0,0,0.05)';
+        context.lineWidth = 1;
+        context.strokeRect(0, 0, 280, 150);
+        
+        // Draw header background
+        context.fillStyle = '#f7f9fc';
+        context.fillRect(0, 0, 280, 30);
+        
+        // Draw header bottom border
+        context.strokeStyle = '#e0e6ed';
+        context.lineWidth = 1;
+        context.beginPath();
+        context.moveTo(0, 30);
+        context.lineTo(280, 30);
+        context.stroke();
+        
+        // Get first item as sample for group properties
+        const sampleItem = group.items[0];
+        
+        // HEADER - number, color dot, quantity badge, name
+        // Order number
+        context.fillStyle = '#94a3b8';
+        context.font = 'bold 11px Arial';
+        context.fillText(group.orderIndex || '1', 10, 20);
+        
+        // Color dot
+        context.fillStyle = group.color || '#4A90E2';
+        context.beginPath();
+        context.arc(30, 15, 5, 0, 2 * Math.PI);
+        context.fill();
+        
+        // Quantity badge
+        context.fillStyle = '#10b981';
+        context.fillRect(45, 7, 35, 16);
+        context.fillStyle = '#ffffff';
+        context.font = 'bold 10px Arial';
+        context.textAlign = 'center';
+        context.fillText(`× ${group.count}`, 62, 18);
+        
+        // Name
+        context.fillStyle = '#1e293b';
+        context.font = 'bold 11px Arial';
+        context.textAlign = 'left';
+        context.fillText(group.name, 88, 19);
+        
+        // CONTENT - two rows, four columns each
+        // Row 1
+        context.fillStyle = '#64748b';
+        context.font = '9px Arial';
+        context.fillText('Wymiary', 10, 45);
+        context.fillStyle = '#1e293b';
+        context.font = 'bold 11px Arial';
+        const dims = `${(sampleItem.length*100).toFixed(0)}×${(sampleItem.width*100).toFixed(0)}×${(sampleItem.height*100).toFixed(0)} cm`;
+        context.fillText(dims, 10, 58);
+        context.fillStyle = '#94a3b8';
+        context.font = '8px Arial';
+        context.fillText('(dł. / szer. / wys.)', 10, 68);
+        
+        // Column 2 - Weight
+        context.fillStyle = '#64748b';
+        context.font = '9px Arial';
+        context.fillText('Waga jedn.', 150, 45);
+        context.fillStyle = '#1e293b';
+        context.font = 'bold 11px Arial';
+        context.fillText(`${sampleItem.weight} kg`, 150, 58);
+        
+        // Row 2
+        // Column 1 - Stacking
+        context.fillStyle = '#64748b';
+        context.font = '9px Arial';
+        context.fillText('Piętrowanie', 10, 85);
+        context.fillStyle = '#1e293b';
+        context.font = 'bold 11px Arial';
+        context.fillText(`${sampleItem.maxStack || 0}`, 10, 98);
+        context.font = '10px Arial';
+        context.fillStyle = '#64748b';
+        context.fillText(` / `, 25, 98);
+        context.fillStyle = '#1e293b';
+        context.fillText(`${sampleItem.maxStackWeight || 0}kg`, 35, 98);
+        
+        // Column 2 - Loading/Unloading
+        context.fillStyle = '#64748b';
+        context.font = '9px Arial';
+        context.fillText('Loading', 150, 85);
+        const loadingMethodsDisplay = ['Back', 'Side', 'Top'];
+        const loadingMethodsData = ['rear', 'side', 'top'];
+        let xPos = 150;
+        loadingMethodsDisplay.forEach((method, idx) => {
+            const isActive = sampleItem.loadingMethods && sampleItem.loadingMethods.includes(loadingMethodsData[idx]);
+            context.fillStyle = isActive ? '#10b981' : '#e2e8f0';
+            context.font = 'bold 8px Arial';
+            context.fillText(method, xPos, 98);
+            xPos += 22;
+        });
+        
+        context.fillStyle = '#64748b';
+        context.font = '9px Arial';
+        context.fillText('Unloading', 150, 108);
+        xPos = 150;
+        loadingMethodsDisplay.forEach((method, idx) => {
+            const isActive = sampleItem.unloadingMethods && sampleItem.unloadingMethods.includes(loadingMethodsData[idx]);
+            context.fillStyle = isActive ? '#10b981' : '#e2e8f0';
+            context.font = 'bold 8px Arial';
+            context.fillText(method, xPos, 118);
+            xPos += 22;
+        });
+        
+        // FOOTER - summary stats
+        context.fillStyle = '#f1f5f9';
+        context.fillRect(0, 125, 280, 25);
+        
+        // Calculate totals
+        const totalWeight = group.totalWeight.toFixed(0);
+        const unitVolume = sampleItem.length * sampleItem.width * sampleItem.height;
+        const totalVolume = (unitVolume * group.count).toFixed(2);
+        const area = (sampleItem.length * sampleItem.width * group.count).toFixed(2);
+        
+        // Calculate LDM properly - area divided by container width
+        const containerWidth = this.containerDimensions ? this.containerDimensions.width : 2.4;
+        let ldm = 0;
+        group.items.forEach(item => {
+            if (item.type === 'steel-coil' || (item.isRoll && !item.isVerticalRoll)) {
+                // For cylinders, use circular area (π × r²) divided by container width
+                const diameter = item.diameter || item.width || 1.8;
+                const radius = diameter / 2;
+                ldm += (Math.PI * radius * radius) / containerWidth;
+            } else if (item.isRoll && item.isVerticalRoll) {
+                // Vertical roll - use diameter × height
+                const diameter = item.diameter || 0.8;
+                ldm += (diameter * item.height) / containerWidth;
+            } else {
+                // Regular items - length × width
+                ldm += (item.length * item.width) / containerWidth;
+            }
+        });
+        ldm = ldm.toFixed(2);
+        
+        // Footer items
+        const footerItems = [
+            { value: `${totalWeight} kg`, label: 'ŁĄCZNA WAGA' },
+            { value: `${totalVolume} m³`, label: 'OBJĘTOŚĆ' },
+            { value: `${area} m²`, label: 'POWIERZCHNIA' },
+            { value: `${ldm} m`, label: 'LDM' }
+        ];
+        
+        const footerItemWidth = 280 / 4;
+        footerItems.forEach((item, index) => {
+            const x = index * footerItemWidth + footerItemWidth / 2;
+            context.fillStyle = '#1e293b';
+            context.font = 'bold 10px Arial';
+            context.textAlign = 'center';
+            context.fillText(item.value, x, 138);
+            context.fillStyle = '#64748b';
+            context.font = '7px Arial';
+            context.fillText(item.label, x, 147);
+        });
+        
+        // Create texture and sprite with high quality settings
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.needsUpdate = true;
+        
+        const spriteMaterial = new THREE.SpriteMaterial({ 
+            map: texture,
+            transparent: true
+        });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        
+        // Set sprite position and scale
+        sprite.position.copy(position);
+        sprite.scale.set(4.2, 2.25, 1); // Scale increased by 20% for better visibility
+        
+        return sprite;
+    }
+    
+    getGroupCenter(groupItems) {
+        // Calculate center of mass for a group of items
+        const center = new THREE.Vector3();
+        let count = 0;
+        let minX = Infinity;
+        
+        groupItems.forEach(item => {
+            const mesh = this.cargoMeshes.find(m => 
+                m.userData && 
+                m.userData.id === item.id
+            );
+            if (mesh && !this.isPositionOutsideContainer(mesh.position)) {
+                center.add(mesh.position);
+                minX = Math.min(minX, mesh.position.x);
+                count++;
+            }
+        });
+        
+        if (count > 0) {
+            center.divideScalar(count);
+        }
+        
+        // Store minX for sorting purposes
+        center.minX = minX !== Infinity ? minX : center.x;
+        
+        return center;
+    }
+    
+    createAnnotations(cargoGroups, viewName = 'default') {
+        const annotationGroup = new THREE.Group();
+        
+        // Get container bounds for positioning info boxes
+        const bounds = this.containerBounds || { 
+            min: { x: -6.8, y: 0, z: -1.24 }, 
+            max: { x: 6.8, y: 2.7, z: 1.24 } 
+        };
+        
+        const trailerHeight = this.containerDimensions?.trailerHeight || 1.2;
+        const containerLength = bounds.max.x - bounds.min.x;
+        const containerWidth = bounds.max.z - bounds.min.z;
+        const containerHeight = bounds.max.y - bounds.min.y;
+        const centerX = (bounds.min.x + bounds.max.x) / 2;
+        
+        // Different positioning for different views
+        let boxY, boxZ;
+        if (viewName === 'top') {
+            // For top view - position at the top edge of the visible area
+            boxY = trailerHeight + 0.5; // Slightly above trailer level
+            boxZ = bounds.min.z - containerWidth * 0.8; // Above container in view (at top edge of screen)
+        } else {
+            // For perspective view - position at top edge of screen
+            // We need boxes to appear at the top of the frame
+            // Position them above and behind the container to appear at top of viewport
+            boxY = containerHeight + trailerHeight + 1; // Above container (lowered from 2 to 1)
+            boxZ = -1; // Behind container center (negative Z)
+        }
+        
+        // First, calculate group centers and sort by X position
+        const groupsWithPositions = cargoGroups.map(group => {
+            const center = this.getGroupCenter(group.items);
+            return { ...group, center, xPos: center.minX };
+        }).filter(g => g.items && g.items.length > 0);
+        
+        // Sort groups by X position (left to right)
+        groupsWithPositions.sort((a, b) => a.xPos - b.xPos);
+        
+        // Limit to max 5 groups and calculate positions
+        const numGroups = Math.min(groupsWithPositions.length, 5);
+        const actualGroups = groupsWithPositions.slice(0, numGroups);
+        
+        // Calculate spacing to distribute boxes
+        let totalSpan, startX, spacing;
+        
+        if (viewName === 'top') {
+            // For top view - spread across width
+            totalSpan = containerLength * 0.8; // Use 80% of container length
+        } else {
+            // For perspective view - spread across width like in top view
+            totalSpan = containerLength * 0.7; // Use 70% of container length
+        }
+        
+        startX = centerX - totalSpan / 2;
+        spacing = totalSpan / Math.max(1, numGroups - 1);
+        
+        actualGroups.forEach((group, index) => {
+            // Assign order index based on position (1-based)
+            group.orderIndex = index + 1;
+            
+            // Calculate info box position - maintain order from left to right
+            const boxX = numGroups === 1 ? centerX : startX + spacing * index;
+            const boxPosition = new THREE.Vector3(boxX, boxY, boxZ);
+            
+            // Create sprite for info box with full group data
+            const sprite = this.createInfoBoxSprite(group, boxPosition);
+            annotationGroup.add(sprite);
+            
+            // Use the already calculated center
+            const groupCenter = group.center;
+            
+            // Create curved leader line using quadratic bezier curve
+            const midPoint = new THREE.Vector3(
+                (groupCenter.x + boxPosition.x) / 2,
+                boxPosition.y - 0.5, // Slightly below the box for a nice curve
+                (groupCenter.z + boxPosition.z) / 2
+            );
+            
+            const curve = new THREE.QuadraticBezierCurve3(
+                groupCenter,
+                midPoint,
+                boxPosition
+            );
+            
+            const points = curve.getPoints(50); // Get 50 points along the curve for smooth line
+            const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+            
+            // Parse color for the line
+            let lineColor = 0x4A90E2;
+            if (group.color) {
+                // Convert hex string to THREE color
+                lineColor = new THREE.Color(group.color).getHex();
+            }
+            
+            const lineMaterial = new THREE.LineBasicMaterial({ 
+                color: lineColor,
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const line = new THREE.Line(lineGeometry, lineMaterial);
+            annotationGroup.add(line);
+            
+            // Add a small sphere at the group center for better visibility
+            const sphereGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+            const sphereMaterial = new THREE.MeshBasicMaterial({ 
+                color: group.color || 0x4A90E2,
+                transparent: true,
+                opacity: 0.9
+            });
+            const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+            sphere.position.copy(groupCenter);
+            annotationGroup.add(sphere);
+        });
+        
+        return annotationGroup;
+    }
+    
+    captureView(cameraSettings = null, includeAnnotations = false, cargoGroups = null) {
+        return new Promise((resolve) => {
+            // Store current camera state
+            const originalCameraPosition = this.camera.position.clone();
+            const originalControlsTarget = this.controls.target.clone();
+            const originalCameraZoom = this.camera.zoom;
+            const originalCameraFov = this.camera.fov;
+            
+            // Apply custom camera settings if provided
+            if (cameraSettings) {
+                if (cameraSettings.position) {
+                    this.camera.position.set(
+                        cameraSettings.position.x,
+                        cameraSettings.position.y,
+                        cameraSettings.position.z
+                    );
+                }
+                if (cameraSettings.target) {
+                    this.controls.target.set(
+                        cameraSettings.target.x,
+                        cameraSettings.target.y,
+                        cameraSettings.target.z
+                    );
+                }
+                if (cameraSettings.zoom !== undefined) {
+                    this.camera.zoom = cameraSettings.zoom;
+                }
+                if (cameraSettings.fov !== undefined) {
+                    this.camera.fov = cameraSettings.fov;
+                }
+                this.camera.updateProjectionMatrix();
+                this.controls.update();
+            }
+            
+            // Add annotations if requested
+            let annotationGroup = null;
+            if (includeAnnotations && cargoGroups) {
+                const viewName = cameraSettings?.name || 'default';
+                annotationGroup = this.createAnnotations(cargoGroups, viewName);
+                this.scene.add(annotationGroup);
+            }
+            
+            // Render the scene
+            this.renderer.render(this.scene, this.camera);
+            
+            // Capture canvas as base64
+            const dataURL = this.renderer.domElement.toDataURL('image/png');
+            
+            // Remove annotations if they were added
+            if (annotationGroup) {
+                this.scene.remove(annotationGroup);
+            }
+            
+            // Restore original camera state
+            this.camera.position.copy(originalCameraPosition);
+            this.controls.target.copy(originalControlsTarget);
+            this.camera.zoom = originalCameraZoom;
+            this.camera.fov = originalCameraFov;
+            this.camera.updateProjectionMatrix();
+            this.controls.update();
+            
+            // Render again with original camera to restore view
+            this.renderer.render(this.scene, this.camera);
+            
+            resolve(dataURL);
+        });
+    }
+    
+    getMultipleViews(cargoGroups = null) {
+        // Get container dimensions for calculating optimal camera positions
+        const bounds = this.containerBounds || { 
+            min: { x: -6.8, y: 0, z: -1.24 }, 
+            max: { x: 6.8, y: 2.7, z: 1.24 } 
+        };
+        
+        const centerX = (bounds.min.x + bounds.max.x) / 2;
+        const centerY = (bounds.min.y + bounds.max.y) / 2;
+        const centerZ = (bounds.min.z + bounds.max.z) / 2;
+        const length = bounds.max.x - bounds.min.x;
+        const width = bounds.max.z - bounds.min.z;
+        const height = bounds.max.y - bounds.min.y;
+        
+        // Get trailer height for better camera positioning
+        const trailerHeight = this.containerDimensions?.trailerHeight || 1.2;
+        
+        // Define camera views matching app startup and with good zoom
+        const views = [
+            {
+                name: 'default',
+                // Perspective view from left side, slightly from back, closer zoom
+                position: { 
+                    x: length * 0.1,  // Camera positioned closer to center
+                    y: height * 2 + trailerHeight,  // Slightly lower for better view
+                    z: width * 2.8  // Closer zoom for better detail
+                },
+                target: { x: centerX, y: trailerHeight + height/2, z: centerZ },
+                fov: 56  // Slightly wider FOV to compensate for closer position
+            },
+            {
+                name: 'top',
+                // Top-down view, close for better detail
+                position: { 
+                    x: centerX, 
+                    y: Math.max(length, width) * 0.75 + trailerHeight,  // Even closer
+                    z: centerZ 
+                },
+                target: { x: centerX, y: trailerHeight, z: centerZ },
+                fov: 50
+            }
+        ];
+        
+        // Store original canvas size
+        const originalWidth = this.renderer.domElement.width;
+        const originalHeight = this.renderer.domElement.height;
+        
+        // Set high resolution for PDF export (2x for better quality)
+        const exportWidth = 1920;
+        const exportHeight = 1080;
+        this.renderer.setSize(exportWidth, exportHeight);
+        this.camera.aspect = exportWidth / exportHeight;
+        this.camera.updateProjectionMatrix();
+        
+        // Capture all views - include annotations if cargo groups provided
+        const includeAnnotations = cargoGroups !== null && cargoGroups.length > 0;
+        const promises = views.map(view => 
+            this.captureView(view, includeAnnotations, cargoGroups).then(dataURL => ({ 
+                name: view.name, 
+                image: dataURL 
+            }))
+        );
+        
+        return Promise.all(promises).then(results => {
+            // Restore original canvas size
+            this.renderer.setSize(originalWidth, originalHeight);
+            this.camera.aspect = originalWidth / originalHeight;
+            this.camera.updateProjectionMatrix();
+            return results;
+        });
+    }
+    
     updateAxleVisualization(config) {
         // Check if container exists and has truck visualization
         if (!this.containerMesh || !this.truckVisualizationGroup) {

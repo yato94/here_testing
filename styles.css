@@ -7,6 +7,7 @@
     --secondary-hover: #475569;
     --danger-color: #ef4444;
     --warning-color: #f59e0b;
+    --warning-hover: #d97706;
     --success-color: #10b981;
     --bg-primary: #ffffff;
     --bg-secondary: #f8fafc;
@@ -3124,5 +3125,299 @@ body {
     .saved-configs-column,
     .file-upload-column {
         flex: 1;
+    }
+}
+
+/* Current configuration display */
+.current-config-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    overflow: hidden;
+}
+
+.current-config-display .config-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.current-config-display .config-name {
+    color: var(--text-primary);
+    font-weight: 600;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.config-name-input {
+    flex: 1;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    outline: none;
+    transition: all 0.2s ease;
+    min-width: 150px;
+    max-width: 300px;
+}
+
+.config-name-input:hover {
+    background: var(--bg-primary);
+    border-color: var(--border-color);
+}
+
+.config-name-input:focus {
+    background: var(--bg-primary);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(79, 172, 254, 0.1);
+}
+
+.config-name-input::placeholder {
+    color: var(--text-secondary);
+    font-weight: 400;
+    font-style: italic;
+}
+
+.btn-quick-save {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.btn-quick-save:hover {
+    background: #2563eb;
+    transform: scale(1.05);
+}
+
+.btn-quick-save-download {
+    background: #10b981;
+    padding: 4px 8px;
+}
+
+.btn-quick-save-download:hover {
+    background: #059669;
+}
+
+/* Overwrite state - orange color */
+.btn-quick-save.btn-overwrite {
+    background: #ff9800;
+}
+
+.btn-quick-save.btn-overwrite:hover {
+    background: #f57c00;
+}
+
+.btn-quick-save-download.btn-overwrite {
+    background: #ff9800;
+}
+
+.btn-quick-save-download.btn-overwrite:hover {
+    background: #f57c00;
+}
+
+/* Disabled state */
+.btn-quick-save:disabled,
+.btn-quick-save-download:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.btn-quick-save:disabled:hover,
+.btn-quick-save-download:disabled:hover {
+    transform: none !important;
+}
+
+.btn-icons-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+/* Save configuration modal enhancements */
+.save-config-container {
+    display: flex;
+    gap: 30px;
+    min-height: 400px;
+}
+
+.save-config-main {
+    flex: 1;
+    min-width: 400px;
+}
+
+.save-config-sidebar {
+    width: 350px;
+    display: flex;
+    flex-direction: column;
+}
+
+.save-config-sidebar h4 {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.existing-configs-list {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    max-height: 350px;
+}
+
+.existing-config-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.existing-config-item:last-child {
+    border-bottom: none;
+}
+
+.existing-config-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.existing-config-item.selected {
+    background: #eff6ff;
+    border-left: 3px solid var(--primary-color);
+    padding-left: 12px;
+}
+
+.existing-config-item.current-config {
+    background: #f0fdf4;
+}
+
+.existing-config-item.current-config.selected {
+    background: #e0f2fe;
+}
+
+.config-main-info {
+    margin-bottom: 6px;
+}
+
+.existing-config-item .config-name {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.current-badge {
+    color: var(--success-color);
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 6px;
+}
+
+.config-meta {
+    color: var(--text-tertiary);
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.config-details {
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+}
+
+.config-vehicle {
+    color: var(--text-secondary);
+}
+
+.config-weight {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.no-existing-configs {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: 13px;
+}
+
+/* Button warning style */
+.btn-warning {
+    background-color: var(--warning-color);
+    color: white;
+}
+
+.btn-warning:hover {
+    background-color: var(--warning-hover);
+}
+
+/* Save/overwrite button groups */
+.save-buttons-group,
+.overwrite-buttons-group {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+}
+
+.modal-footer {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.modal-footer .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-footer .btn svg {
+    flex-shrink: 0;
+}
+
+.btn-success {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #059669;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .save-config-container {
+        flex-direction: column;
+    }
+    
+    .save-config-main {
+        min-width: auto;
+    }
+    
+    .save-config-sidebar {
+        width: 100%;
+        max-height: 250px;
+    }
+    
+    .existing-configs-list {
+        max-height: 200px;
     }
 }
