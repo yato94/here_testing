@@ -1329,8 +1329,10 @@ class Scene3D {
                 this.controls.enabled = true;
                 this.hoveredObject = null;
                 document.body.style.cursor = 'default';
-                // Hide ruler and dimension labels when not hovering
+                // Hide ruler when not hovering
                 this.hideRuler();
+                // Hide dimension labels when not hovering
+                this.hideDimensionLabels();
                 
                 // Restore group highlight if any group is selected
                 if (this.selectedGroupId) {
@@ -2793,6 +2795,9 @@ class Scene3D {
                             obj.position.y += deltaY;
                             obj.position.z += deltaZ;
                         });
+                        
+                        // Update dimension labels for units outside container
+                        this.createDimensionLabels(this.draggedObjects[0]);
                     }
                     // If not valid stacking, units stay at their current position
                     
@@ -4604,8 +4609,7 @@ class Scene3D {
             this.rulerVisible = false;
         }
         
-        // Also hide dimension labels
-        this.hideDimensionLabels();
+        // Note: dimension labels are managed separately and not hidden with ruler
     }
     
     createDimensionLabels(mesh) {
@@ -5735,14 +5739,30 @@ class Scene3D {
         context.lineTo(280, 30);
         context.stroke();
         
-        // Get first item as sample for group properties
-        const sampleItem = group.items[0];
+        // Check if this is an overflow box
+        const isOverflow = position.userData?.isOverflow;
+        const overflowCount = position.userData?.overflowCount || 0;
         
-        // HEADER - number, color dot, quantity badge, name
-        // Order number
-        context.fillStyle = '#94a3b8';
-        context.font = 'bold 11px Arial';
-        context.fillText(group.orderIndex || '1', 10, 20);
+        if (isOverflow) {
+            // Special overflow box design
+            context.fillStyle = '#94a3b8';
+            context.font = 'bold 14px Arial';
+            context.textAlign = 'center';
+            context.fillText(`+ ${overflowCount} other groups`, 140, 75);
+            
+            context.font = '11px Arial';
+            context.fillText('Details below', 140, 95);
+            context.textAlign = 'left';
+        } else {
+            // Normal info box
+            // Get first item as sample for group properties
+            const sampleItem = group.items[0];
+            
+            // HEADER - number, color dot, quantity badge, name
+            // Order number
+            context.fillStyle = '#94a3b8';
+            context.font = 'bold 11px Arial';
+            context.fillText(group.orderIndex || '1', 10, 20);
         
         // Color dot
         context.fillStyle = group.color || '#4A90E2';
@@ -5856,25 +5876,26 @@ class Scene3D {
         });
         ldm = ldm.toFixed(2);
         
-        // Footer items
-        const footerItems = [
-            { value: `${totalWeight} kg`, label: 'ŁĄCZNA WAGA' },
-            { value: `${totalVolume} m³`, label: 'OBJĘTOŚĆ' },
-            { value: `${area} m²`, label: 'POWIERZCHNIA' },
-            { value: `${ldm} m`, label: 'LDM' }
-        ];
-        
-        const footerItemWidth = 280 / 4;
-        footerItems.forEach((item, index) => {
-            const x = index * footerItemWidth + footerItemWidth / 2;
-            context.fillStyle = '#1e293b';
-            context.font = 'bold 10px Arial';
-            context.textAlign = 'center';
-            context.fillText(item.value, x, 138);
-            context.fillStyle = '#64748b';
-            context.font = '7px Arial';
-            context.fillText(item.label, x, 147);
-        });
+            // Footer items
+            const footerItems = [
+                { value: `${totalWeight} kg`, label: 'TOTAL WEIGHT' },
+                { value: `${totalVolume} m³`, label: 'VOLUME' },
+                { value: `${area} m²`, label: 'AREA' },
+                { value: `${ldm} m`, label: 'LDM' }
+            ];
+            
+            const footerItemWidth = 280 / 4;
+            footerItems.forEach((item, index) => {
+                const x = index * footerItemWidth + footerItemWidth / 2;
+                context.fillStyle = '#1e293b';
+                context.font = 'bold 10px Arial';
+                context.textAlign = 'center';
+                context.fillText(item.value, x, 138);
+                context.fillStyle = '#64748b';
+                context.font = '7px Arial';
+                context.fillText(item.label, x, 147);
+            });
+        } // Close the else block for normal info box
         
         // Create texture and sprite with high quality settings
         const texture = new THREE.CanvasTexture(canvas);
@@ -5890,7 +5911,9 @@ class Scene3D {
         
         // Set sprite position and scale
         sprite.position.copy(position);
-        sprite.scale.set(4.2, 2.25, 1); // Scale increased by 20% for better visibility
+        // Default scale - can be overridden by caller
+        const scaleFactor = position.userData?.scale || 1.0;
+        sprite.scale.set(4.28 * scaleFactor, 2.30 * scaleFactor, 1); // Base scale reduced by 20% total (was 5.31, 2.85)
         
         return sprite;
     }
@@ -5938,6 +5961,9 @@ class Scene3D {
         const containerHeight = bounds.max.y - bounds.min.y;
         const centerX = (bounds.min.x + bounds.max.x) / 2;
         
+        // Check if this is a SOLO vehicle
+        const isSolo = this.containerDimensions?.isSolo || false;
+        
         // Different positioning for different views
         let boxY, boxZ;
         if (viewName === 'top') {
@@ -5948,7 +5974,7 @@ class Scene3D {
             // For perspective view - position at top edge of screen
             // We need boxes to appear at the top of the frame
             // Position them above and behind the container to appear at top of viewport
-            boxY = containerHeight + trailerHeight + 1; // Above container (lowered from 2 to 1)
+            boxY = containerHeight + trailerHeight + 2; // Above container (raised higher for better visibility)
             boxZ = -1; // Behind container center (negative Z)
         }
         
@@ -5961,31 +5987,72 @@ class Scene3D {
         // Sort groups by X position (left to right)
         groupsWithPositions.sort((a, b) => a.xPos - b.xPos);
         
-        // Limit to max 5 groups and calculate positions
-        const numGroups = Math.min(groupsWithPositions.length, 5);
-        const actualGroups = groupsWithPositions.slice(0, numGroups);
+        // Process all groups, not limit to 5
+        const actualGroups = groupsWithPositions;
         
-        // Calculate spacing to distribute boxes
-        let totalSpan, startX, spacing;
-        
-        if (viewName === 'top') {
-            // For top view - spread across width
-            totalSpan = containerLength * 0.8; // Use 80% of container length
-        } else {
-            // For perspective view - spread across width like in top view
-            totalSpan = containerLength * 0.7; // Use 70% of container length
+        // Calculate box dimensions in world space (accounting for scale)
+        // For SOLO in top view, apply additional 30% reduction (20% + 10% = 30%)
+        let topRowScale = viewName === 'top' ? 0.95 : 1.0; // Top view boxes are 5% smaller
+        if (isSolo && viewName === 'top') {
+            topRowScale *= 0.7; // Additional 30% reduction for SOLO in top view (0.95 * 0.7 = 0.665)
         }
+        const boxWidth = 4.28 * topRowScale; // Current sprite scale X
+        const minSpacing = 0.3; // Minimum space between boxes
+        const effectiveBoxWidth = boxWidth + minSpacing;
         
-        startX = centerX - totalSpan / 2;
-        spacing = totalSpan / Math.max(1, numGroups - 1);
+        // Maximum 4 boxes per row for better readability
+        const boxesPerRow = Math.min(4, actualGroups.length);
+        
+        // Distribute groups into rows
+        const topRowGroups = [];
+        const bottomRowGroups = [];
+        let overflowGroups = [];
+        
+        // Check if we need overflow handling
+        const needsOverflow = actualGroups.length > boxesPerRow * 2;
+        const maxGroups = needsOverflow ? boxesPerRow * 2 - 1 : boxesPerRow * 2;
         
         actualGroups.forEach((group, index) => {
             // Assign order index based on position (1-based)
             group.orderIndex = index + 1;
             
-            // Calculate info box position - maintain order from left to right
-            const boxX = numGroups === 1 ? centerX : startX + spacing * index;
+            if (index < boxesPerRow) {
+                // First row
+                topRowGroups.push(group);
+            } else if (index < maxGroups) {
+                // Second row (leave space for overflow if needed)
+                bottomRowGroups.push(group);
+            } else {
+                // Overflow groups
+                overflowGroups.push(group);
+            }
+        });
+        
+        // If we have overflow, add special overflow marker to bottom row
+        if (overflowGroups.length > 0) {
+            // Create a special overflow group marker
+            const overflowMarker = {
+                isOverflowMarker: true,
+                overflowCount: overflowGroups.length,
+                orderIndex: maxGroups + 1
+            };
+            bottomRowGroups.push(overflowMarker);
+        }
+        
+        // Process top row
+        topRowGroups.forEach((group, index) => {
+            const rowCount = topRowGroups.length;
+            const totalWidth = effectiveBoxWidth * rowCount - minSpacing; // Remove extra spacing at the end
+            const startX = centerX - totalWidth / 2 + boxWidth / 2; // Shift right by half box width
+            
+            const boxX = startX + index * effectiveBoxWidth;
             const boxPosition = new THREE.Vector3(boxX, boxY, boxZ);
+            
+            // For top view, make boxes 5% smaller (or 66.5% for SOLO)
+            if (viewName === 'top') {
+                const scale = isSolo ? 0.665 : 0.95; // 33.5% smaller for SOLO, 5% smaller for others
+                boxPosition.userData = { scale: scale };
+            }
             
             // Create sprite for info box with full group data
             const sprite = this.createInfoBoxSprite(group, boxPosition);
@@ -6019,7 +6086,7 @@ class Scene3D {
             
             const lineMaterial = new THREE.LineBasicMaterial({ 
                 color: lineColor,
-                linewidth: 2,
+                linewidth: 3,
                 transparent: true,
                 opacity: 0.8
             });
@@ -6038,6 +6105,116 @@ class Scene3D {
             sphere.position.copy(groupCenter);
             annotationGroup.add(sphere);
         });
+        
+        // Process bottom row (if any)
+        if (bottomRowGroups.length > 0 || overflowGroups.length > 0) {
+            // Calculate bottom row Y position
+            let bottomBoxY, bottomBoxZ;
+            
+            if (viewName === 'top') {
+                // For top view - position at bottom edge of visible area
+                bottomBoxY = trailerHeight + 0.5; // Same height as top row
+                bottomBoxZ = bounds.max.z + containerWidth * 0.8; // Below container in view (at bottom edge of screen)
+            } else {
+                // For perspective view - position at bottom edge of screen
+                bottomBoxY = trailerHeight; // Below container, raised higher for better visibility
+                bottomBoxZ = containerWidth * 2; // In front of container (positive Z)
+            }
+            
+            bottomRowGroups.forEach((group, index) => {
+                const rowCount = bottomRowGroups.length;
+                // For perspective view, adjust spacing for smaller boxes
+                // For top view, use same scale as top row (95%, or 66.5% for SOLO)
+                let bottomRowScale = (viewName === 'perspective' || viewName === 'default') ? 0.85 : 
+                                      (viewName === 'top' ? 0.95 : 1.0);
+                // Apply SOLO reduction if needed (30% total reduction)
+                if (isSolo && viewName === 'top') {
+                    bottomRowScale *= 0.7; // Additional 30% reduction for SOLO in top view
+                }
+                // Calculate bottom box width based on base width (4.28), not the already scaled boxWidth
+                const bottomBoxWidth = 4.28 * bottomRowScale;
+                const bottomEffectiveWidth = bottomBoxWidth + minSpacing;
+                
+                const totalWidth = bottomEffectiveWidth * rowCount - minSpacing; // Remove extra spacing at the end
+                const startX = centerX - totalWidth / 2 + bottomBoxWidth / 2; // Shift right by half box width
+                
+                const boxX = startX + index * bottomEffectiveWidth;
+                const boxPosition = new THREE.Vector3(boxX, bottomBoxY, bottomBoxZ);
+                
+                // For perspective view, make bottom row 15% smaller
+                // For top view, make bottom row 5% smaller (or 66.5% for SOLO)
+                if (viewName === 'perspective' || viewName === 'default') {
+                    boxPosition.userData = { scale: 0.85 }; // 15% smaller than top row
+                } else if (viewName === 'top') {
+                    const scale = isSolo ? 0.665 : 0.95; // 33.5% smaller for SOLO, 5% smaller for others
+                    boxPosition.userData = { scale: scale };
+                }
+                
+                // Check if this is an overflow marker
+                if (group.isOverflowMarker) {
+                    // Add overflow info to userData
+                    boxPosition.userData = {
+                        ...boxPosition.userData,
+                        isOverflow: true,
+                        overflowCount: group.overflowCount
+                    };
+                }
+                
+                // Create sprite for info box with full group data
+                const sprite = this.createInfoBoxSprite(group, boxPosition);
+                annotationGroup.add(sprite);
+                
+                // Skip leader lines for overflow markers
+                if (!group.isOverflowMarker) {
+                    // Use the already calculated center
+                    const groupCenter = group.center;
+                    
+                    // Create curved leader line using quadratic bezier curve
+                    const midPoint = new THREE.Vector3(
+                        (groupCenter.x + boxPosition.x) / 2,
+                        bottomBoxY + 0.5, // Slightly above the box for bottom row
+                        (groupCenter.z + boxPosition.z) / 2
+                    );
+                
+                const curve = new THREE.QuadraticBezierCurve3(
+                    groupCenter,
+                    midPoint,
+                    boxPosition
+                );
+                
+                const points = curve.getPoints(50);
+                const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                
+                // Parse color for the line
+                let lineColor = 0x4A90E2;
+                if (group.color) {
+                    lineColor = new THREE.Color(group.color).getHex();
+                }
+                
+                const lineMaterial = new THREE.LineBasicMaterial({ 
+                    color: lineColor,
+                    linewidth: 2,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const line = new THREE.Line(lineGeometry, lineMaterial);
+                annotationGroup.add(line);
+                
+                // Add a small sphere at the group center
+                const sphereGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+                const sphereMaterial = new THREE.MeshBasicMaterial({ 
+                    color: group.color || 0x4A90E2,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+                    sphere.position.copy(groupCenter);
+                    annotationGroup.add(sphere);
+                } // Close if (!group.isOverflowMarker)
+            });
+            
+        }
         
         return annotationGroup;
     }
@@ -6127,29 +6304,29 @@ class Scene3D {
         // Get trailer height for better camera positioning
         const trailerHeight = this.containerDimensions?.trailerHeight || 1.2;
         
-        // Define camera views matching app startup and with good zoom
+        // Define camera views with better visibility of full container
         const views = [
             {
                 name: 'default',
-                // Perspective view from left side, slightly from back, closer zoom
+                // Perspective view from center, slightly from back, zoomed out more
                 position: { 
-                    x: length * 0.1,  // Camera positioned closer to center
-                    y: height * 2 + trailerHeight,  // Slightly lower for better view
-                    z: width * 2.8  // Closer zoom for better detail
+                    x: 0,  // Centered
+                    y: height * 3.5 + trailerHeight,  // Higher for better overview
+                    z: width * 5.5  // Further back to see entire container
                 },
                 target: { x: centerX, y: trailerHeight + height/2, z: centerZ },
-                fov: 56  // Slightly wider FOV to compensate for closer position
+                fov: 45  // Narrower FOV for less distortion
             },
             {
                 name: 'top',
-                // Top-down view, close for better detail
+                // Top-down view, closer for better detail
                 position: { 
                     x: centerX, 
-                    y: Math.max(length, width) * 0.75 + trailerHeight,  // Even closer
+                    y: Math.max(length, width) * 0.85 + trailerHeight,  // Closer than before
                     z: centerZ 
                 },
                 target: { x: centerX, y: trailerHeight, z: centerZ },
-                fov: 50
+                fov: 55  // Adjusted FOV for better framing
             }
         ];
         
@@ -6157,9 +6334,11 @@ class Scene3D {
         const originalWidth = this.renderer.domElement.width;
         const originalHeight = this.renderer.domElement.height;
         
-        // Set high resolution for PDF export (2x for better quality)
-        const exportWidth = 1920;
-        const exportHeight = 1080;
+        // Set higher resolution for PDF export optimized for A4 landscape
+        // A4 landscape is 297x210mm, ratio ~1.414
+        // Accounting for title space, the actual content area is more like 1.5:1
+        const exportWidth = 3000;  // High resolution width
+        const exportHeight = 2000; // Aspect ratio 1.5:1 for better page fill
         this.renderer.setSize(exportWidth, exportHeight);
         this.camera.aspect = exportWidth / exportHeight;
         this.camera.updateProjectionMatrix();

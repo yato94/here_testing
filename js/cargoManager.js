@@ -253,24 +253,41 @@ class CargoManager {
             const itemWidth = item.mesh && item.mesh.userData.width ? item.mesh.userData.width : item.width;
             const itemHeight = item.mesh && item.mesh.userData.height ? item.mesh.userData.height : item.height;
             
-            // Convert from scene coordinates (center at 0,0,0) to bin packing coordinates (origin at corner)
-            // Scene: x ranges from -length/2 to +length/2
-            // Bin packing: x ranges from 0 to length
-            const binX = item.position.x + (this.containerDimensions.length / 2) - (itemLength / 2);
-            const binY = item.position.y - this.containerDimensions.trailerHeight - (itemHeight / 2);
-            const binZ = item.position.z + (this.containerDimensions.width / 2) - (itemWidth / 2);
-            
-            return {
-                x: binX,
-                y: binY,
-                z: binZ,
-                width: itemLength,
-                depth: itemWidth,
-                height: itemHeight,
-                isRoll: item.isRoll || false,
-                isVerticalRoll: item.isVerticalRoll || false,
-                isHorizontalRoll: item.isHorizontalRoll || false
-            };
+            // For JUMBO, keep scene coordinates - they will be converted in _arrangeGroupItems
+            // For standard containers, convert to bin packing coordinates
+            if (this.sections) {
+                // JUMBO: use scene coordinates directly
+                return {
+                    x: item.position.x - (itemLength / 2),
+                    y: item.position.y - this.containerDimensions.trailerHeight - (itemHeight / 2),
+                    z: item.position.z - (itemWidth / 2),
+                    width: itemLength,
+                    depth: itemWidth,
+                    height: itemHeight,
+                    isRoll: item.isRoll || false,
+                    isVerticalRoll: item.isVerticalRoll || false,
+                    isHorizontalRoll: item.isHorizontalRoll || false
+                };
+            } else {
+                // Standard container: convert from scene coordinates to bin packing coordinates
+                // Scene: x ranges from -length/2 to +length/2
+                // Bin packing: x ranges from 0 to length
+                const binX = item.position.x + (this.containerDimensions.length / 2) - (itemLength / 2);
+                const binY = item.position.y - this.containerDimensions.trailerHeight - (itemHeight / 2);
+                const binZ = item.position.z + (this.containerDimensions.width / 2) - (itemWidth / 2);
+                
+                return {
+                    x: binX,
+                    y: binY,
+                    z: binZ,
+                    width: itemLength,
+                    depth: itemWidth,
+                    height: itemHeight,
+                    isRoll: item.isRoll || false,
+                    isVerticalRoll: item.isVerticalRoll || false,
+                    isHorizontalRoll: item.isHorizontalRoll || false
+                };
+            }
         });
         
         // Arrange only items within weight limit
@@ -838,17 +855,23 @@ class CargoManager {
                 const sectionEnd = xOffset + section.length;
                 
                 // Filter occupied spaces for this section
+                // Note: occupied spaces are already in scene coordinates for JUMBO
                 const spacesInSection = occupiedSpaces.filter(space => {
-                    const spaceStart = space.x;
-                    const spaceEnd = space.x + space.width;
-                    // Check if space overlaps with this section
-                    return spaceStart < sectionEnd && spaceEnd > sectionStart;
+                    // Get the center position of the occupied space in scene coordinates
+                    const spaceCenterX = space.x + (space.width / 2);
+                    // Check if space center is within this section
+                    return spaceCenterX >= sectionStart && spaceCenterX <= sectionEnd;
                 }).map(space => {
-                    // Convert to section-local coordinates
+                    // Convert from scene coordinates to section-local bin packing coordinates
+                    // Scene coordinates: x is already at corner (not center)
+                    // Section local: x starts at 0 for each section
+                    const localX = space.x - sectionStart;
+                    const localZ = space.z + (section.width / 2); // Adjust for section coordinate system
+                    
                     return {
-                        x: space.x - sectionStart,
+                        x: localX,
                         y: space.y,
-                        z: space.z + (section.width / 2), // Adjust for section coordinate system
+                        z: localZ,
                         width: space.width,
                         depth: space.depth,
                         height: space.height,

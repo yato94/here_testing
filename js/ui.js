@@ -2748,32 +2748,27 @@ class UI {
             
             // Page 1: Perspective View
             pdf.setFontSize(16);
-            pdf.text('Load Plan - Perspective View', pageWidth / 2, 15, { align: 'center' });
+            pdf.text('Load Plan - Perspective View', pageWidth / 2, 12, { align: 'center' });
             
             // Add date
             pdf.setFontSize(10);
             const date = new Date().toLocaleString('en-US');
-            pdf.text(`Date: ${date}`, pageWidth - 10, 10, { align: 'right' });
+            pdf.text(`Date: ${date}`, pageWidth - 5, 8, { align: 'right' });
             
-            // Calculate full page image dimensions
-            const imgMargin = 15;
-            const availableWidth = pageWidth - (imgMargin * 2);
-            const maxHeight = pageHeight - 35; // Leave space for title
+            // Calculate full page image dimensions with minimal margins
+            const sideMargin = 3; // Minimal side margin
+            const topMargin = 18; // Space for title and date
+            const bottomMargin = 3; // Minimal bottom margin
+            const availableWidth = pageWidth - (sideMargin * 2);
+            const availableHeight = pageHeight - topMargin - bottomMargin; // Maximum height available
             
-            // Maintain aspect ratio (16:9 for our canvas)
-            const aspectRatio = 16 / 9;
-            let imgWidth = availableWidth;
-            let imgHeight = imgWidth / aspectRatio;
+            // Fill entire available width and height
+            const imgWidth = availableWidth;
+            const imgHeight = availableHeight;
             
-            // Check if height exceeds max, then scale down
-            if (imgHeight > maxHeight) {
-                imgHeight = maxHeight;
-                imgWidth = imgHeight * aspectRatio;
-            }
-            
-            // Center the image
-            const xPos = (pageWidth - imgWidth) / 2;
-            const yPos = 25;
+            // Position image to fill the page
+            const xPos = sideMargin;
+            const yPos = topMargin;
             
             // Find perspective view
             const perspectiveView = views.find(v => v.name === 'default');
@@ -2791,7 +2786,7 @@ class UI {
             // Page 2: Top View
             pdf.addPage();
             pdf.setFontSize(16);
-            pdf.text('Load Plan - Top View', pageWidth / 2, 15, { align: 'center' });
+            pdf.text('Load Plan - Top View', pageWidth / 2, 12, { align: 'center' });
             
             // Find top view
             const topView = views.find(v => v.name === 'top');
