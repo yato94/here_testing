@@ -47,6 +47,11 @@ class Scene3D {
         this.canStackAtPosition = true;
         this.containerBounds = null;
         
+        // Axle load visualization
+        this.axleLoadGroup = null;
+        this.showAxleLoads = false;
+        this.axleBlinkAnimation = null;
+        
         this.init();
     }
     
@@ -79,7 +84,10 @@ class Scene3D {
         this.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
         this.camera.position.set(20, 15, 20);
         
-        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            preserveDrawingBuffer: true  // Ważne dla eksportu PDF - zachowuje bufor do przechwytywania canvas
+        });
         this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
         this.container.appendChild(this.renderer.domElement);
         
@@ -5583,6 +5591,7 @@ class Scene3D {
                     
                     // Apply rotation to sprite (sprites rotate around Z axis)
                     sprite.material.rotation = -angle;  // Negative because screen Y is inverted
+                    sprite.material.needsUpdate = true;  // Ensure material updates
                     
                     // Calculate the edge length in screen pixels for scaling
                     const edgeScreenLength = Math.sqrt(
@@ -5690,7 +5699,31 @@ class Scene3D {
         // Update dimension labels scale if they exist
         this.updateDimensionLabelsScale();
         
+        // Update blinking for overloaded axle labels
+        this.updateAxleLoadBlinking();
+        
         this.renderer.render(this.scene, this.camera);
+    }
+    
+    // Update blinking animation for overloaded axle labels
+    updateAxleLoadBlinking() {
+        if (!this.axleLoadGroup || !this.showAxleLoads) return;
+        
+        const currentTime = Date.now();
+        
+        this.axleLoadGroup.traverse((child) => {
+            if (child.userData.isOverloaded) {
+                // Check if it's time to toggle the blink state (every 0.5 second)
+                if (currentTime - child.userData.lastBlinkTime >= 500) {
+                    child.userData.lastBlinkTime = currentTime;
+                    child.userData.blinkState = !child.userData.blinkState;
+                    
+                    // Redraw with current text and blinking color
+                    const text = child.userData.currentText || '0.0t';
+                    this.redrawAxleLabel(child, text, child.userData.blinkState);
+                }
+            }
+        });
     }
     
     exportToPNG() {
@@ -5700,6 +5733,23 @@ class Scene3D {
                 resolve(blob);
             });
         });
+    }
+    
+    getOrdinalSuffix(num) {
+        // Get English ordinal suffix (st, nd, rd, th)
+        const j = num % 10;
+        const k = num % 100;
+        
+        if (j == 1 && k != 11) {
+            return 'st';
+        }
+        if (j == 2 && k != 12) {
+            return 'nd';
+        }
+        if (j == 3 && k != 13) {
+            return 'rd';
+        }
+        return 'th';
     }
     
     createInfoBoxSprite(group, position) {
@@ -5759,48 +5809,65 @@ class Scene3D {
             const sampleItem = group.items[0];
             
             // HEADER - number, color dot, quantity badge, name
-            // Order number
+            // Order number with ordinal suffix
+            const orderNum = group.orderIndex || 1;
+            const ordinalSuffix = this.getOrdinalSuffix(orderNum);
+            
+            // Draw number
             context.fillStyle = '#94a3b8';
             context.font = 'bold 11px Arial';
-            context.fillText(group.orderIndex || '1', 10, 20);
+            context.fillText(orderNum.toString(), 10, 20);
+            
+            // Measure number width to position suffix
+            const numWidth = context.measureText(orderNum.toString()).width;
+            
+            // Draw smaller suffix
+            context.font = '8px Arial';  // Smaller font for suffix
+            context.fillText(ordinalSuffix, 10 + numWidth, 20);
         
-        // Color dot
+        // Shape indicator based on unit type (circle for cylindrical, square for box)
+        const isCylindrical = sampleItem.isRoll || sampleItem.type === 'steel-coil';
         context.fillStyle = group.color || '#4A90E2';
-        context.beginPath();
-        context.arc(30, 15, 5, 0, 2 * Math.PI);
-        context.fill();
         
-        // Quantity badge
-        context.fillStyle = '#10b981';
-        context.fillRect(45, 7, 35, 16);
-        context.fillStyle = '#ffffff';
-        context.font = 'bold 10px Arial';
-        context.textAlign = 'center';
-        context.fillText(`× ${group.count}`, 62, 18);
+        if (isCylindrical) {
+            // Circle for Roll/Steel Coil
+            context.beginPath();
+            context.arc(38, 15, 8, 0, 2 * Math.PI);
+            context.fill();
+        } else {
+            // Square for box units
+            context.fillRect(30, 7, 16, 16);
+        }
+        
+        // Quantity text next to shape
+        context.fillStyle = '#1e293b';
+        context.font = 'bold 11px Arial';
+        context.textAlign = 'left';
+        context.fillText(`× ${group.count}`, 52, 19);
         
         // Name
         context.fillStyle = '#1e293b';
         context.font = 'bold 11px Arial';
         context.textAlign = 'left';
-        context.fillText(group.name, 88, 19);
+        context.fillText(group.name, 92, 19);
         
         // CONTENT - two rows, four columns each
         // Row 1
         context.fillStyle = '#64748b';
         context.font = '9px Arial';
-        context.fillText('Wymiary', 10, 45);
+        context.fillText('Dimensions', 10, 45);
         context.fillStyle = '#1e293b';
         context.font = 'bold 11px Arial';
         const dims = `${(sampleItem.length*100).toFixed(0)}×${(sampleItem.width*100).toFixed(0)}×${(sampleItem.height*100).toFixed(0)} cm`;
         context.fillText(dims, 10, 58);
         context.fillStyle = '#94a3b8';
         context.font = '8px Arial';
-        context.fillText('(dł. / szer. / wys.)', 10, 68);
+        context.fillText('(L / W / H)', 10, 68);
         
         // Column 2 - Weight
         context.fillStyle = '#64748b';
         context.font = '9px Arial';
-        context.fillText('Waga jedn.', 150, 45);
+        context.fillText('Unit weight', 150, 45);
         context.fillStyle = '#1e293b';
         context.font = 'bold 11px Arial';
         context.fillText(`${sampleItem.weight} kg`, 150, 58);
@@ -5809,7 +5876,7 @@ class Scene3D {
         // Column 1 - Stacking
         context.fillStyle = '#64748b';
         context.font = '9px Arial';
-        context.fillText('Piętrowanie', 10, 85);
+        context.fillText('Stacking', 10, 85);
         context.fillStyle = '#1e293b';
         context.font = 'bold 11px Arial';
         context.fillText(`${sampleItem.maxStack || 0}`, 10, 98);
@@ -5946,6 +6013,33 @@ class Scene3D {
         return center;
     }
     
+    getClosestGroupItem(groupItems, targetPoint) {
+        // Find the closest unit from the group to the target point (infobox)
+        let closestPosition = null;
+        let minDistance = Infinity;
+        
+        groupItems.forEach(item => {
+            const mesh = this.cargoMeshes.find(m => 
+                m.userData && 
+                m.userData.id === item.id
+            );
+            if (mesh && !this.isPositionOutsideContainer(mesh.position)) {
+                const distance = mesh.position.distanceTo(targetPoint);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestPosition = mesh.position.clone();
+                }
+            }
+        });
+        
+        // If no position found (shouldn't happen), return group center as fallback
+        if (!closestPosition) {
+            return this.getGroupCenter(groupItems);
+        }
+        
+        return closestPosition;
+    }
+    
     createAnnotations(cargoGroups, viewName = 'default') {
         const annotationGroup = new THREE.Group();
         
@@ -6058,23 +6152,22 @@ class Scene3D {
             const sprite = this.createInfoBoxSprite(group, boxPosition);
             annotationGroup.add(sprite);
             
-            // Use the already calculated center
-            const groupCenter = group.center;
+            // Find the closest unit from the group to the infobox
+            const closestUnitPosition = this.getClosestGroupItem(group.items, boxPosition);
             
-            // Create curved leader line using quadratic bezier curve
-            const midPoint = new THREE.Vector3(
-                (groupCenter.x + boxPosition.x) / 2,
-                boxPosition.y - 0.5, // Slightly below the box for a nice curve
-                (groupCenter.z + boxPosition.z) / 2
+            // Calculate edge point on info box
+            // For top row infoboxes: line goes to bottom edge
+            const infoBoxHeight = 2.30 * (boxPosition.userData?.scale || 1);
+            
+            // Bottom center of the infobox (Y-axis is vertical)
+            const edgePoint = new THREE.Vector3(
+                boxPosition.x, 
+                boxPosition.y - infoBoxHeight / 2,  // Bottom edge of infobox (lower Y value)
+                boxPosition.z
             );
             
-            const curve = new THREE.QuadraticBezierCurve3(
-                groupCenter,
-                midPoint,
-                boxPosition
-            );
-            
-            const points = curve.getPoints(50); // Get 50 points along the curve for smooth line
+            // Create straight line from closest unit to bottom edge of infobox
+            const points = [closestUnitPosition, edgePoint];
             const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
             
             // Parse color for the line
@@ -6086,7 +6179,7 @@ class Scene3D {
             
             const lineMaterial = new THREE.LineBasicMaterial({ 
                 color: lineColor,
-                linewidth: 3,
+                linewidth: 5,
                 transparent: true,
                 opacity: 0.8
             });
@@ -6094,7 +6187,7 @@ class Scene3D {
             const line = new THREE.Line(lineGeometry, lineMaterial);
             annotationGroup.add(line);
             
-            // Add a small sphere at the group center for better visibility
+            // Add a small sphere at the closest unit position for better visibility
             const sphereGeometry = new THREE.SphereGeometry(0.15, 16, 16);
             const sphereMaterial = new THREE.MeshBasicMaterial({ 
                 color: group.color || 0x4A90E2,
@@ -6102,7 +6195,7 @@ class Scene3D {
                 opacity: 0.9
             });
             const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-            sphere.position.copy(groupCenter);
+            sphere.position.copy(closestUnitPosition);
             annotationGroup.add(sphere);
         });
         
@@ -6166,60 +6259,1283 @@ class Scene3D {
                 
                 // Skip leader lines for overflow markers
                 if (!group.isOverflowMarker) {
-                    // Use the already calculated center
-                    const groupCenter = group.center;
+                    // Find the closest unit from the group to the infobox
+                    const closestUnitPosition = this.getClosestGroupItem(group.items, boxPosition);
                     
-                    // Create curved leader line using quadratic bezier curve
-                    const midPoint = new THREE.Vector3(
-                        (groupCenter.x + boxPosition.x) / 2,
-                        bottomBoxY + 0.5, // Slightly above the box for bottom row
-                        (groupCenter.z + boxPosition.z) / 2
+                    // Calculate edge point on info box
+                    // For bottom row infoboxes: line goes to top edge
+                    const infoBoxHeight = 2.30 * (boxPosition.userData?.scale || 1);
+                    
+                    // Top center of the infobox (Y-axis is vertical)
+                    const edgePoint = new THREE.Vector3(
+                        boxPosition.x, 
+                        boxPosition.y + infoBoxHeight / 2,  // Top edge of infobox (higher Y value)
+                        boxPosition.z
                     );
-                
-                const curve = new THREE.QuadraticBezierCurve3(
-                    groupCenter,
-                    midPoint,
-                    boxPosition
-                );
-                
-                const points = curve.getPoints(50);
-                const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-                
-                // Parse color for the line
-                let lineColor = 0x4A90E2;
-                if (group.color) {
-                    lineColor = new THREE.Color(group.color).getHex();
-                }
-                
-                const lineMaterial = new THREE.LineBasicMaterial({ 
-                    color: lineColor,
-                    linewidth: 2,
-                    transparent: true,
-                    opacity: 0.8
-                });
-                
-                const line = new THREE.Line(lineGeometry, lineMaterial);
-                annotationGroup.add(line);
-                
-                // Add a small sphere at the group center
-                const sphereGeometry = new THREE.SphereGeometry(0.15, 16, 16);
-                const sphereMaterial = new THREE.MeshBasicMaterial({ 
-                    color: group.color || 0x4A90E2,
-                    transparent: true,
-                    opacity: 0.9
-                });
+                    
+                    // Create straight line from closest unit to top edge of infobox
+                    const points = [closestUnitPosition, edgePoint];
+                    const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                    
+                    // Parse color for the line
+                    let lineColor = 0x4A90E2;
+                    if (group.color) {
+                        lineColor = new THREE.Color(group.color).getHex();
+                    }
+                    
+                    const lineMaterial = new THREE.LineBasicMaterial({ 
+                        color: lineColor,
+                        linewidth: 5,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    
+                    const line = new THREE.Line(lineGeometry, lineMaterial);
+                    annotationGroup.add(line);
+                    
+                    // Add a small sphere at the closest unit position
+                    const sphereGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+                    const sphereMaterial = new THREE.MeshBasicMaterial({ 
+                        color: group.color || 0x4A90E2,
+                        transparent: true,
+                        opacity: 0.9
+                    });
                     const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-                    sphere.position.copy(groupCenter);
+                    sphere.position.copy(closestUnitPosition);
                     annotationGroup.add(sphere);
                 } // Close if (!group.isOverflowMarker)
             });
             
         }
         
+        // Add measurement ruler to the annotation group
+        const ruler = this.createPDFRuler(viewName);
+        if (ruler) {
+            annotationGroup.add(ruler);
+        }
+        
         return annotationGroup;
     }
     
-    captureView(cameraSettings = null, includeAnnotations = false, cargoGroups = null) {
+    createPDFRuler(viewName = 'default') {
+        const rulerGroup = new THREE.Group();
+        
+        if (!this.containerBounds) return rulerGroup;
+        
+        const trailerHeight = this.containerDimensions?.trailerHeight || 1.1;
+        const containerLength = this.containerBounds.max.x - this.containerBounds.min.x;
+        const containerWidth = this.containerBounds.max.z - this.containerBounds.min.z;
+        const containerHeight = this.containerBounds.max.y - this.containerBounds.min.y;
+        
+        // === LENGTH RULER (bottom edge) ===
+        // Ruler positioning based on view type
+        let rulerY = trailerHeight; // Height of the ruler
+        let rulerZ; // Z position depends on view
+        
+        if (viewName === 'top') {
+            // For top view, place ruler at the bottom edge (max Z)
+            rulerZ = this.containerBounds.max.z + 0.3;
+        } else {
+            // For perspective view, place ruler at the front edge (max Z)
+            rulerZ = this.containerBounds.max.z + 0.2;
+        }
+        
+        // Check if this is a JUMBO vehicle with sections
+        if (this.containerBounds.isJumbo && this.containerBounds.sections) {
+            // JUMBO: Create two separate rulers for each section
+            const gap = 0.5; // 50cm gap between sections
+            const section1Start = this.containerBounds.min.x;
+            const section1End = section1Start + this.containerBounds.sections[0].length;
+            const section2Start = section1End + gap;
+            const section2End = this.containerBounds.max.x;
+            
+            // Section 1 ruler (starts from 0)
+            this.addRulerSection(rulerGroup, section1Start, section1End, rulerY, rulerZ, 0, 'horizontal');
+            
+            // Section 2 ruler (also starts from 0 for its own section)
+            this.addRulerSection(rulerGroup, section2Start, section2End, rulerY, rulerZ, 0, 'horizontal');
+        } else {
+            // Standard container: single ruler
+            this.addRulerSection(rulerGroup, this.containerBounds.min.x, this.containerBounds.max.x, rulerY, rulerZ, 0, 'horizontal');
+        }
+        
+        // === WIDTH RULER (top edge) ===
+        // Position at top-front edge of container
+        const widthRulerX = this.containerBounds.max.x + 0.05; // Very close to the container edge
+        const widthRulerY = this.containerBounds.max.y + 0.05; // Just above container
+        
+        // Create width ruler along Z-axis (reversed - from max to min)
+        this.addWidthRuler(rulerGroup, 
+            this.containerBounds.max.z, 
+            this.containerBounds.min.z, 
+            widthRulerX, 
+            widthRulerY, 
+            viewName);
+        
+        // === HEIGHT RULER (side edge) ===
+        // Position at right-front corner
+        const heightRulerX = this.containerBounds.max.x + 0.05; // Very close to side
+        const heightRulerZ = this.containerBounds.max.z + 0.05; // Very close to front
+        
+        // Create height ruler along Y-axis
+        this.addHeightRuler(rulerGroup, 
+            this.containerBounds.min.y, 
+            this.containerBounds.max.y, 
+            heightRulerX, 
+            heightRulerZ, 
+            viewName);
+        
+        return rulerGroup;
+    }
+    
+    addRulerSection(rulerGroup, startX, endX, rulerY, rulerZ, startOffset = 0, orientation = 'horizontal') {
+        const sectionLength = endX - startX;
+        const tickSpacing = 0.5; // Tick every 0.5m
+        const majorTickSpacing = 1.0; // Major tick every 1m
+        
+        // Create white outline for ruler baseline
+        const outlineMaterial = new THREE.LineBasicMaterial({ 
+            color: 0xFFFFFF,
+            linewidth: 5,
+            opacity: 1,
+            transparent: true
+        });
+        
+        const baselineGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(startX, rulerY, rulerZ),
+            new THREE.Vector3(endX, rulerY, rulerZ)
+        ]);
+        const outlineBaseline = new THREE.Line(baselineGeometry, outlineMaterial);
+        rulerGroup.add(outlineBaseline);
+        
+        // Create black center line
+        const baselineMaterial = new THREE.LineBasicMaterial({ 
+            color: 0x000000,
+            linewidth: 2,
+            opacity: 1,
+            transparent: true
+        });
+        
+        const baseline = new THREE.Line(baselineGeometry, baselineMaterial);
+        rulerGroup.add(baseline);
+        
+        // Add tick marks and labels
+        const numTicks = Math.floor(sectionLength / tickSpacing) + 1;
+        
+        for (let i = 0; i < numTicks; i++) {
+            const distance = i * tickSpacing;
+            const xPos = startX + distance;
+            
+            // Skip if position is beyond the section end
+            if (xPos > endX + 0.01) continue;
+            
+            const isMajorTick = (distance + startOffset) % majorTickSpacing === 0;
+            const tickHeight = isMajorTick ? 0.2 : 0.1;
+            
+            // Create tick mark with white outline
+            const tickGeometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(xPos, rulerY - tickHeight/2, rulerZ),
+                new THREE.Vector3(xPos, rulerY + tickHeight/2, rulerZ)
+            ]);
+            
+            // White outline for tick
+            const tickOutline = new THREE.Line(tickGeometry, outlineMaterial);
+            rulerGroup.add(tickOutline);
+            
+            // Black center for tick
+            const tick = new THREE.Line(tickGeometry, baselineMaterial);
+            rulerGroup.add(tick);
+            
+            // Add label for every tick (every 0.5m)
+            const labelDistance = distance + startOffset;
+            const numberText = `${labelDistance.toFixed(1)}`;
+            
+            // Create text sprite with dual colors for visibility
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 32;
+            const context = canvas.getContext('2d');
+            
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = 'high';
+            
+            // Draw black text with white outline for visibility on any background
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            
+            // Draw the number
+            context.font = 'bold 20px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+            const numberWidth = context.measureText(numberText).width;
+            const numberX = (canvas.width / 2) - 6; // Shift left to make room for 'm'
+            
+            // White outline for number
+            context.strokeStyle = '#FFFFFF';
+            context.lineWidth = 2.5;
+            context.strokeText(numberText, numberX, canvas.height / 2);
+            
+            // Black fill for number
+            context.fillStyle = '#000000';
+            context.fillText(numberText, numberX, canvas.height / 2);
+            
+            // Draw smaller 'm' unit
+            context.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+            const mX = numberX + numberWidth/2 + 5; // More spacing
+            
+            // White outline for 'm'
+            context.strokeStyle = '#FFFFFF';
+            context.lineWidth = 2.5;
+            context.strokeText('m', mX, canvas.height / 2 + 1);
+            
+            // Black fill for 'm'
+            context.fillStyle = '#000000';
+            context.fillText('m', mX, canvas.height / 2 + 1);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            
+            const spriteMaterial = new THREE.SpriteMaterial({ 
+                map: texture,
+                sizeAttenuation: false,
+                opacity: 1,
+                transparent: true,
+                depthTest: false
+            });
+            
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.scale.set(0.035, 0.0175, 1); // Smaller scale with better proportions
+            sprite.position.set(xPos, rulerY - 0.1, rulerZ);
+            rulerGroup.add(sprite);
+        }
+        
+        // Always add end label to show exact section length
+        // Position it at the next 0.5m mark after the last regular tick, but show actual length value
+        const displayValue = sectionLength; // Always use section length for display
+        
+        // Calculate positions
+        const lastRegularTickDistance = Math.floor(sectionLength / tickSpacing) * tickSpacing;
+        const remainingDistance = sectionLength - lastRegularTickDistance;
+        
+        // Only add end label if section doesn't end exactly on a tick mark
+        if (remainingDistance > 0.01) {
+            // Position the label at the next 0.5m position to avoid overlap
+            const labelXPos = startX + lastRegularTickDistance + tickSpacing;
+            
+            // But show the actual end value
+            const endLabelText = `${displayValue.toFixed(2)}`;
+            
+            // Create text sprite for end label
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 32;
+            const context = canvas.getContext('2d');
+            
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = 'high';
+            
+            // Draw black text with white outline
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            
+            // Draw the number
+            context.font = 'bold 20px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+            const numberWidth = context.measureText(endLabelText).width;
+            const numberX = (canvas.width / 2) - 6;
+            
+            // White outline for number
+            context.strokeStyle = '#FFFFFF';
+            context.lineWidth = 2.5;
+            context.strokeText(endLabelText, numberX, canvas.height / 2);
+            
+            // Black fill for number
+            context.fillStyle = '#000000';
+            context.fillText(endLabelText, numberX, canvas.height / 2);
+            
+            // Draw smaller 'm' unit
+            context.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+            const mX = numberX + numberWidth/2 + 5;
+            
+            // White outline for 'm'
+            context.strokeStyle = '#FFFFFF';
+            context.lineWidth = 2.5;
+            context.strokeText('m', mX, canvas.height / 2 + 1);
+            
+            // Black fill for 'm'
+            context.fillStyle = '#000000';
+            context.fillText('m', mX, canvas.height / 2 + 1);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            
+            const spriteMaterial = new THREE.SpriteMaterial({ 
+                map: texture,
+                sizeAttenuation: false,
+                opacity: 1,
+                transparent: true,
+                depthTest: false
+            });
+            
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.scale.set(0.035, 0.0175, 1);
+            sprite.position.set(labelXPos, rulerY - 0.1, rulerZ); // Position at next 0.5m mark
+            rulerGroup.add(sprite);
+            
+            // Add tick mark at the actual end position (not at label position)
+            const endTickGeometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(endX, rulerY - 0.1, rulerZ),
+                new THREE.Vector3(endX, rulerY + 0.1, rulerZ)
+            ]);
+            
+            // White outline for end tick
+            const endTickOutline = new THREE.Line(endTickGeometry, outlineMaterial);
+            rulerGroup.add(endTickOutline);
+            
+            // Black center for end tick
+            const endTick = new THREE.Line(endTickGeometry, baselineMaterial);
+            rulerGroup.add(endTick);
+        }
+        
+        // Add end caps
+        const capSize = 0.2;
+        
+        // Start cap
+        const startCapGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(startX, rulerY - capSize, rulerZ),
+            new THREE.Vector3(startX, rulerY + capSize, rulerZ)
+        ]);
+        // White outline for start cap
+        const startCapOutline = new THREE.Line(startCapGeometry, outlineMaterial);
+        rulerGroup.add(startCapOutline);
+        // Black center for start cap
+        const startCap = new THREE.Line(startCapGeometry, baselineMaterial);
+        rulerGroup.add(startCap);
+        
+        // End cap
+        const endCapGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(endX, rulerY - capSize, rulerZ),
+            new THREE.Vector3(endX, rulerY + capSize, rulerZ)
+        ]);
+        // White outline for end cap
+        const endCapOutline = new THREE.Line(endCapGeometry, outlineMaterial);
+        rulerGroup.add(endCapOutline);
+        // Black center for end cap
+        const endCap = new THREE.Line(endCapGeometry, baselineMaterial);
+        rulerGroup.add(endCap);
+    }
+    
+    addWidthRuler(rulerGroup, startZ, endZ, rulerX, rulerY, viewName) {
+        const width = Math.abs(endZ - startZ);
+        const isReversed = startZ > endZ;
+        const tickSpacing = 0.5;
+        const majorTickSpacing = 1.0;
+        
+        // Create white outline for ruler baseline
+        const outlineMaterial = new THREE.LineBasicMaterial({ 
+            color: 0xFFFFFF,
+            linewidth: 4,
+            opacity: 1,
+            transparent: false
+        });
+        
+        // Create black center line
+        const baselineMaterial = new THREE.LineBasicMaterial({ 
+            color: 0x000000,
+            linewidth: 2,
+            opacity: 1,
+            transparent: false
+        });
+        
+        // Main baseline (along Z-axis)
+        const baselineGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(rulerX, rulerY, startZ),
+            new THREE.Vector3(rulerX, rulerY, endZ)
+        ]);
+        
+        // White outline
+        const outlineLine = new THREE.Line(baselineGeometry, outlineMaterial);
+        rulerGroup.add(outlineLine);
+        
+        // Black center line
+        const baseline = new THREE.Line(baselineGeometry, baselineMaterial);
+        rulerGroup.add(baseline);
+        
+        // Add tick marks and labels
+        const numTicks = Math.floor(width / tickSpacing) + 1;
+        
+        for (let i = 0; i < numTicks; i++) {
+            const distance = i * tickSpacing;
+            if (distance > width) break;
+            
+            const zPos = isReversed ? startZ - distance : startZ + distance;
+            const isMajor = distance % majorTickSpacing === 0;
+            const tickLength = isMajor ? 0.1 : 0.05; // Smaller ticks for width ruler
+            
+            // Tick mark (perpendicular to baseline, along Y-axis for top ruler)
+            const tickGeometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(rulerX, rulerY - tickLength, zPos),
+                new THREE.Vector3(rulerX, rulerY + tickLength, zPos)
+            ]);
+            
+            // White outline for tick
+            const tickOutline = new THREE.Line(tickGeometry, outlineMaterial);
+            rulerGroup.add(tickOutline);
+            
+            // Black center for tick
+            const tick = new THREE.Line(tickGeometry, baselineMaterial);
+            rulerGroup.add(tick);
+            
+            // Add number labels for major ticks (skip 0)
+            if (isMajor && distance > 0) {
+                this.createRulerLabel(rulerGroup, rulerX, rulerY + 0.15, zPos, distance, 'width');
+            }
+        }
+        
+        // Add end label if width doesn't end on tick mark
+        const lastTickDistance = Math.floor(width / tickSpacing) * tickSpacing;
+        const remainder = width - lastTickDistance;
+        
+        if (remainder > 0.01) {
+            // Position label at next 0.5m mark
+            const labelZPos = isReversed ? startZ - lastTickDistance - tickSpacing : startZ + lastTickDistance + tickSpacing;
+            this.createRulerLabel(rulerGroup, rulerX, rulerY + 0.15, labelZPos, width, 'width');
+            
+            // Add tick at actual end
+            const endTickGeometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(rulerX, rulerY - 0.05, endZ),
+                new THREE.Vector3(rulerX, rulerY + 0.05, endZ)
+            ]);
+            
+            const endTickOutline = new THREE.Line(endTickGeometry, outlineMaterial);
+            rulerGroup.add(endTickOutline);
+            
+            const endTick = new THREE.Line(endTickGeometry, baselineMaterial);
+            rulerGroup.add(endTick);
+        }
+        
+        // Add end caps
+        const capSize = 0.1; // Smaller end caps for width ruler
+        
+        // Start cap
+        const startCapGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(rulerX, rulerY - capSize, startZ),
+            new THREE.Vector3(rulerX, rulerY + capSize, startZ)
+        ]);
+        rulerGroup.add(new THREE.Line(startCapGeometry, outlineMaterial));
+        rulerGroup.add(new THREE.Line(startCapGeometry, baselineMaterial));
+        
+        // End cap
+        const endCapGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(rulerX, rulerY - capSize, endZ),
+            new THREE.Vector3(rulerX, rulerY + capSize, endZ)
+        ]);
+        rulerGroup.add(new THREE.Line(endCapGeometry, outlineMaterial));
+        rulerGroup.add(new THREE.Line(endCapGeometry, baselineMaterial));
+    }
+    
+    addHeightRuler(rulerGroup, startY, endY, rulerX, rulerZ, viewName) {
+        const height = endY - startY;
+        const tickSpacing = 0.5;
+        const majorTickSpacing = 1.0;
+        
+        // Create white outline for ruler baseline
+        const outlineMaterial = new THREE.LineBasicMaterial({ 
+            color: 0xFFFFFF,
+            linewidth: 4,
+            opacity: 1,
+            transparent: false
+        });
+        
+        // Create black center line
+        const baselineMaterial = new THREE.LineBasicMaterial({ 
+            color: 0x000000,
+            linewidth: 2,
+            opacity: 1,
+            transparent: false
+        });
+        
+        // Main baseline (along Y-axis)
+        const baselineGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(rulerX, startY, rulerZ),
+            new THREE.Vector3(rulerX, endY, rulerZ)
+        ]);
+        
+        // White outline
+        const outlineLine = new THREE.Line(baselineGeometry, outlineMaterial);
+        rulerGroup.add(outlineLine);
+        
+        // Black center line
+        const baseline = new THREE.Line(baselineGeometry, baselineMaterial);
+        rulerGroup.add(baseline);
+        
+        // Add tick marks and labels
+        const numTicks = Math.floor(height / tickSpacing) + 1;
+        
+        for (let i = 0; i < numTicks; i++) {
+            const distance = i * tickSpacing;
+            if (distance > height) break;
+            
+            const yPos = startY + distance;
+            const isMajor = distance % majorTickSpacing === 0;
+            const tickLength = isMajor ? 0.1 : 0.05; // Smaller ticks for height ruler
+            
+            // Tick mark (perpendicular to baseline, along X-axis for side ruler)
+            const tickGeometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(rulerX - tickLength, yPos, rulerZ),
+                new THREE.Vector3(rulerX + tickLength, yPos, rulerZ)
+            ]);
+            
+            // White outline for tick
+            const tickOutline = new THREE.Line(tickGeometry, outlineMaterial);
+            rulerGroup.add(tickOutline);
+            
+            // Black center for tick
+            const tick = new THREE.Line(tickGeometry, baselineMaterial);
+            rulerGroup.add(tick);
+            
+            // Add number labels for major ticks (skip 0)
+            if (isMajor && distance > 0) {
+                this.createRulerLabel(rulerGroup, rulerX + 0.15, yPos, rulerZ, distance, 'height');
+            }
+        }
+        
+        // Add end label if height doesn't end on tick mark
+        const lastTickDistance = Math.floor(height / tickSpacing) * tickSpacing;
+        const remainder = height - lastTickDistance;
+        
+        if (remainder > 0.01) {
+            // Position label at the actual end height
+            const labelYPos = endY;
+            this.createRulerLabel(rulerGroup, rulerX + 0.15, labelYPos, rulerZ, height, 'height');
+            
+            // Add tick at actual end
+            const endTickGeometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(rulerX - 0.05, endY, rulerZ),
+                new THREE.Vector3(rulerX + 0.05, endY, rulerZ)
+            ]);
+            
+            const endTickOutline = new THREE.Line(endTickGeometry, outlineMaterial);
+            rulerGroup.add(endTickOutline);
+            
+            const endTick = new THREE.Line(endTickGeometry, baselineMaterial);
+            rulerGroup.add(endTick);
+        }
+        
+        // Add end caps
+        const capSize = 0.1; // Smaller end caps for height ruler
+        
+        // Start cap
+        const startCapGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(rulerX - capSize, startY, rulerZ),
+            new THREE.Vector3(rulerX + capSize, startY, rulerZ)
+        ]);
+        rulerGroup.add(new THREE.Line(startCapGeometry, outlineMaterial));
+        rulerGroup.add(new THREE.Line(startCapGeometry, baselineMaterial));
+        
+        // End cap
+        const endCapGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(rulerX - capSize, endY, rulerZ),
+            new THREE.Vector3(rulerX + capSize, endY, rulerZ)
+        ]);
+        rulerGroup.add(new THREE.Line(endCapGeometry, outlineMaterial));
+        rulerGroup.add(new THREE.Line(endCapGeometry, baselineMaterial));
+    }
+    
+    createRulerLabel(rulerGroup, x, y, z, value, type = 'length') {
+        const canvas = document.createElement('canvas');
+        canvas.width = 96;
+        canvas.height = 32;
+        const context = canvas.getContext('2d');
+        
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Prepare text
+        const displayText = value.toFixed(2);
+        
+        // Set font for number
+        context.font = 'bold 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        
+        const numberWidth = context.measureText(displayText).width;
+        const numberX = canvas.width / 2 - 8;
+        
+        // White outline for number
+        context.strokeStyle = '#FFFFFF';
+        context.lineWidth = 3;
+        context.strokeText(displayText, numberX, canvas.height / 2);
+        
+        // Black fill for number
+        context.fillStyle = '#000000';
+        context.fillText(displayText, numberX, canvas.height / 2);
+        
+        // Draw 'm' unit
+        context.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+        const mX = numberX + numberWidth/2 + 5;
+        
+        // White outline for 'm'
+        context.strokeStyle = '#FFFFFF';
+        context.lineWidth = 2.5;
+        context.strokeText('m', mX, canvas.height / 2 + 1);
+        
+        // Black fill for 'm'
+        context.fillStyle = '#000000';
+        context.fillText('m', mX, canvas.height / 2 + 1);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        
+        const spriteMaterial = new THREE.SpriteMaterial({ 
+            map: texture,
+            sizeAttenuation: false,
+            opacity: 1,
+            transparent: true,
+            depthTest: false
+        });
+        
+        const sprite = new THREE.Sprite(spriteMaterial);
+        
+        // Adjust scale based on type
+        if (type === 'height') {
+            sprite.scale.set(0.035, 0.0175, 1); // Same as length labels
+        } else if (type === 'width') {
+            sprite.scale.set(0.035, 0.0175, 1); // Same as length labels
+        } else {
+            sprite.scale.set(0.035, 0.0175, 1);
+        }
+        
+        sprite.position.set(x, y, z);
+        rulerGroup.add(sprite);
+    }
+    
+    createAxleLoadVisualization() {
+        const group = new THREE.Group();
+        
+        // Get axle load data from the UI - filter out hidden elements
+        const allIndicators = document.querySelectorAll('.axle-load-indicator .axle-item');
+        const axleIndicators = Array.from(allIndicators).filter(el => 
+            el.style.display !== 'none' && window.getComputedStyle(el).display !== 'none'
+        );
+        if (axleIndicators.length === 0) {
+            return null;
+        }
+        
+        const axleData = [];
+        axleIndicators.forEach((indicator, index) => {
+            const label = indicator.querySelector('.axle-label')?.textContent || '';
+            const value = indicator.querySelector('.axle-value')?.textContent || '';
+            const progressBar = indicator.querySelector('.progress-fill');
+            
+            // Get percentage from value (load / max)
+            let percentage = 0;
+            if (value) {
+                const parts = value.split('/');
+                if (parts.length === 2) {
+                    const load = parseFloat(parts[0].trim());
+                    const max = parseFloat(parts[1].trim().replace('kg', '').trim());
+                    if (max > 0) {
+                        percentage = (load / max) * 100;
+                    }
+                }
+            }
+            
+            
+            // Determine color based on percentage and warning class
+            let color = '#22c55e'; // Green
+            if (indicator.classList.contains('warning-min')) {
+                color = '#fb923c'; // Orange for minimum warning
+            } else if (percentage > 100) {
+                color = '#ef4444'; // Red for overload
+            } else if (percentage > 90) {
+                color = '#fbbf24'; // Yellow for warning
+            }
+            
+            axleData.push({ label, value, percentage, color });
+        });
+        
+        // Get vehicle configuration
+        const bounds = this.containerBounds;
+        const isSolo = this.containerDimensions?.isSolo || false;
+        const isJumbo = this.containerDimensions?.isJumbo || false;
+        
+        // Get axle configuration from axleCalculator or use defaults
+        const vehicleType = this.containerDimensions?.vehicleType || 'standard';
+        const config = window.axleCalculator?.axleConfig || {};
+        const tractorAxles = config.tractorAxles || 1;
+        const trailerAxles = config.trailerAxles || (isSolo ? 0 : 3);
+        
+        // Calculate axle positions based on current configuration
+        const containerFront = bounds.min.x;
+        const containerEnd = bounds.max.x;
+        
+        let frontAxleX, driveAxlePositions = [], trailerAxlePositions = [];
+        
+        if (isSolo) {
+            // SOLO vehicle - front and drive axles only
+            const distToFront = config.distCargoStartToFront || 1.0;
+            const distToDrive = config.distCargoStartToDrive || 5.5;
+            frontAxleX = containerFront - distToFront;
+            const driveAxlesCenter = containerFront + distToDrive;
+            
+            // Calculate drive axle positions
+            if (tractorAxles === 1) {
+                driveAxlePositions = [driveAxlesCenter];
+            } else if (tractorAxles === 2) {
+                const spacing = 1.35;
+                driveAxlePositions = [
+                    driveAxlesCenter - spacing/2,
+                    driveAxlesCenter + spacing/2
+                ];
+            }
+        } else if (isJumbo) {
+            // JUMBO vehicle
+            const section1Start = containerFront;
+            const section1Length = this.containerDimensions?.section1Length || 7.7;
+            const section2Start = section1Start + section1Length + 0.5; // 0.5m gap
+            
+            // Truck axles
+            frontAxleX = section1Start - (config.distSection1StartToFront || 1.0);
+            const driveAxlesCenter = section1Start + (config.distSection1StartToDrive || 5.5);
+            
+            // Drive axle positions
+            if (tractorAxles === 1) {
+                driveAxlePositions = [driveAxlesCenter];
+            } else if (tractorAxles === 2) {
+                const spacing = 1.35;
+                driveAxlePositions = [
+                    driveAxlesCenter - spacing/2,
+                    driveAxlesCenter + spacing/2
+                ];
+            }
+            
+            // Trailer axle positions
+            const trailerAxlesCenter = section2Start + (config.distSection2StartToTrailerAxles || 5.5);
+            if (trailerAxles === 1) {
+                trailerAxlePositions = [trailerAxlesCenter];
+            } else if (trailerAxles === 2) {
+                const spacing = 1.31;
+                trailerAxlePositions = [
+                    trailerAxlesCenter - spacing/2,
+                    trailerAxlesCenter + spacing/2
+                ];
+            }
+        } else {
+            // Standard trailer vehicle
+            const kingpinX = containerFront + (config.distFrontToKingpin || 1.7);
+            frontAxleX = kingpinX - (config.distFrontAxleToKingpin || 3.1);
+            const driveAxlesCenter = kingpinX + (config.distKingpinToDrive || 0.5);
+            const trailerAxlesCenter = containerFront + (config.distFrontToKingpin || 1.7) + (config.distKingpinToTrailer || 7.7);
+            
+            // Drive axle positions
+            if (tractorAxles === 1) {
+                driveAxlePositions = [driveAxlesCenter];
+            } else if (tractorAxles === 2) {
+                const spacing = 1.35;
+                driveAxlePositions = [
+                    driveAxlesCenter - spacing/2,
+                    driveAxlesCenter + spacing/2
+                ];
+            }
+            
+            // Trailer axle positions
+            if (trailerAxles === 1) {
+                trailerAxlePositions = [trailerAxlesCenter];
+            } else if (trailerAxles === 2) {
+                const spacing = 1.31;
+                trailerAxlePositions = [
+                    trailerAxlesCenter - spacing/2,
+                    trailerAxlesCenter + spacing/2
+                ];
+            } else if (trailerAxles === 3) {
+                const spacing = 1.31;
+                trailerAxlePositions = [
+                    trailerAxlesCenter - spacing,
+                    trailerAxlesCenter,
+                    trailerAxlesCenter + spacing
+                ];
+            }
+        }
+        
+        // Create sprites for axle loads
+        let axleIndex = 0;
+        
+        // Front axle (always single)
+        if (axleIndex < axleData.length) {
+            const data = axleData[axleIndex++];
+            // Create label for positive Z side (left side when viewing from back)
+            const frontLabelPos = this.createAxleLoadSprite(
+                data.label,
+                data.value,
+                data.percentage,
+                data.color
+            );
+            frontLabelPos.position.x = frontAxleX;
+            group.add(frontLabelPos);
+            
+            // Create label for negative Z side (right side when viewing from back)
+            const frontLabelNeg = this.createAxleLoadSprite(
+                data.label,
+                data.value,
+                data.percentage,
+                data.color
+            );
+            frontLabelNeg.position.x = frontAxleX;
+            frontLabelNeg.position.z = -frontLabelPos.position.z; // Mirror on the other side
+            frontLabelNeg.rotation.y = Math.PI; // Rotate 180 degrees to face the other way
+            group.add(frontLabelNeg);
+        }
+        
+        // Drive axles - split the load equally if multiple axles
+        if (axleIndex < axleData.length && driveAxlePositions.length > 0) {
+            const data = axleData[axleIndex++];
+            // Extract load value and divide by number of axles
+            const totalLoadKg = parseFloat(data.value.split('/')[0].trim());
+            const maxLoadKg = parseFloat(data.value.split('/')[1].trim().replace('kg', '').trim());
+            const loadPerAxle = totalLoadKg / driveAxlePositions.length;
+            const maxPerAxle = maxLoadKg / driveAxlePositions.length;
+            
+            driveAxlePositions.forEach(x => {
+                const axleValue = `${Math.round(loadPerAxle)} / ${Math.round(maxPerAxle)} kg`;
+                // Create label for positive Z side
+                const labelPos = this.createAxleLoadSprite(
+                    data.label,
+                    axleValue,
+                    data.percentage, // Keep same percentage for color
+                    data.color,
+                    true // isDriveAxle
+                );
+                labelPos.position.x = x;
+                group.add(labelPos);
+                
+                // Create label for negative Z side
+                const labelNeg = this.createAxleLoadSprite(
+                    data.label,
+                    axleValue,
+                    data.percentage,
+                    data.color,
+                    true // isDriveAxle
+                );
+                labelNeg.position.x = x;
+                labelNeg.position.z = -labelPos.position.z; // Mirror on the other side
+                labelNeg.rotation.y = Math.PI; // Rotate 180 degrees to face the other way
+                group.add(labelNeg);
+            });
+        }
+        
+        // Trailer axles - split the load equally if multiple axles
+        if (axleIndex < axleData.length && trailerAxlePositions.length > 0) {
+            const data = axleData[axleIndex++];
+            // Extract load value and divide by number of axles
+            const totalLoadKg = parseFloat(data.value.split('/')[0].trim());
+            const maxLoadKg = parseFloat(data.value.split('/')[1].trim().replace('kg', '').trim());
+            const loadPerAxle = totalLoadKg / trailerAxlePositions.length;
+            const maxPerAxle = maxLoadKg / trailerAxlePositions.length;
+            
+            trailerAxlePositions.forEach(x => {
+                const axleValue = `${Math.round(loadPerAxle)} / ${Math.round(maxPerAxle)} kg`;
+                // Create label for positive Z side
+                const labelPos = this.createAxleLoadSprite(
+                    data.label,
+                    axleValue,
+                    data.percentage, // Keep same percentage for color
+                    data.color
+                );
+                labelPos.position.x = x;
+                group.add(labelPos);
+                
+                // Create label for negative Z side
+                const labelNeg = this.createAxleLoadSprite(
+                    data.label,
+                    axleValue,
+                    data.percentage,
+                    data.color
+                );
+                labelNeg.position.x = x;
+                labelNeg.position.z = -labelPos.position.z; // Mirror on the other side
+                labelNeg.rotation.y = Math.PI; // Rotate 180 degrees to face the other way
+                group.add(labelNeg);
+            });
+        }
+        
+        return group;
+    }
+    
+    createAxleLoadSprite(label, value, percentage, color, isDriveAxle = false) {
+        // Extract tonnage from value (e.g., "6888 / 10000 kg" -> "6.9t")
+        const loadKg = parseFloat(value.split('/')[0].trim());
+        const loadTons = (loadKg / 1000).toFixed(1);
+        const text = `${loadTons}t`;
+        
+        // Check if overloaded (percentage > 100)
+        const isOverloaded = percentage > 100;
+        
+        // Create smaller canvas for individual wheel labels
+        const canvas = document.createElement('canvas');
+        canvas.width = 160;
+        canvas.height = 64;
+        const context = canvas.getContext('2d');
+        
+        // Function to draw the text
+        const drawText = (useRedColor = false) => {
+            // Clear canvas
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Set text properties - smaller for individual wheels
+            context.font = 'bold 38px Arial';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            
+            // Add strong shadow for visibility
+            context.shadowColor = 'rgba(0, 0, 0, 1)';
+            context.shadowBlur = 6;
+            context.shadowOffsetX = 2;
+            context.shadowOffsetY = 2;
+            
+            // Set text color based on state
+            context.fillStyle = useRedColor ? '#FF0000' : '#FFFFFF';
+            
+            // Draw text in an arc
+            context.save();
+            context.translate(80, 32);
+            
+            // Draw text with gentle upward curve (smile shape)
+            const totalWidth = context.measureText(text).width;
+            let currentX = -totalWidth * 0.5; // Center text properly
+            
+            text.split('').forEach((char, i, arr) => {
+                context.save();
+                
+                const charWidth = context.measureText(char).width;
+                const normalizedX = currentX / (totalWidth * 0.5); // Normalized position from -1 to 1
+                
+                // Simple parabolic curve for smile shape - centered properly
+                const yOffset = 4 * (normalizedX * normalizedX - 0.5); // Gentler curve, properly centered
+                
+                // Very slight rotation for natural look
+                const rotation = normalizedX * 0.1;
+                
+                context.translate(currentX + charWidth/2, yOffset);
+                context.rotate(rotation);
+                
+                context.fillText(char, 0, 0);
+                context.restore();
+                
+                currentX += charWidth; // Normal spacing between characters
+            });
+            
+            context.restore();
+        };
+        
+        // Initial draw
+        drawText(false);
+        
+        // Create texture from canvas
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        
+        // Create a plane geometry instead of sprite
+        const geometry = new THREE.PlaneGeometry(0.7, 0.28); // Even larger plane for better visibility
+        const material = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            side: THREE.DoubleSide,
+            depthTest: true,  // Enable depth testing so labels can be occluded
+            depthWrite: true  // Enable depth writing so labels occlude other objects properly
+        });
+        
+        const mesh = new THREE.Mesh(geometry, material);
+        
+        // Position the label on top of the wheel
+        // Drive axles have double wheels, other axles have single wheels
+        const zPosition = isDriveAxle ? 1.35 : 1.25;
+        
+        mesh.position.set(
+            0, // X will be set when adding to scene
+            0.95, // Y position - on top of wheel
+            zPosition  // Z position - aligned with outer wheel
+        );
+        
+        // No rotation needed - plane is vertical by default (standing up)
+        
+        // Store canvas and context for all labels (needed for updates)
+        mesh.userData.canvas = canvas;
+        mesh.userData.context = context;
+        mesh.userData.drawText = drawText;
+        mesh.userData.currentText = text;
+        mesh.userData.percentage = percentage;
+        
+        // Add blinking animation for overloaded axles
+        if (isOverloaded) {
+            mesh.userData.isOverloaded = true;
+            mesh.userData.blinkState = false;
+            mesh.userData.lastBlinkTime = Date.now();
+        }
+        
+        return mesh;
+    }
+    
+    roundRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+    }
+    
+    // Toggle axle load visualization
+    toggleAxleLoadDisplay(show) {
+        this.showAxleLoads = show;
+        
+        if (show) {
+            this.updateAxleLoadVisualization();
+        } else {
+            this.removeAxleLoadVisualization();
+        }
+    }
+    
+    // Update axle load visualization
+    updateAxleLoadVisualization() {
+        if (!this.showAxleLoads) {
+            this.removeAxleLoadVisualization();
+            return;
+        }
+        
+        // Get current axle configuration
+        const config = window.axleCalculator?.axleConfig || {};
+        const currentTractorAxles = config.tractorAxles || 1;
+        const currentTrailerAxles = config.trailerAxles || 3;
+        
+        // Check if axle configuration has changed (need to recreate visualization)
+        const configChanged = this.axleLoadGroup && (
+            this.axleLoadGroup.userData.tractorAxles !== currentTractorAxles ||
+            this.axleLoadGroup.userData.trailerAxles !== currentTrailerAxles
+        );
+        
+        // Check if we need to create new visualization or update existing
+        if (!this.axleLoadGroup || configChanged) {
+            // Remove old visualization if it exists
+            if (this.axleLoadGroup) {
+                this.scene.remove(this.axleLoadGroup);
+                this.axleLoadGroup = null;
+            }
+            
+            // Create new visualization
+            this.axleLoadGroup = this.createAxleLoadVisualization();
+            if (this.axleLoadGroup) {
+                // Store configuration for change detection
+                this.axleLoadGroup.userData.tractorAxles = currentTractorAxles;
+                this.axleLoadGroup.userData.trailerAxles = currentTrailerAxles;
+                this.scene.add(this.axleLoadGroup);
+            }
+        } else {
+            // Update existing labels with new values
+            this.updateExistingAxleLabels();
+        }
+    }
+    
+    // Update existing axle labels with new values
+    updateExistingAxleLabels() {
+        if (!this.axleLoadGroup) return;
+        
+        // Get current axle load data from the UI
+        const allIndicators = document.querySelectorAll('.axle-load-indicator .axle-item');
+        const axleIndicators = Array.from(allIndicators).filter(el => 
+            el.style.display !== 'none' && window.getComputedStyle(el).display !== 'none'
+        );
+        
+        if (axleIndicators.length === 0) return;
+        
+        // Get vehicle configuration
+        const isSolo = this.containerDimensions?.isSolo || false;
+        const isJumbo = this.containerDimensions?.isJumbo || false;
+        const config = window.axleCalculator?.axleConfig || {};
+        const tractorAxles = config.tractorAxles || 1;
+        const trailerAxles = config.trailerAxles || (isSolo ? 0 : 3);
+        
+        const axleData = [];
+        axleIndicators.forEach((indicator) => {
+            const value = indicator.querySelector('.axle-value')?.textContent || '';
+            
+            // Get percentage from value (load / max)
+            let percentage = 0;
+            if (value) {
+                const parts = value.split('/');
+                if (parts.length === 2) {
+                    const load = parseFloat(parts[0].trim());
+                    const max = parseFloat(parts[1].trim().replace('kg', '').trim());
+                    if (max > 0) {
+                        percentage = (load / max) * 100;
+                    }
+                }
+            }
+            
+            axleData.push({ value, percentage });
+        });
+        
+        // Track which physical axle we're updating (considering multiple axles per group)
+        let physicalAxleIndex = 0;
+        let axleGroupIndex = 0;
+        
+        this.axleLoadGroup.traverse((child) => {
+            if (child.isMesh && child.userData.canvas) {
+                // Determine which axle group this label belongs to
+                let axleCount = 1;
+                let loadPerAxle = 0;
+                let percentage = 0;
+                
+                if (physicalAxleIndex < 2) {
+                    // Front axle (always single)
+                    if (axleData[0]) {
+                        const loadKg = parseFloat(axleData[0].value.split('/')[0].trim());
+                        loadPerAxle = loadKg;
+                        percentage = axleData[0].percentage;
+                    }
+                } else if (physicalAxleIndex < 2 + (tractorAxles * 2)) {
+                    // Drive axles
+                    if (axleData[1]) {
+                        const totalLoadKg = parseFloat(axleData[1].value.split('/')[0].trim());
+                        loadPerAxle = totalLoadKg / tractorAxles;
+                        percentage = axleData[1].percentage;
+                    }
+                } else if (!isSolo && trailerAxles > 0 && axleData[2]) {
+                    // Trailer axles
+                    const totalLoadKg = parseFloat(axleData[2].value.split('/')[0].trim());
+                    loadPerAxle = totalLoadKg / trailerAxles;
+                    percentage = axleData[2].percentage;
+                }
+                
+                const loadTons = (loadPerAxle / 1000).toFixed(1);
+                const text = `${loadTons}t`;
+                
+                // Update overload status
+                const wasOverloaded = child.userData.isOverloaded || false;
+                const isOverloaded = percentage > 100;
+                
+                // Update text content
+                child.userData.currentText = text;
+                child.userData.percentage = percentage;
+                
+                if (wasOverloaded !== isOverloaded) {
+                    // Overload status changed
+                    child.userData.isOverloaded = isOverloaded;
+                    
+                    if (!isOverloaded) {
+                        // No longer overloaded - reset to white
+                        child.userData.blinkState = false;
+                        if (child.userData.drawText) {
+                            // Redraw with new text and white color
+                            this.redrawAxleLabel(child, text, false);
+                        }
+                    } else if (!wasOverloaded) {
+                        // Just became overloaded - initialize blinking
+                        child.userData.blinkState = false;
+                        child.userData.lastBlinkTime = Date.now();
+                    }
+                } else if (!isOverloaded) {
+                    // Still not overloaded - just update text
+                    this.redrawAxleLabel(child, text, false);
+                }
+                // If still overloaded, let the blinking animation handle the drawing
+                
+                physicalAxleIndex++;
+            }
+        });
+    }
+    
+    // Helper function to redraw axle label
+    redrawAxleLabel(mesh, text, useRedColor) {
+        if (!mesh.userData.canvas || !mesh.userData.context) return;
+        
+        const context = mesh.userData.context;
+        const canvas = mesh.userData.canvas;
+        
+        // Clear canvas
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Set text properties
+        context.font = 'bold 38px Arial';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        
+        // Add shadow
+        context.shadowColor = 'rgba(0, 0, 0, 1)';
+        context.shadowBlur = 6;
+        context.shadowOffsetX = 2;
+        context.shadowOffsetY = 2;
+        
+        // Set text color
+        context.fillStyle = useRedColor ? '#FF0000' : '#FFFFFF';
+        
+        // Draw text in an arc
+        context.save();
+        context.translate(80, 32);
+        
+        const totalWidth = context.measureText(text).width;
+        let currentX = -totalWidth * 0.5;
+        
+        text.split('').forEach((char) => {
+            context.save();
+            const charWidth = context.measureText(char).width;
+            const normalizedX = currentX / (totalWidth * 0.5);
+            const yOffset = 4 * (normalizedX * normalizedX - 0.5);
+            const rotation = normalizedX * 0.1;
+            
+            context.translate(currentX + charWidth/2, yOffset);
+            context.rotate(rotation);
+            context.fillText(char, 0, 0);
+            context.restore();
+            
+            currentX += charWidth;
+        });
+        
+        context.restore();
+        
+        // Update texture
+        if (mesh.material && mesh.material.map) {
+            mesh.material.map.needsUpdate = true;
+        }
+    }
+    
+    // Start blinking animation for overloaded axles
+    startAxleLoadBlinking() {
+        // Animation is now handled in the main animate() loop
+        // This function is kept for compatibility but doesn't need to do anything
+    }
+    
+    // Remove axle load visualization
+    removeAxleLoadVisualization() {
+        if (this.axleLoadGroup) {
+            this.scene.remove(this.axleLoadGroup);
+            // Dispose of materials and geometries
+            this.axleLoadGroup.traverse((child) => {
+                if (child.material) {
+                    if (child.material.map) {
+                        child.material.map.dispose();
+                    }
+                    child.material.dispose();
+                }
+                if (child.geometry) {
+                    child.geometry.dispose();
+                }
+            });
+            this.axleLoadGroup = null;
+        }
+    }
+    
+    captureView(cameraSettings = null, includeAnnotations = false, cargoGroups = null, includeAxleLoads = false, focusGroupId = null) {
         return new Promise((resolve) => {
             // Store current camera state
             const originalCameraPosition = this.camera.position.clone();
@@ -6261,15 +7577,120 @@ class Scene3D {
                 this.scene.add(annotationGroup);
             }
             
+            // Hide existing axle load visualization for perspective/top views
+            let needToRestoreAxleLoad = false;
+            if (this.axleLoadGroup && this.showAxleLoads && cameraSettings?.name !== 'side') {
+                // Temporarily hide axle loads for non-side views
+                this.scene.remove(this.axleLoadGroup);
+                needToRestoreAxleLoad = true;
+            }
+            
+            // Handle transparency for focused group
+            const originalMaterials = new Map();
+            const originalEdges = new Map();
+            let closestUnitInGroup = null;
+            let closestDistance = Infinity;
+            
+            if (focusGroupId !== null) {
+                // Store original materials and set transparency for non-focused units
+                for (let mesh of this.cargoMeshes) {
+                    const userData = mesh.userData;
+                    if (userData && userData.groupId !== undefined) {
+                        // Store original material
+                        originalMaterials.set(mesh, {
+                            material: mesh.material.clone(),
+                            transparent: mesh.material.transparent,
+                            opacity: mesh.material.opacity
+                        });
+                        
+                        // Set transparency for units not in the focused group
+                        if (userData.groupId !== focusGroupId) {
+                            mesh.material.transparent = true;
+                            mesh.material.opacity = 0.2;
+                            
+                            // Find and hide ALL line-based elements (edges) for this mesh
+                            // This includes LineSegments, Line, and LineLoop for cylinders
+                            mesh.traverse(child => {
+                                if (child.type === 'LineSegments' || child.type === 'Line' || child.type === 'LineLoop') {
+                                    if (!originalEdges.has(child)) {
+                                        originalEdges.set(child, child.visible);
+                                    }
+                                    child.visible = false;
+                                }
+                            });
+                        } else {
+                            // Find closest unit in the focused group to camera
+                            const distance = mesh.position.distanceTo(this.camera.position);
+                            if (distance < closestDistance) {
+                                closestDistance = distance;
+                                closestUnitInGroup = mesh;
+                            }
+                        }
+                    }
+                }
+                
+                // Don't add dimension labels for group view in PDF export
+                // Labels are not needed and cause scaling issues
+            }
+            
+            // Add axle load visualization if requested (for side view only)
+            let axleLoadGroup = null;
+            let createdTemporaryAxleGroup = false;
+            if (includeAxleLoads && cameraSettings?.name === 'side') {
+                // Always create or use axle load visualization for side view
+                if (this.axleLoadGroup && this.showAxleLoads) {
+                    // Ensure existing group is visible for side view
+                    if (!this.axleLoadGroup.parent) {
+                        this.scene.add(this.axleLoadGroup);
+                    }
+                    axleLoadGroup = this.axleLoadGroup;
+                } else {
+                    // Create temporary axle load group for PDF export
+                    axleLoadGroup = this.createAxleLoadVisualization();
+                    if (axleLoadGroup) {
+                        this.scene.add(axleLoadGroup);
+                        createdTemporaryAxleGroup = true;
+                    }
+                }
+            }
+            
             // Render the scene
             this.renderer.render(this.scene, this.camera);
             
-            // Capture canvas as base64
-            const dataURL = this.renderer.domElement.toDataURL('image/png');
+            // Capture canvas as base64 with JPEG compression for smaller file size
+            // Quality 0.75 provides good balance between file size and image quality
+            const dataURL = this.renderer.domElement.toDataURL('image/jpeg', 0.75);
             
             // Remove annotations if they were added
             if (annotationGroup) {
                 this.scene.remove(annotationGroup);
+            }
+            
+            // No need to remove dimension labels since we're not adding them for group view anymore
+            
+            // Remove axle load visualization if it was temporarily created
+            if (createdTemporaryAxleGroup && axleLoadGroup) {
+                this.scene.remove(axleLoadGroup);
+            }
+            
+            // Restore original materials and edges if transparency was applied
+            if (focusGroupId !== null) {
+                for (let [mesh, originalData] of originalMaterials) {
+                    mesh.material.transparent = originalData.transparent;
+                    mesh.material.opacity = originalData.opacity;
+                }
+                
+                // Restore edge visibility for all line-based elements
+                for (let [element, originalVisibility] of originalEdges) {
+                    if (element.type === 'LineSegments' || element.type === 'Line' || element.type === 'LineLoop') {
+                        element.visible = originalVisibility;
+                    }
+                }
+            }
+            
+            // Restore axle load visualization if it was hidden
+            if (needToRestoreAxleLoad && this.axleLoadGroup) {
+                this.scene.add(this.axleLoadGroup);
             }
             
             // Restore original camera state
@@ -6287,7 +7708,59 @@ class Scene3D {
         });
     }
     
-    getMultipleViews(cargoGroups = null) {
+    captureGroupView(groupId, cargoGroups) {
+        // Get container dimensions for calculating optimal camera position
+        const bounds = this.containerBounds || { 
+            min: { x: -6.8, y: 0, z: -1.24 }, 
+            max: { x: 6.8, y: 2.7, z: 1.24 } 
+        };
+        
+        const length = bounds.max.x - bounds.min.x;
+        const width = bounds.max.z - bounds.min.z;
+        const height = bounds.max.y - bounds.min.y;
+        const containerHeight = this.containerHeight || height;
+        const trailerHeight = this.trailerOffset || 1.2;
+        
+        // Find the specific group data
+        const focusGroup = cargoGroups.find(g => {
+            // Match based on the first item's groupId in the group
+            return g.items && g.items.length > 0 && g.items[0].groupId === groupId;
+        });
+        
+        if (!focusGroup) return null;
+        
+        // Create camera settings for perspective view
+        const cameraSettings = {
+            position: { x: 0, y: height * 3.5 + trailerHeight, z: width * 5.5 },
+            target: { x: 0, y: height / 2 + trailerHeight, z: 0 },
+            fov: 45,
+            name: 'group_view'
+        };
+        
+        // Store current canvas size
+        const originalWidth = this.renderer.domElement.width;
+        const originalHeight = this.renderer.domElement.height;
+        
+        // Set canvas size for group view (3:2 ratio, 1800x1200)
+        this.renderer.setSize(1800, 1200);
+        this.camera.aspect = 1800 / 1200;
+        this.camera.updateProjectionMatrix();
+        
+        // Create annotations for only this group with single info box
+        const singleGroupArray = [focusGroup];
+        
+        // Capture view with focus on this group
+        return this.captureView(cameraSettings, true, singleGroupArray, false, groupId).then(dataURL => {
+            // Restore original canvas size
+            this.renderer.setSize(originalWidth, originalHeight);
+            this.camera.aspect = originalWidth / originalHeight;
+            this.camera.updateProjectionMatrix();
+            
+            return dataURL;
+        });
+    }
+    
+    getMultipleViews(cargoGroups = null, includeSideView = false) {
         // Get container dimensions for calculating optimal camera positions
         const bounds = this.containerBounds || { 
             min: { x: -6.8, y: 0, z: -1.24 }, 
@@ -6330,27 +7803,89 @@ class Scene3D {
             }
         ];
         
+        // Add side view if requested
+        if (includeSideView) {
+            // For side view, calculate precise center of entire vehicle (truck + cargo space)
+            // Get actual truck cabin position from the visualization
+            // Cabin is positioned at frontAxle - 0.2, and extends cabinLength/2 = 1.1 forward
+            // So truck front is at: frontAxle - 0.2 - 1.1 = frontAxle - 1.3
+            // Front axle is typically at containerFront - 1.0 (for SOLO) or kingpin - 3.1 (for standard)
+            
+            let truckFrontX;
+            let cargoEndX = bounds.max.x;
+            
+            // Check vehicle type to calculate accurate truck front position
+            const isSolo = this.containerDimensions?.isSolo || false;
+            const isJumbo = this.containerDimensions?.isJumbo || false;
+            
+            if (isSolo) {
+                // SOLO: front axle is 1.0m before cargo start
+                // Cabin front is 1.3m before front axle
+                truckFrontX = bounds.min.x - 1.0 - 1.3;
+            } else if (isJumbo) {
+                // JUMBO: similar to SOLO for first section
+                truckFrontX = bounds.min.x - 1.0 - 1.3;
+            } else {
+                // Standard trailer: front axle is 3.1m before kingpin
+                // Kingpin is 1.7m from cargo front
+                // Cabin front is 1.3m before front axle
+                const kingpinX = bounds.min.x + 1.7;
+                const frontAxleX = kingpinX - 3.1;
+                truckFrontX = frontAxleX - 1.3;
+            }
+            
+            // Add small margins for better framing
+            truckFrontX -= 0.5;
+            cargoEndX += 0.5;
+            
+            // Calculate true center of the entire vehicle
+            const vehicleCenterX = (truckFrontX + cargoEndX) / 2;
+            
+            views.push({
+                name: 'side',
+                // Side view from the right side of the vehicle - optimized for full width display
+                position: { 
+                    x: vehicleCenterX, 
+                    y: trailerHeight + height * 0.55,  // Slightly elevated for better view
+                    z: width * 3.9  // Further back for better overview
+                },
+                target: { x: vehicleCenterX, y: trailerHeight + height/2, z: centerZ },
+                fov: 40  // Balanced FOV for proper framing
+            });
+        }
+        
         // Store original canvas size
         const originalWidth = this.renderer.domElement.width;
         const originalHeight = this.renderer.domElement.height;
         
-        // Set higher resolution for PDF export optimized for A4 landscape
-        // A4 landscape is 297x210mm, ratio ~1.414
-        // Accounting for title space, the actual content area is more like 1.5:1
-        const exportWidth = 3000;  // High resolution width
-        const exportHeight = 2000; // Aspect ratio 1.5:1 for better page fill
-        this.renderer.setSize(exportWidth, exportHeight);
-        this.camera.aspect = exportWidth / exportHeight;
-        this.camera.updateProjectionMatrix();
-        
         // Capture all views - include annotations if cargo groups provided
         const includeAnnotations = cargoGroups !== null && cargoGroups.length > 0;
-        const promises = views.map(view => 
-            this.captureView(view, includeAnnotations, cargoGroups).then(dataURL => ({ 
+        const promises = views.map(view => {
+            // Set different aspect ratios for different views
+            let exportWidth, exportHeight;
+            
+            if (view.name === 'side') {
+                // Wide aspect ratio for side view to fill page width
+                exportWidth = 3000;
+                exportHeight = 1000; // 3:1 ratio for wide side view
+            } else {
+                // Standard aspect ratio for other views
+                exportWidth = 3000;
+                exportHeight = 2000; // 3:2 ratio
+            }
+            
+            this.renderer.setSize(exportWidth, exportHeight);
+            this.camera.aspect = exportWidth / exportHeight;
+            this.camera.updateProjectionMatrix();
+            
+            // Include axle loads only for side view, but no annotations for side view
+            const includeAxleLoads = view.name === 'side';
+            const includeAnnotationsForView = view.name === 'side' ? false : includeAnnotations;
+            return this.captureView(view, includeAnnotationsForView, includeAnnotationsForView ? cargoGroups : null, includeAxleLoads).then(dataURL => ({ 
                 name: view.name, 
                 image: dataURL 
-            }))
-        );
+            }));
+        });
         
         return Promise.all(promises).then(results => {
             // Restore original canvas size

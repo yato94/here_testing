@@ -28,6 +28,13 @@ class UI {
         this.setupGroupSelectionCallbacks();
         this.updateStatistics();
         
+        // Initialize 3D axle load display from saved settings
+        const savedShowAxleLoads = localStorage.getItem('showAxleLoadsOn3D');
+        // Default to true (enabled) if no saved setting exists
+        if (savedShowAxleLoads === null || savedShowAxleLoads === 'true') {
+            this.scene3d.toggleAxleLoadDisplay(true);
+        }
+        
         // Store reference for global access
         window.uiInstance = this;
     }
@@ -450,6 +457,7 @@ class UI {
         this.axleCalculator.setVehicle(vehicle);
         
         this.cargoManager.setContainer(containerDimensions, vehicle.maxLoad);
+        this.cargoManager.currentVehicleType = vehicleType;
         
         // For JUMBO, show actual cargo length without gap
         const displayLength = vehicle.isJumbo && vehicle.sections 
@@ -509,6 +517,7 @@ class UI {
         
         // Update the scene and cargo manager
         this.cargoManager.setContainer(containerDimensions, vehicle.maxLoad);
+        this.cargoManager.currentVehicleType = 'solo';
         
         // Update UI info
         document.getElementById('dimensionsInfo').textContent = `${length.toFixed(1)} × ${vehicle.width} × ${height.toFixed(1)} m`;
@@ -589,6 +598,7 @@ class UI {
         
         // Update the scene and cargo manager
         this.cargoManager.setContainer(containerDimensions, vehicle.maxLoad);
+        this.cargoManager.currentVehicleType = 'jumbo';
         
         // Update UI info
         const totalLength = section1Length + section2Length; // Without gap
@@ -659,6 +669,7 @@ class UI {
             { length: length, width: width, height: height },
             customVehicle.maxLoad
         );
+        this.cargoManager.currentVehicleType = 'custom';
         
         document.getElementById('dimensionsInfo').textContent = `${length} × ${width} × ${height} m`;
         const volume = (length * width * height).toFixed(1);
@@ -995,6 +1006,10 @@ class UI {
                         this.updateLoadedUnitsList();
                         this.updateStatistics();
                         this.updateAxleIndicators();
+                        // Update 3D axle load visualization after auto-arrange
+                        if (this.scene3d.showAxleLoads) {
+                            this.scene3d.updateAxleLoadVisualization();
+                        }
                     }
                 });
             });
@@ -1063,6 +1078,10 @@ class UI {
                         this.updateLoadedUnitsList();
                         this.updateStatistics();
                         this.updateAxleIndicators();
+                        // Update 3D axle load visualization after auto-arrange
+                        if (this.scene3d.showAxleLoads) {
+                            this.scene3d.updateAxleLoadVisualization();
+                        }
                     }
                     
                     // Clear input after adding
@@ -1239,6 +1258,7 @@ class UI {
         
         this.updateLoadedUnitsList();
         this.updateStatistics();
+        this.updateAxleIndicators();
         return cargo;
     }
     
@@ -1296,6 +1316,7 @@ class UI {
         const cargo = this.cargoManager.addCargoUnit(unitType, params);
         this.updateLoadedUnitsList();
         this.updateStatistics();
+        this.updateAxleIndicators();
         return cargo;
     }
     
@@ -1320,8 +1341,8 @@ class UI {
             this.loadConfiguration();
         });
         
-        document.getElementById('generateReport').addEventListener('click', () => {
-            this.generateReport();
+        document.getElementById('exportPDF2').addEventListener('click', () => {
+            this.exportToPDF();
         });
         
         // Config name input
@@ -1441,6 +1462,11 @@ class UI {
         this.updateStatistics();
         this.updateAxleIndicators();
         this.updateLoadedUnitsList();
+        
+        // Update 3D axle load visualization after auto-arrange
+        if (this.scene3d.showAxleLoads) {
+            this.scene3d.updateAxleLoadVisualization();
+        }
         
         if (result.success) {
             this.showNotification('Ładunek rozmieszczony automatycznie', 'success');
@@ -2150,6 +2176,11 @@ class UI {
         this.updateStatistics();
         this.updateAxleIndicators();
         
+        // Update 3D axle load visualization after auto-arrange
+        if (this.scene3d.showAxleLoads) {
+            this.scene3d.updateAxleLoadVisualization();
+        }
+        
         // Show notification about the change
         if (result && !result.success) {
             const messages = [];
@@ -2734,30 +2765,62 @@ class UI {
             // Show loading indicator
             this.showNotification('Generating PDF...', 'info');
             
+            // Update axle load indicators to ensure current data is displayed
+            this.updateAxleIndicators();
+            
             // Get cargo groups for annotations
             const cargoGroups = this.getCargoGroups();
             
-            // Get multiple views from 3D scene with annotations
-            const views = await this.scene3d.getMultipleViews(cargoGroups);
+            // Get multiple views from 3D scene with annotations (including side view for page 3)
+            const views = await this.scene3d.getMultipleViews(cargoGroups, true);
             
-            // Initialize jsPDF (landscape A4)
+            // Initialize jsPDF (landscape A4) with compression enabled
             const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('landscape', 'mm', 'a4');
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4',
+                compress: true  // Enable PDF compression
+            });
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
             
+            // Get plan name - use current config name or generate default
+            const planName = this.currentConfigName || this.generateDefaultName();
+            
             // Page 1: Perspective View
-            pdf.setFontSize(16);
-            pdf.text('Load Plan - Perspective View', pageWidth / 2, 12, { align: 'center' });
+            // Add plan name at the top
+            pdf.setFontSize(14);
+            pdf.setFont(undefined, 'bold');
+            pdf.text(planName, pageWidth / 2, 8, { align: 'center' });
+            
+            // Add view title below plan name
+            pdf.setFontSize(12);
+            pdf.setFont(undefined, 'normal');
+            pdf.text('Load Plan - Perspective View', pageWidth / 2, 14, { align: 'center' });
+            
+            // Add watermark text
+            pdf.setFontSize(9);
+            pdf.setFont(undefined, 'italic');
+            pdf.setTextColor(100, 100, 100);
+            pdf.text('Planned and generated on', 5, 5, { align: 'left' });
+            pdf.text('Transport-Nomad.com', 5, 9, { align: 'left' });
             
             // Add date
             pdf.setFontSize(10);
-            const date = new Date().toLocaleString('en-US');
+            pdf.setFont(undefined, 'normal');
+            pdf.setTextColor(0, 0, 0);
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const time = now.toLocaleTimeString('en-US');
+            const date = `${day}/${month}/${year} ${time}`;
             pdf.text(`Date: ${date}`, pageWidth - 5, 8, { align: 'right' });
             
             // Calculate full page image dimensions with minimal margins
             const sideMargin = 3; // Minimal side margin
-            const topMargin = 18; // Space for title and date
+            const topMargin = 20; // Space for plan name, title and date
             const bottomMargin = 3; // Minimal bottom margin
             const availableWidth = pageWidth - (sideMargin * 2);
             const availableHeight = pageHeight - topMargin - bottomMargin; // Maximum height available
@@ -2779,14 +2842,30 @@ class UI {
                 pdf.setLineWidth(0.5);
                 pdf.rect(xPos - 1, yPos - 1, imgWidth + 2, imgHeight + 2);
                 
-                // Add perspective view image
-                pdf.addImage(perspectiveView.image, 'PNG', xPos, yPos, imgWidth, imgHeight);
+                // Add perspective view image with JPEG format and FAST compression
+                pdf.addImage(perspectiveView.image, 'JPEG', xPos, yPos, imgWidth, imgHeight, undefined, 'FAST');
             }
             
             // Page 2: Top View
             pdf.addPage();
-            pdf.setFontSize(16);
-            pdf.text('Load Plan - Top View', pageWidth / 2, 12, { align: 'center' });
+            // Add plan name at the top
+            pdf.setFontSize(14);
+            pdf.setFont(undefined, 'bold');
+            pdf.text(planName, pageWidth / 2, 8, { align: 'center' });
+            
+            // Add view title below plan name
+            pdf.setFontSize(12);
+            pdf.setFont(undefined, 'normal');
+            pdf.text('Load Plan - Top View', pageWidth / 2, 14, { align: 'center' });
+            
+            // Add watermark text
+            pdf.setFontSize(9);
+            pdf.setFont(undefined, 'italic');
+            pdf.setTextColor(100, 100, 100);
+            pdf.text('Planned and generated on', 5, 5, { align: 'left' });
+            pdf.text('Transport-Nomad.com', 5, 9, { align: 'left' });
+            pdf.setFont(undefined, 'normal');
+            pdf.setTextColor(0, 0, 0);
             
             // Find top view
             const topView = views.find(v => v.name === 'top');
@@ -2797,180 +2876,133 @@ class UI {
                 pdf.setLineWidth(0.5);
                 pdf.rect(xPos - 1, yPos - 1, imgWidth + 2, imgHeight + 2);
                 
-                // Add top view image
-                pdf.addImage(topView.image, 'PNG', xPos, yPos, imgWidth, imgHeight);
+                // Add top view image with JPEG format and FAST compression
+                pdf.addImage(topView.image, 'JPEG', xPos, yPos, imgWidth, imgHeight, undefined, 'FAST');
             }
             
-            // Page 3: Cargo Summary
+            // Page 3: Vehicle Summary & Axle Configuration
             pdf.addPage();
-            pdf.setFontSize(16);
-            pdf.text('Cargo Summary', pageWidth / 2, 15, { align: 'center' });
+            // Add plan name at the top
+            pdf.setFontSize(14);
+            pdf.setFont(undefined, 'bold');
+            pdf.text(planName, pageWidth / 2, 8, { align: 'center' });
             
-            // Add vehicle info
+            // Add summary title below plan name
             pdf.setFontSize(12);
+            pdf.setFont(undefined, 'normal');
+            pdf.text('Vehicle Configuration & Load Summary', pageWidth / 2, 14, { align: 'center' });
+            
+            // Add watermark text
+            pdf.setFontSize(9);
+            pdf.setFont(undefined, 'italic');
+            pdf.setTextColor(100, 100, 100);
+            pdf.text('Planned and generated on', 5, 5, { align: 'left' });
+            pdf.text('Transport-Nomad.com', 5, 9, { align: 'left' });
+            pdf.setFont(undefined, 'normal');
+            pdf.setTextColor(0, 0, 0);
+            
             let yPosition = 25;
             
-            // Get vehicle name from dropdown
-            const vehicleDropdown = document.querySelector('.custom-select-trigger .option-name');
-            const vehicleName = vehicleDropdown ? vehicleDropdown.textContent : 'Unknown';
+            // Vehicle Specifications Section
+            this.addVehicleSpecificationsSection(pdf, yPosition);
+            yPosition = 90; // Fixed position after specifications
             
-            const dimensionsInfo = document.getElementById('dimensionsInfo')?.textContent || 'No data';
-            const volumeInfo = document.getElementById('volumeInfo')?.textContent || 'No data';
-            const maxLoadInput = document.getElementById('maxLoadInput');
-            const maxLoad = maxLoadInput ? `${maxLoadInput.value} tons` : 'No data';
+            // Side view with axle loads (bottom half of the page)
+            const sideView = views.find(v => v.name === 'side');
+            if (sideView) {
+                // Add section title
+                pdf.setFontSize(11);
+                pdf.setFont(undefined, 'bold');
+                pdf.setTextColor(41, 98, 255);
+                pdf.text('Load Distribution & Axle Loads', 15, yPosition);
+                yPosition += 5;
+                
+                // Add disclaimer about axle load calculations
+                pdf.setFontSize(8);
+                pdf.setFont(undefined, 'italic');
+                pdf.setTextColor(100, 116, 139);
+                const disclaimerText = 'Note: Axle load calculations are based on empty weights and distances between reference points which may vary depending on truck and trailer manufacturers. Always verify that the empty weights and distances match those used in the settings.';
+                const splitDisclaimer = pdf.splitTextToSize(disclaimerText, pageWidth - 30);
+                pdf.text(splitDisclaimer, 15, yPosition);
+                yPosition += splitDisclaimer.length * 3 + 2;
+                
+                // Add side view image with axle load visualization
+                // Full width of the page - the side view has 3:1 ratio for wide display
+                const xPos = 15;
+                const imgWidth = pageWidth - 30; // Full width minus margins
+                // The side view export is 3000x1000px (3:1 ratio)
+                const imgHeight = imgWidth / 3; // Maintain 3:1 ratio
+                
+                const imgYPos = yPosition;
+                
+                // Add subtle background for the visualization
+                pdf.setFillColor(248, 250, 252);
+                pdf.roundedRect(xPos - 2, imgYPos - 2, imgWidth + 4, imgHeight + 4, 3, 3, 'F');
+                
+                // Add border
+                pdf.setDrawColor(226, 232, 240);
+                pdf.setLineWidth(0.5);
+                pdf.roundedRect(xPos - 2, imgYPos - 2, imgWidth + 4, imgHeight + 4, 3, 3, 'S');
+                
+                // Add side view image with JPEG format and FAST compression
+                pdf.addImage(sideView.image, 'JPEG', xPos, imgYPos, imgWidth, imgHeight, undefined, 'FAST');
+            }
             
-            pdf.text(`Vehicle: ${vehicleName}`, 10, yPosition);
-            yPosition += 7;
-            pdf.text(`Dimensions: ${dimensionsInfo}`, 10, yPosition);
-            yPosition += 7;
-            pdf.text(`Volume: ${volumeInfo}`, 10, yPosition);
-            yPosition += 7;
-            pdf.text(`Max. Load: ${maxLoad}`, 10, yPosition);
-            yPosition += 12;
-            
-            // Add cargo groups as styled cards
+            // Pages 4+: Individual cargo group views
             if (cargoGroups.length > 0) {
-                pdf.setFontSize(14);
-                pdf.text('Cargo Groups:', 10, yPosition);
-                yPosition += 10;
-                
-                // Render each group as a card
-                cargoGroups.forEach((group, index) => {
-                    // Check if we need a new page
-                    if (yPosition > pageHeight - 45) {
-                        pdf.addPage();
-                        yPosition = 20;
-                    }
+                for (let index = 0; index < cargoGroups.length; index++) {
+                    const group = cargoGroups[index];
                     
-                    // Card background
-                    pdf.setFillColor(248, 250, 252); // Light gray background
-                    pdf.roundedRect(10, yPosition - 5, pageWidth - 20, 35, 2, 2, 'F');
+                    // Add new page for this group
+                    pdf.addPage();
                     
-                    // Card border
-                    pdf.setDrawColor(226, 232, 240);
-                    pdf.setLineWidth(0.5);
-                    pdf.roundedRect(10, yPosition - 5, pageWidth - 20, 35, 2, 2, 'S');
-                    
-                    // Group number in circle
-                    pdf.setFillColor(59, 130, 246); // Blue
-                    pdf.circle(18, yPosition + 10, 3, 'F');
-                    pdf.setTextColor(255, 255, 255);
-                    pdf.setFontSize(10);
-                    pdf.text((index + 1).toString(), 18, yPosition + 11, { align: 'center' });
-                    
-                    // Color dot
-                    if (group.color) {
-                        const rgb = this.hexToRgb(group.color);
-                        pdf.setFillColor(rgb.r, rgb.g, rgb.b);
-                        pdf.circle(28, yPosition + 10, 2, 'F');
-                    }
-                    
-                    // Quantity badge
-                    pdf.setFillColor(236, 253, 245); // Light green
-                    pdf.setDrawColor(134, 239, 172); // Green border
-                    pdf.setLineWidth(0.3);
-                    pdf.roundedRect(35, yPosition + 6, 20, 8, 1, 1, 'FD');
-                    pdf.setTextColor(22, 163, 74); // Green text
-                    pdf.setFontSize(9);
-                    pdf.text(`× ${group.count}`, 45, yPosition + 11, { align: 'center' });
-                    
-                    // Group name
-                    pdf.setTextColor(30, 41, 59); // Dark text
-                    pdf.setFontSize(11);
+                    // Add plan name at the top
+                    pdf.setFontSize(14);
                     pdf.setFont(undefined, 'bold');
-                    pdf.text(group.name || 'Unnamed', 60, yPosition + 11);
+                    pdf.text(planName, pageWidth / 2, 8, { align: 'center' });
                     
-                    // Reset font
+                    // Add group title
+                    pdf.setFontSize(12);
                     pdf.setFont(undefined, 'normal');
+                    const groupTitle = `Group ${index + 1}: ${group.name || 'Unnamed'} (× ${group.count})`;
+                    pdf.text(groupTitle, pageWidth / 2, 14, { align: 'center' });
+                    
+                    // Add watermark text
                     pdf.setFontSize(9);
-                    pdf.setTextColor(100, 116, 139); // Gray text
+                    pdf.setFont(undefined, 'italic');
+                    pdf.setTextColor(100, 100, 100);
+                    pdf.text('Planned and generated on', 5, 5, { align: 'left' });
+                    pdf.text('Transport-Nomad.com', 5, 9, { align: 'left' });
+                    pdf.setFont(undefined, 'normal');
+                    pdf.setTextColor(0, 0, 0);
                     
-                    // First row of details
-                    let xPos = 15;
-                    pdf.text('Dimensions:', xPos, yPosition + 20);
-                    pdf.setTextColor(30, 41, 59);
-                    pdf.text(group.dimensions, xPos + 25, yPosition + 20);
+                    // Capture group view with transparency for other units
+                    const groupId = group.items && group.items.length > 0 ? group.items[0].groupId : null;
                     
-                    xPos = 90;
-                    pdf.setTextColor(100, 116, 139);
-                    pdf.text('Unit weight:', xPos, yPosition + 20);
-                    pdf.setTextColor(30, 41, 59);
-                    pdf.text(`${group.unitWeight} kg`, xPos + 25, yPosition + 20);
-                    
-                    xPos = 150;
-                    pdf.setTextColor(100, 116, 139);
-                    pdf.text('Total weight:', xPos, yPosition + 20);
-                    pdf.setTextColor(30, 41, 59);
-                    pdf.text(`${group.totalWeight} kg`, xPos + 28, yPosition + 20);
-                    
-                    xPos = 210;
-                    pdf.setTextColor(100, 116, 139);
-                    pdf.text('Stacking:', xPos, yPosition + 20);
-                    pdf.setTextColor(30, 41, 59);
-                    pdf.text(`${group.maxStack}/${group.maxStackWeight || 'inf'} kg`, xPos + 22, yPosition + 20);
-                    
-                    yPosition += 40;
-                });
-            }
-            
-            // Add statistics
-            yPosition += 10;
-            pdf.setFontSize(14);
-            pdf.text('Statistics:', 10, yPosition);
-            yPosition += 8;
-            
-            pdf.setFontSize(10);
-            
-            // Get statistics from the compact statistics panel
-            const statItems = document.querySelectorAll('.statistics.compact .stat-item-compact');
-            const stats = {};
-            statItems.forEach(item => {
-                const label = item.querySelector('.stat-label')?.textContent;
-                const value = item.querySelector('.stat-value, .stat-value-small')?.textContent;
-                if (label && value) {
-                    stats[label] = value;
+                    if (groupId !== null && groupId !== undefined) {
+                        const groupViewDataURL = await this.scene3d.captureGroupView(groupId, cargoGroups);
+                        
+                        if (groupViewDataURL) {
+                            // Calculate image position and size
+                            const imgWidth = pageWidth - 30;
+                            const imgHeight = imgWidth / 1.5; // 3:2 aspect ratio
+                            const xPos = 15;
+                            const yPos = 25;
+                            
+                            // Add subtle background
+                            pdf.setFillColor(248, 250, 252);
+                            pdf.roundedRect(xPos - 2, yPos - 2, imgWidth + 4, imgHeight + 4, 3, 3, 'F');
+                            
+                            // Add border
+                            pdf.setDrawColor(226, 232, 240);
+                            pdf.setLineWidth(0.5);
+                            pdf.roundedRect(xPos - 2, yPos - 2, imgWidth + 4, imgHeight + 4, 3, 3, 'S');
+                            
+                            // Add group view image with JPEG format and FAST compression
+                            pdf.addImage(groupViewDataURL, 'JPEG', xPos, yPos, imgWidth, imgHeight, undefined, 'FAST');
+                        }
+                    }
                 }
-            });
-            
-            if (stats['Waga']) {
-                pdf.text(`Total Weight: ${stats['Waga']}`, 15, yPosition);
-                yPosition += 6;
-            }
-            if (stats['Przestrzen'] || stats['Przestrzeń']) {
-                pdf.text(`Space Usage: ${stats['Przestrzen'] || stats['Przestrzeń']}`, 15, yPosition);
-                yPosition += 6;
-            }
-            if (stats['Ladownosc'] || stats['Ładowność']) {
-                pdf.text(`Load Capacity: ${stats['Ladownosc'] || stats['Ładowność']}`, 15, yPosition);
-                yPosition += 6;
-            }
-            if (stats['Liczba']) {
-                pdf.text(`Unit Count: ${stats['Liczba']}`, 15, yPosition);
-                yPosition += 6;
-            }
-            const cogStat = stats['Srodek ciezkosci'] || stats['Środek ciężkości'];
-            if (cogStat) {
-                pdf.text(`Center of Gravity: ${cogStat}`, 15, yPosition);
-                yPosition += 6;
-            }
-            
-            // Add axle loads if available
-            const axleIndicators = document.querySelectorAll('.axle-indicator');
-            if (axleIndicators.length > 0) {
-                yPosition += 10;
-                pdf.setFontSize(14);
-                pdf.text('Axle Loads:', 10, yPosition);
-                yPosition += 8;
-                
-                pdf.setFontSize(10);
-                axleIndicators.forEach(indicator => {
-                    const label = indicator.querySelector('.axle-label').textContent;
-                    const value = indicator.querySelector('.axle-value').textContent;
-                    const percentage = indicator.querySelector('.axle-percentage').textContent;
-                    
-                    pdf.text(`${label}: ${value} (${percentage})`, 15, yPosition);
-                    yPosition += 6;
-                });
             }
             
             // Save PDF
@@ -3034,6 +3066,191 @@ class UI {
             g: parseInt(result[2], 16),
             b: parseInt(result[3], 16)
         } : { r: 128, g: 128, b: 128 };
+    }
+    
+    addVehicleSpecificationsSection(pdf, startY) {
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        
+        // Get vehicle information
+        const vehicleDropdown = document.querySelector('.custom-select-trigger .option-name');
+        const vehicleName = vehicleDropdown ? vehicleDropdown.textContent : 'Unknown';
+        const dimensionsInfo = document.getElementById('dimensionsInfo')?.textContent || 'No data';
+        const maxLoadInput = document.getElementById('maxLoadInput');
+        const maxLoad = maxLoadInput ? parseFloat(maxLoadInput.value) * 1000 : 0; // Convert to kg
+        
+        // Get axle configuration from localStorage
+        const vehicleType = this.cargoManager.currentVehicleType || 'standard';
+        const settingsKey = `axleSettings_${vehicleType}`;
+        const axleSettings = JSON.parse(localStorage.getItem(settingsKey) || '{}');
+        
+        // Determine vehicle type characteristics
+        const isSolo = this.cargoManager.containerDimensions?.isSolo || false;
+        const isJumbo = this.cargoManager.containerDimensions?.isJumbo || false;
+        
+        // Get current axle loads
+        this.axleCalculator.updateCargo(this.cargoManager.cargoItems);
+        const axleLoads = this.axleCalculator.calculateAxleLoads();
+        
+        // Create two-column layout
+        const col1X = 15;
+        const col2X = pageWidth / 2 + 5;
+        let yPos = startY;
+        
+        // Section 1: Vehicle Specifications (left column)
+        pdf.setFontSize(11);
+        pdf.setFont(undefined, 'bold');
+        pdf.setTextColor(41, 98, 255);
+        pdf.text('Vehicle Specifications', col1X, yPos);
+        yPos += 8;
+        
+        // Background for specifications
+        pdf.setFillColor(248, 250, 252);
+        pdf.roundedRect(col1X - 2, yPos - 4, pageWidth/2 - 15, 35, 2, 2, 'F');
+        
+        pdf.setFontSize(9);
+        pdf.setFont(undefined, 'normal');
+        pdf.setTextColor(100, 116, 139); // Gray labels
+        
+        // Vehicle type
+        pdf.text('Vehicle Type:', col1X + 2, yPos);
+        pdf.setTextColor(30, 41, 59); // Dark values
+        pdf.setFont(undefined, 'bold');
+        pdf.text(vehicleName, col1X + 35, yPos);
+        
+        // Dimensions
+        yPos += 6;
+        pdf.setFont(undefined, 'normal');
+        pdf.setTextColor(100, 116, 139);
+        pdf.text('Cargo Space:', col1X + 2, yPos);
+        pdf.setTextColor(30, 41, 59);
+        pdf.setFont(undefined, 'bold');
+        pdf.text(dimensionsInfo, col1X + 35, yPos);
+        
+        // Maximum cargo weight
+        yPos += 6;
+        pdf.setFont(undefined, 'normal');
+        pdf.setTextColor(100, 116, 139);
+        pdf.text('Max Cargo Weight:', col1X + 2, yPos);
+        pdf.setTextColor(30, 41, 59);
+        pdf.setFont(undefined, 'bold');
+        pdf.text(`${maxLoad.toLocaleString()} kg`, col1X + 35, yPos);
+        
+        // Number of axles
+        yPos += 6;
+        const tractorAxles = axleSettings.tractorAxles || 1;
+        const trailerAxles = axleSettings.trailerAxles || (isSolo ? 0 : (isJumbo ? 2 : 3));
+        pdf.setFont(undefined, 'normal');
+        pdf.setTextColor(100, 116, 139);
+        pdf.text('Axle Configuration:', col1X + 2, yPos);
+        pdf.setTextColor(30, 41, 59);
+        pdf.setFont(undefined, 'bold');
+        if (isSolo) {
+            pdf.text(`Front: 1, Drive: ${tractorAxles}`, col1X + 35, yPos);
+        } else if (isJumbo) {
+            pdf.text(`Front: 1, Drive: ${tractorAxles}, Trailer: ${trailerAxles}`, col1X + 35, yPos);
+        } else {
+            pdf.text(`Front: 1, Drive: ${tractorAxles}, Trailer: ${trailerAxles}`, col1X + 35, yPos);
+        }
+        
+        // We still need to calculate empty weights for the axle details section
+        const emptyFront = axleSettings.emptyFrontAxle || 5800;
+        const emptyDrive = axleSettings.emptyDriveAxles || 3600;
+        const emptyTrailer = axleSettings.emptyTrailerAxles || (isSolo ? 0 : (isJumbo ? 4200 : 5200));
+        
+        // Section 2: Axle Configuration Details (right column)
+        yPos = startY;
+        pdf.setFontSize(11);
+        pdf.setFont(undefined, 'bold');
+        pdf.setTextColor(41, 98, 255);
+        pdf.text('Axle Load Limits & Distances', col2X, yPos);
+        yPos += 8;
+        
+        // Background for axle details
+        pdf.setFillColor(248, 250, 252);
+        pdf.roundedRect(col2X - 2, yPos - 4, pageWidth/2 - 15, 55, 2, 2, 'F');
+        
+        pdf.setFontSize(9);
+        pdf.setFont(undefined, 'normal');
+        
+        // Front axle
+        pdf.setTextColor(100, 116, 139);
+        pdf.text('Front Axle:', col2X + 2, yPos);
+        pdf.setTextColor(30, 41, 59);
+        const maxFront = axleSettings.maxFrontAxle || 10000;
+        const loadedFront = axleLoads ? (isJumbo ? axleLoads.frontAxle?.load : axleLoads.front?.load) || 0 : 0;
+        pdf.setFontSize(8);
+        pdf.text(`Max: ${maxFront.toLocaleString()} kg | Empty: ${emptyFront.toLocaleString()} kg | Loaded: ${loadedFront.toLocaleString()} kg`, col2X + 35, yPos);
+        pdf.setFontSize(9);
+        
+        // Drive axles
+        yPos += 6;
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(`Drive Axle${tractorAxles > 1 ? 's' : ''}:`, col2X + 2, yPos);
+        pdf.setTextColor(30, 41, 59);
+        const maxDrive = axleSettings.maxDriveAxles || (tractorAxles === 2 ? 18000 : 11500);
+        const loadedDrive = axleLoads ? (isJumbo ? axleLoads.driveAxles?.load : axleLoads.drive?.load) || 0 : 0;
+        pdf.setFontSize(8);
+        pdf.text(`Max: ${maxDrive.toLocaleString()} kg | Empty: ${emptyDrive.toLocaleString()} kg | Loaded: ${loadedDrive.toLocaleString()} kg`, col2X + 35, yPos);
+        pdf.setFontSize(9);
+        
+        // Trailer axles (if applicable)
+        if (!isSolo) {
+            yPos += 6;
+            pdf.setTextColor(100, 116, 139);
+            pdf.text(`Trailer Axle${trailerAxles > 1 ? 's' : ''}:`, col2X + 2, yPos);
+            pdf.setTextColor(30, 41, 59);
+            const maxTrailer = axleSettings.maxTrailerAxles || 
+                (trailerAxles === 1 ? 10000 : trailerAxles === 2 ? 18000 : 24000);
+            const loadedTrailer = axleLoads ? (isJumbo ? axleLoads.trailerAxles?.load : axleLoads.trailer?.load) || 0 : 0;
+            pdf.setFontSize(8);
+            pdf.text(`Max: ${maxTrailer.toLocaleString()} kg | Empty: ${emptyTrailer.toLocaleString()} kg | Loaded: ${loadedTrailer.toLocaleString()} kg`, col2X + 35, yPos);
+            pdf.setFontSize(9);
+        }
+        
+        // Distance information
+        yPos += 6;
+        pdf.setTextColor(100, 116, 139);
+        pdf.text('Axle Distances:', col2X + 2, yPos);
+        pdf.setTextColor(30, 41, 59);
+        pdf.setFontSize(8);
+        
+        if (isSolo) {
+            const distToFront = axleSettings.distCargoStartToFront || 1.0;
+            const distToDrive = axleSettings.distCargoStartToDrive || 5.5;
+            pdf.text(`Front: ${distToFront.toFixed(1)}m before container, Drive: ${distToDrive.toFixed(1)}m from container start`, 
+                     col2X + 35, yPos);
+        } else if (isJumbo) {
+            const distToFront = axleSettings.distSection1StartToFront || 1.0;
+            const distToDrive = axleSettings.distSection1StartToDrive || 5.5;
+            const distToTrailer = axleSettings.distSection2StartToTrailerAxles || 5.5;
+            pdf.text(`Front: ${distToFront.toFixed(1)}m, Drive: ${distToDrive.toFixed(1)}m, Trailer: ${distToTrailer.toFixed(1)}m`, 
+                     col2X + 35, yPos);
+        } else {
+            const distFrontToKingpin = axleSettings.distFrontToKingpin || 1.7;
+            const distKingpinToTrailer = axleSettings.distKingpinToTrailer || 7.7;
+            const distFrontAxleToKingpin = axleSettings.distFrontAxleToKingpin || 3.1;
+            const distKingpinToDrive = axleSettings.distKingpinToDrive || 0.5;
+            const distTrailerToEnd = axleSettings.distTrailerToEnd || 4.2;
+            yPos += 4;
+            pdf.text(`Kingpin: ${distFrontToKingpin.toFixed(1)}m from container front`, col2X + 35, yPos);
+            yPos += 4;
+            pdf.text(`Front axle: ${distFrontAxleToKingpin.toFixed(1)}m before kingpin`, col2X + 35, yPos);
+            yPos += 4;
+            pdf.text(`Drive axle: ${distKingpinToDrive.toFixed(1)}m behind kingpin`, col2X + 35, yPos);
+            yPos += 4;
+            pdf.text(`Trailer axles: ${distKingpinToTrailer.toFixed(1)}m from kingpin`, col2X + 35, yPos);
+            yPos += 4;
+            pdf.text(`Trailer axles: ${distTrailerToEnd.toFixed(1)}m from container rear`, col2X + 35, yPos);
+        }
+        
+        // Minimum drive axle load
+        yPos += 6;
+        pdf.setFontSize(9);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text('Min Drive Load:', col2X + 2, yPos);
+        pdf.setTextColor(30, 41, 59);
+        const minDriveLoad = axleSettings.minDriveAxleLoad || 25;
+        pdf.text(`${minDriveLoad}% of total weight`, col2X + 35, yPos);
     }
     
     saveConfiguration() {
@@ -3289,77 +3506,79 @@ class UI {
             const soloDimensionSliders = document.getElementById('soloDimensionSliders');
             const jumboDimensionSliders = document.getElementById('jumboDimensionSliders');
             
-            if (vehicleType !== 'custom') {
-                // Update dropdown visual
-                const option = customSelect.querySelector(`.custom-option[data-value="${vehicleType}"]`);
-                if (option) {
-                    const name = option.querySelector('.option-name').textContent;
-                    const dimensions = option.querySelector('.option-dimensions').textContent;
+            // Always update dropdown visual for all vehicle types
+            const option = customSelect.querySelector(`.custom-option[data-value="${vehicleType}"]`);
+            if (option) {
+                const name = option.querySelector('.option-name').textContent;
+                const dimensions = option.querySelector('.option-dimensions').textContent;
+                
+                customSelect.querySelector('.custom-select-trigger .option-name').textContent = name;
+                customSelect.querySelector('.custom-select-trigger .option-dimensions').textContent = dimensions;
+                
+                // Update all options selected state
+                customSelect.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
+                option.classList.add('selected');
+            } else {
+                console.warn(`Vehicle type option not found: ${vehicleType}`);
+            }
+            
+            // Show/hide appropriate dimension controls based on vehicle type
+            if (vehicleType === 'solo') {
+                customDimensions.classList.add('hidden');
+                soloDimensionSliders.classList.remove('hidden');
+                jumboDimensionSliders.classList.add('hidden');
+                
+                // Update SOLO sliders if container dimensions are saved
+                if (config.container) {
+                    const soloLengthSlider = document.getElementById('soloLengthSlider');
+                    const soloHeightSlider = document.getElementById('soloHeightSlider');
+                    const soloLengthValue = document.getElementById('soloLengthValue');
+                    const soloHeightValue = document.getElementById('soloHeightValue');
                     
-                    customSelect.querySelector('.custom-select-trigger .option-name').textContent = name;
-                    customSelect.querySelector('.custom-select-trigger .option-dimensions').textContent = dimensions;
-                    
-                    // Update all options selected state
-                    customSelect.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
-                    option.classList.add('selected');
+                    if (soloLengthSlider && config.container.length) {
+                        soloLengthSlider.value = config.container.length;
+                        soloLengthValue.textContent = `${config.container.length.toFixed(2)}m`;
+                    }
+                    if (soloHeightSlider && config.container.height) {
+                        soloHeightSlider.value = config.container.height;
+                        soloHeightValue.textContent = `${config.container.height.toFixed(1)}m`;
+                    }
                 }
                 
-                // Show/hide appropriate dimension controls
-                if (vehicleType === 'solo') {
-                    customDimensions.classList.add('hidden');
-                    soloDimensionSliders.classList.remove('hidden');
-                    jumboDimensionSliders.classList.add('hidden');
+                // Store current vehicle before changing
+                const previousVehicle = this.currentVehicle;
+                
+                // Load the vehicle (this sets up the container)
+                this.loadVehicle(vehicleType, previousVehicle);
+                this.currentVehicle = vehicleType;
+            } else if (vehicleType === 'jumbo') {
+                customDimensions.classList.add('hidden');
+                soloDimensionSliders.classList.add('hidden');
+                jumboDimensionSliders.classList.remove('hidden');
+                
+                // Update JUMBO sliders if sections are saved
+                if (config.container && config.container.sections) {
+                    const jumboSection1LengthSlider = document.getElementById('jumboSection1LengthSlider');
+                    const jumboSection1HeightSlider = document.getElementById('jumboSection1HeightSlider');
+                    const jumboSection2LengthSlider = document.getElementById('jumboSection2LengthSlider');
+                    const jumboSection2HeightSlider = document.getElementById('jumboSection2HeightSlider');
+                    const jumboSection1LengthValue = document.getElementById('jumboSection1LengthValue');
+                    const jumboSection1HeightValue = document.getElementById('jumboSection1HeightValue');
+                    const jumboSection2LengthValue = document.getElementById('jumboSection2LengthValue');
+                    const jumboSection2HeightValue = document.getElementById('jumboSection2HeightValue');
                     
-                    // Update SOLO sliders if container dimensions are saved
-                    if (config.container) {
-                        const soloLengthSlider = document.getElementById('soloLengthSlider');
-                        const soloHeightSlider = document.getElementById('soloHeightSlider');
-                        const soloLengthValue = document.getElementById('soloLengthValue');
-                        const soloHeightValue = document.getElementById('soloHeightValue');
-                        
-                        if (soloLengthSlider && config.container.length) {
-                            soloLengthSlider.value = config.container.length;
-                            soloLengthValue.textContent = `${config.container.length.toFixed(2)}m`;
-                        }
-                        if (soloHeightSlider && config.container.height) {
-                            soloHeightSlider.value = config.container.height;
-                            soloHeightValue.textContent = `${config.container.height.toFixed(1)}m`;
-                        }
+                    if (jumboSection1LengthSlider && config.container.sections[0]) {
+                        jumboSection1LengthSlider.value = config.container.sections[0].length;
+                        jumboSection1LengthValue.textContent = `${config.container.sections[0].length.toFixed(2)}m`;
+                        jumboSection1HeightSlider.value = config.container.sections[0].height;
+                        jumboSection1HeightValue.textContent = `${config.container.sections[0].height.toFixed(1)}m`;
                     }
-                } else if (vehicleType === 'jumbo') {
-                    customDimensions.classList.add('hidden');
-                    soloDimensionSliders.classList.add('hidden');
-                    jumboDimensionSliders.classList.remove('hidden');
-                    
-                    // Update JUMBO sliders if sections are saved
-                    if (config.container && config.container.sections) {
-                        const jumboSection1LengthSlider = document.getElementById('jumboSection1LengthSlider');
-                        const jumboSection1HeightSlider = document.getElementById('jumboSection1HeightSlider');
-                        const jumboSection2LengthSlider = document.getElementById('jumboSection2LengthSlider');
-                        const jumboSection2HeightSlider = document.getElementById('jumboSection2HeightSlider');
-                        const jumboSection1LengthValue = document.getElementById('jumboSection1LengthValue');
-                        const jumboSection1HeightValue = document.getElementById('jumboSection1HeightValue');
-                        const jumboSection2LengthValue = document.getElementById('jumboSection2LengthValue');
-                        const jumboSection2HeightValue = document.getElementById('jumboSection2HeightValue');
-                        
-                        if (jumboSection1LengthSlider && config.container.sections[0]) {
-                            jumboSection1LengthSlider.value = config.container.sections[0].length;
-                            jumboSection1LengthValue.textContent = `${config.container.sections[0].length.toFixed(2)}m`;
-                            jumboSection1HeightSlider.value = config.container.sections[0].height;
-                            jumboSection1HeightValue.textContent = `${config.container.sections[0].height.toFixed(1)}m`;
-                        }
-                        if (jumboSection2LengthSlider && config.container.sections[1]) {
-                            jumboSection2LengthSlider.value = config.container.sections[1].length;
-                            jumboSection2LengthValue.textContent = `${config.container.sections[1].length.toFixed(2)}m`;
-                            jumboSection2HeightSlider.value = config.container.sections[1].height;
-                            jumboSection2HeightValue.textContent = `${config.container.sections[1].height.toFixed(1)}m`;
-                        }
+                    if (jumboSection2LengthSlider && config.container.sections[1]) {
+                        jumboSection2LengthSlider.value = config.container.sections[1].length;
+                        jumboSection2LengthValue.textContent = `${config.container.sections[1].length.toFixed(2)}m`;
+                        jumboSection2HeightSlider.value = config.container.sections[1].height;
+                        jumboSection2HeightValue.textContent = `${config.container.sections[1].height.toFixed(1)}m`;
                     }
-                } else {
-                    // Standard vehicles - hide all dimension controls
-                    customDimensions.classList.add('hidden');
-                    soloDimensionSliders.classList.add('hidden');
-                    jumboDimensionSliders.classList.add('hidden');
                 }
                 
                 // Store current vehicle before changing
@@ -3379,6 +3598,18 @@ class UI {
                     this.cargoManager.setContainer(config.container, config.maxLoad);
                 }
                 this.currentVehicle = 'custom';
+            } else {
+                // Standard vehicles (standard, mega, coilmulde, containers etc.) - hide all dimension controls
+                customDimensions.classList.add('hidden');
+                soloDimensionSliders.classList.add('hidden');
+                jumboDimensionSliders.classList.add('hidden');
+                
+                // Store current vehicle before changing
+                const previousVehicle = this.currentVehicle;
+                
+                // Load the vehicle (this sets up the container)
+                this.loadVehicle(vehicleType, previousVehicle);
+                this.currentVehicle = vehicleType;
             }
             
             // THEN: Import the cargo items (now the correct container is set)
@@ -3387,63 +3618,16 @@ class UI {
             this.updateLoadedUnitsList();
             this.updateStatistics();
             this.updateAxleIndicators();
+            // Update 3D axle load visualization if enabled
+            if (this.scene3d.showAxleLoads) {
+                this.scene3d.updateAxleLoadVisualization();
+            }
         } catch (error) {
             console.error('Error applying configuration:', error);
             this.showNotification('Błąd wczytywania konfiguracji', 'error');
         }
     }
     
-    generateReport() {
-        const stats = this.cargoManager.getStatistics();
-        const axleLoads = this.axleCalculator.calculateAxleLoads();
-        const config = this.cargoManager.exportConfiguration();
-        
-        let report = `RAPORT ZAŁADUNKU\n`;
-        report += `Data: ${new Date().toLocaleString('pl-PL')}\n\n`;
-        
-        report += `PRZESTRZEŃ ŁADUNKOWA:\n`;
-        report += `- Typ: ${CONFIG.vehicles[this.currentVehicle]?.name || 'Własne wymiary'}\n`;
-        report += `- Wymiary: ${config.container.length}m x ${config.container.width}m x ${config.container.height}m\n`;
-        report += `- Max. ładowność: ${config.maxLoad / 1000} ton\n\n`;
-        
-        report += `STATYSTYKI:\n`;
-        report += `- Liczba jednostek: ${stats.totalItems}\n`;
-        report += `- Całkowita waga: ${stats.totalWeight} kg\n`;
-        report += `- Wykorzystanie przestrzeni: ${stats.volumeUsage.toFixed(1)}%\n`;
-        report += `- Wykorzystanie ładowności: ${stats.weightUsage.toFixed(1)}%\n`;
-        if (stats.outsideItems > 0) {
-            report += `- Jednostki poza przestrzenią: ${stats.outsideItems}\n`;
-        }
-        report += `\n`;
-        
-        if (axleLoads) {
-            report += `OBCIĄŻENIE OSI:\n`;
-            report += `- Oś przednia (ciągnik): ${axleLoads.front.load} / ${axleLoads.front.max} kg (${axleLoads.front.percentage.toFixed(1)}%)\n`;
-            report += `- Osie napędowe (ciągnik): ${axleLoads.drive.load} / ${axleLoads.drive.max} kg (${axleLoads.drive.percentage.toFixed(1)}%)\n`;
-            report += `- Osie naczepy: ${axleLoads.trailer.load} / ${axleLoads.trailer.max} kg (${axleLoads.trailer.percentage.toFixed(1)}%)\n\n`;
-        }
-        
-        report += `LISTA ŁADUNKÓW:\n`;
-        config.cargoItems.forEach((item, index) => {
-            report += `${index + 1}. ${item.name}\n`;
-            report += `   - Wymiary: ${item.dimensions.length}m x ${item.dimensions.width}m x ${item.dimensions.height}m\n`;
-            report += `   - Waga: ${item.weight} kg\n`;
-            if (item.position) {
-                report += `   - Pozycja: X=${item.position.x.toFixed(2)}, Y=${item.position.y.toFixed(2)}, Z=${item.position.z.toFixed(2)}\n`;
-            }
-        });
-        
-        const blob = new Blob([report], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `raport-zaladunku-${new Date().toISOString().slice(0, 10)}.txt`;
-        a.click();
-        
-        URL.revokeObjectURL(url);
-        this.showNotification('Raport wygenerowany', 'success');
-    }
     
     showNotification(message, type = 'info') {
         const notification = document.createElement('div');
@@ -3580,6 +3764,14 @@ class UI {
         
         // Set minimum drive axle load
         document.getElementById('minDriveAxleLoad').value = config.minDriveAxleLoad || 25;
+        
+        // Load 3D axle loads display setting
+        const showAxleLoadsCheckbox = document.getElementById('showAxleLoadsOn3D');
+        if (showAxleLoadsCheckbox) {
+            // Load from localStorage, default to true if no saved setting
+            const savedSetting = localStorage.getItem('showAxleLoadsOn3D');
+            showAxleLoadsCheckbox.checked = savedSetting === null || savedSetting === 'true';
+        }
     }
     
     saveAxleSettings() {
@@ -3627,6 +3819,15 @@ class UI {
         
         // Update axle indicators
         this.updateAxleIndicators();
+        
+        // Save and apply 3D axle loads display setting
+        const showAxleLoadsCheckbox = document.getElementById('showAxleLoadsOn3D');
+        if (showAxleLoadsCheckbox) {
+            const showAxleLoads = showAxleLoadsCheckbox.checked;
+            localStorage.setItem('showAxleLoadsOn3D', showAxleLoads);
+            // Toggle 3D axle load display
+            this.scene3d.toggleAxleLoadDisplay(showAxleLoads);
+        }
         
         // Update 3D visualization
         this.scene3d.updateAxleVisualization(config);

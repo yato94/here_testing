@@ -14,6 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.updateLoadedUnitsList(); // Update list to show units outside
         ui.updateStatistics();
         ui.updateAxleIndicators();
+        // Update 3D axle load visualization if enabled
+        if (scene3d.showAxleLoads) {
+            scene3d.updateAxleLoadVisualization();
+        }
     };
     
     // Connect dynamic axle update during dragging
@@ -23,6 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
             cargoManager.updateCargoPositions(tempUpdatedCargo);
         }
         ui.updateAxleIndicators();
+        // Update 3D axle load visualization if enabled
+        if (scene3d.showAxleLoads) {
+            scene3d.updateAxleLoadVisualization();
+        }
     };
     
     // Connect cargo removal callback
@@ -31,6 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.updateLoadedUnitsList();
         ui.updateStatistics();
         ui.updateAxleIndicators();
+        // Update 3D axle load visualization if enabled
+        if (scene3d.showAxleLoads) {
+            scene3d.updateAxleLoadVisualization();
+        }
     };
     
     // Connect cargo rearranged callback
@@ -38,6 +50,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.updateLoadedUnitsList();
         ui.updateStatistics();
         ui.updateAxleIndicators();
+        // Update 3D axle load visualization if enabled
+        if (scene3d.showAxleLoads) {
+            scene3d.updateAxleLoadVisualization();
+        }
     };
     
     // Connect group selection/deselection callbacks
@@ -55,6 +71,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.updateLoadedUnitsList();
         ui.updateStatistics();
         ui.updateAxleIndicators();
+        // Update 3D axle load visualization if enabled
+        if (scene3d.showAxleLoads) {
+            scene3d.updateAxleLoadVisualization();
+        }
     };
     
     const style = document.createElement('style');
