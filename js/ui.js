@@ -2654,28 +2654,30 @@ class UI {
     updateStatistics() {
         const stats = this.cargoManager.getStatistics();
         
+        // Count unique groups
+        const groups = {};
+        this.cargoManager.cargoItems.forEach(item => {
+            if (!item.isOutside && item.groupId) {
+                groups[item.groupId] = true;
+            }
+        });
+        const groupCount = Object.keys(groups).length;
+        
         // Update compact statistics in bottom section
         const statItems = document.querySelectorAll('.stat-item-compact .stat-value');
-        if (statItems.length >= 4) {
+        if (statItems.length >= 5) {
             statItems[0].textContent = `${stats.volumeUsage.toFixed(1)}%`;
             statItems[1].textContent = `${stats.weightUsage.toFixed(1)}%`;
-            // Show weight of items inside the container only
-            statItems[2].textContent = `${stats.insideWeight} kg`;
-            // Show total items with indication if some are outside
-            statItems[3].textContent = stats.outsideItems > 0 ? 
-                `${stats.placedItems} (+${stats.outsideItems} poza)` : 
-                stats.totalItems;
-        }
-        
-        // Update center of gravity
-        const cogElement = document.querySelector('.stat-item-compact.full-width .stat-value-small');
-        if (cogElement) {
-            if (stats.centerOfGravity) {
-                const cog = stats.centerOfGravity;
-                cogElement.textContent = `X: ${cog.x.toFixed(2)}m Y: ${cog.y.toFixed(2)}m Z: ${cog.z.toFixed(2)}m`;
+            // Show weight in format: loaded / max capacity
+            statItems[2].textContent = `${stats.insideWeight} / ${stats.maxLoad} kg`;
+            // Show units count
+            if (stats.outsideItems > 0) {
+                statItems[3].textContent = `${stats.placedItems} (+${stats.outsideItems} poza)`;
             } else {
-                cogElement.textContent = 'X: 0m Y: 0m Z: 0m';
+                statItems[3].textContent = `${stats.totalItems}`;
             }
+            // Show groups count
+            statItems[4].textContent = `${groupCount}`;
         }
     }
     
