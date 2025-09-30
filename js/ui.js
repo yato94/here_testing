@@ -3,20 +3,25 @@ class UI {
         this.scene3d = scene3d;
         this.cargoManager = cargoManager;
         this.axleCalculator = axleCalculator;
-        this.currentVehicle = 'standard';
+
+        // Load saved vehicle type from localStorage, default to 'standard'
+        const savedVehicleType = localStorage.getItem('lastVehicleType');
+        this.currentVehicle = savedVehicleType || 'standard';
+
         this.unitCounts = {};
         this.unitParameters = {};
         this.currentConfigId = null;
         this.currentConfigName = null;
-        
+
         // Maximum number of configurations to store in localStorage
         this.MAX_STORED_CONFIGS = 50;
-        
+
         this.init();
     }
     
     init() {
         this.setupVehicleSelector();
+        this.setupDimensionButtons();
         this.setupCargoUnits();
         this.setupControlButtons();
         this.setupViewControls();
@@ -99,7 +104,15 @@ class UI {
         const soloHeightSlider = document.getElementById('soloHeightSlider');
         const soloLengthValue = document.getElementById('soloLengthValue');
         const soloHeightValue = document.getElementById('soloHeightValue');
-        
+
+        // Custom dimensions sliders
+        const customLengthSlider = document.getElementById('customLengthSlider');
+        const customWidthSlider = document.getElementById('customWidthSlider');
+        const customHeightSlider = document.getElementById('customHeightSlider');
+        const customLengthValue = document.getElementById('customLengthValue');
+        const customWidthValue = document.getElementById('customWidthValue');
+        const customHeightValue = document.getElementById('customHeightValue');
+
         // JUMBO dimension sliders
         const jumboDimensionSliders = document.getElementById('jumboDimensionSliders');
         const jumboSection1LengthSlider = document.getElementById('jumboSection1LengthSlider');
@@ -154,16 +167,33 @@ class UI {
                 
                 // Update hidden select
                 vehicleSelect.value = value;
-                
+
+                // Save selected vehicle type to localStorage
+                localStorage.setItem('lastVehicleType', value);
+
                 // Store previous vehicle type before updating
                 const previousVehicleType = this.currentVehicle;
-                
+
                 if (value === 'custom') {
                     customDimensions.classList.remove('hidden');
                     soloDimensionSliders.classList.add('hidden');
                     jumboDimensionSliders.classList.add('hidden');
+
+                    // Load saved Custom dimensions from localStorage
+                    const savedDimensions = localStorage.getItem('customDimensions');
+                    if (savedDimensions) {
+                        const dims = JSON.parse(savedDimensions);
+                        customLengthSlider.value = dims.length;
+                        customWidthSlider.value = dims.width;
+                        customHeightSlider.value = dims.height;
+                        customLengthValue.textContent = `${dims.length.toFixed(2)}m`;
+                        customWidthValue.textContent = `${dims.width.toFixed(2)}m`;
+                        customHeightValue.textContent = `${dims.height.toFixed(2)}m`;
+                    }
+
                     this.currentVehicle = value;
-                    // Axle configuration will be updated in loadCustomVehicle
+                    // Load custom vehicle immediately to hide axle panel and set up clean space
+                    this.loadCustomVehicle();
                 } else if (value === 'solo') {
                     customDimensions.classList.add('hidden');
                     soloDimensionSliders.classList.remove('hidden');
@@ -234,16 +264,53 @@ class UI {
             customSelect.classList.remove('open');
             customOptions.classList.add('hidden');
         });
-        
-        const customInputs = customDimensions.querySelectorAll('input');
-        customInputs.forEach(input => {
-            input.addEventListener('change', () => {
+
+        // Setup Custom dimensions sliders
+        if (customLengthSlider && customWidthSlider && customHeightSlider) {
+            // Load saved dimensions if they exist
+            const savedDimensions = localStorage.getItem('customDimensions');
+            if (savedDimensions) {
+                const dims = JSON.parse(savedDimensions);
+                customLengthSlider.value = dims.length;
+                customWidthSlider.value = dims.width;
+                customHeightSlider.value = dims.height;
+                customLengthValue.textContent = `${dims.length.toFixed(2)}m`;
+                customWidthValue.textContent = `${dims.width.toFixed(2)}m`;
+                customHeightValue.textContent = `${dims.height.toFixed(2)}m`;
+
+                // Update dropdown display for Custom with saved dimensions
+                const customOption = customSelect.querySelector('.custom-option[data-value="custom"]');
+                if (customOption) {
+                    const dimensionText = `${dims.length.toFixed(1)}m × ${dims.width.toFixed(2)}m × ${dims.height.toFixed(1)}m`;
+                    customOption.querySelector('.option-dimensions').textContent = dimensionText;
+                }
+            }
+
+            customLengthSlider.addEventListener('input', () => {
+                const length = parseFloat(customLengthSlider.value);
+                customLengthValue.textContent = `${length.toFixed(2)}m`;
                 if (this.currentVehicle === 'custom') {
-                    this.loadCustomVehicle();
+                    this.updateCustomDimensions(length, parseFloat(customWidthSlider.value), parseFloat(customHeightSlider.value));
                 }
             });
-        });
-        
+
+            customWidthSlider.addEventListener('input', () => {
+                const width = parseFloat(customWidthSlider.value);
+                customWidthValue.textContent = `${width.toFixed(2)}m`;
+                if (this.currentVehicle === 'custom') {
+                    this.updateCustomDimensions(parseFloat(customLengthSlider.value), width, parseFloat(customHeightSlider.value));
+                }
+            });
+
+            customHeightSlider.addEventListener('input', () => {
+                const height = parseFloat(customHeightSlider.value);
+                customHeightValue.textContent = `${height.toFixed(2)}m`;
+                if (this.currentVehicle === 'custom') {
+                    this.updateCustomDimensions(parseFloat(customLengthSlider.value), parseFloat(customWidthSlider.value), height);
+                }
+            });
+        }
+
         // Setup SOLO dimension sliders
         if (soloLengthSlider && soloHeightSlider) {
             // Load saved dimensions if they exist
@@ -357,11 +424,130 @@ class UI {
                 }
             }
         }
-        
-        // Set initial selection
-        options[0].classList.add('selected');
-        this.currentVehicle = 'standard';
-        this.loadVehicle('standard');
+
+        // Setup distance sliders for axle configuration
+        const distanceSliders = [
+            // Standard trailer
+            { id: 'distFrontToKingpin', valueId: 'distFrontToKingpinValue', decimals: 2 },
+            { id: 'distKingpinToTrailer', valueId: 'distKingpinToTrailerValue', decimals: 2 },
+            { id: 'distFrontAxleToKingpin', valueId: 'distFrontAxleToKingpinValue', decimals: 2 },
+            { id: 'distKingpinToDrive', valueId: 'distKingpinToDriveValue', decimals: 2 },
+            // SOLO
+            { id: 'distCargoStartToFront', valueId: 'distCargoStartToFrontValue', decimals: 2 },
+            { id: 'distCargoStartToDrive', valueId: 'distCargoStartToDriveValue', decimals: 2 },
+            // JUMBO
+            { id: 'distSection1StartToFront', valueId: 'distSection1StartToFrontValue', decimals: 2 },
+            { id: 'distSection1StartToDrive', valueId: 'distSection1StartToDriveValue', decimals: 2 },
+            { id: 'distSection2StartToTrailerAxles', valueId: 'distSection2StartToTrailerAxlesValue', decimals: 2 }
+        ];
+
+        distanceSliders.forEach(sliderConfig => {
+            const slider = document.getElementById(sliderConfig.id);
+            const valueDisplay = document.getElementById(sliderConfig.valueId);
+
+            if (slider && valueDisplay) {
+                slider.addEventListener('input', () => {
+                    const value = parseFloat(slider.value);
+                    valueDisplay.textContent = `${value.toFixed(sliderConfig.decimals)}m`;
+
+                    // Trigger axle calculation update
+                    if (this.axleCalculator) {
+                        this.updateAxleConfiguration();
+                    }
+                });
+            }
+        });
+
+        // Initialize UI with saved vehicle type or default to 'standard'
+        const savedVehicleType = this.currentVehicle; // Already loaded in constructor from localStorage
+
+        // Find and select the appropriate option in dropdown
+        const selectedOption = Array.from(options).find(opt => opt.dataset.value === savedVehicleType);
+        if (selectedOption) {
+            // Remove selection from all options first
+            options.forEach(opt => opt.classList.remove('selected'));
+            // Select the saved option
+            selectedOption.classList.add('selected');
+
+            // Update dropdown trigger display
+            const name = selectedOption.querySelector('.option-name').textContent;
+            const dimensions = selectedOption.querySelector('.option-dimensions').textContent;
+            customSelectTrigger.querySelector('.option-name').textContent = name;
+            customSelectTrigger.querySelector('.option-dimensions').textContent = dimensions;
+
+            // Update hidden select
+            vehicleSelect.value = savedVehicleType;
+
+            // Show/hide appropriate dimension sliders
+            if (savedVehicleType === 'custom') {
+                customDimensions.classList.remove('hidden');
+                soloDimensionSliders.classList.add('hidden');
+                jumboDimensionSliders.classList.add('hidden');
+
+                // Load saved Custom dimensions
+                const savedDimensions = localStorage.getItem('customDimensions');
+                if (savedDimensions) {
+                    const dims = JSON.parse(savedDimensions);
+                    customLengthSlider.value = dims.length;
+                    customWidthSlider.value = dims.width;
+                    customHeightSlider.value = dims.height;
+                    customLengthValue.textContent = `${dims.length.toFixed(2)}m`;
+                    customWidthValue.textContent = `${dims.width.toFixed(2)}m`;
+                    customHeightValue.textContent = `${dims.height.toFixed(2)}m`;
+                }
+                this.loadCustomVehicle();
+            } else if (savedVehicleType === 'solo') {
+                customDimensions.classList.add('hidden');
+                soloDimensionSliders.classList.remove('hidden');
+                jumboDimensionSliders.classList.add('hidden');
+
+                // Load saved SOLO dimensions
+                const savedDimensions = localStorage.getItem('soloDimensions');
+                if (savedDimensions) {
+                    const dims = JSON.parse(savedDimensions);
+                    soloLengthSlider.value = dims.length;
+                    soloHeightSlider.value = dims.height;
+                    soloLengthValue.textContent = `${dims.length.toFixed(2)}m`;
+                    soloHeightValue.textContent = `${dims.height.toFixed(1)}m`;
+                }
+                this.loadVehicle(savedVehicleType);
+            } else if (savedVehicleType === 'jumbo') {
+                customDimensions.classList.add('hidden');
+                soloDimensionSliders.classList.add('hidden');
+                jumboDimensionSliders.classList.remove('hidden');
+
+                // Load saved JUMBO dimensions
+                const savedDimensions = localStorage.getItem('jumboDimensions');
+                if (savedDimensions) {
+                    try {
+                        const dims = JSON.parse(savedDimensions);
+                        if (dims && dims.section1 && dims.section2) {
+                            jumboSection1LengthSlider.value = dims.section1.length;
+                            jumboSection1HeightSlider.value = dims.section1.height;
+                            jumboSection2LengthSlider.value = dims.section2.length;
+                            jumboSection2HeightSlider.value = dims.section2.height;
+                            jumboSection1LengthValue.textContent = `${dims.section1.length.toFixed(2)}m`;
+                            jumboSection1HeightValue.textContent = `${dims.section1.height.toFixed(1)}m`;
+                            jumboSection2LengthValue.textContent = `${dims.section2.length.toFixed(2)}m`;
+                            jumboSection2HeightValue.textContent = `${dims.section2.height.toFixed(1)}m`;
+                        }
+                    } catch (e) {
+                        console.log('Invalid JUMBO dimensions in localStorage, using defaults');
+                    }
+                }
+                this.loadVehicle(savedVehicleType);
+            } else {
+                customDimensions.classList.add('hidden');
+                soloDimensionSliders.classList.add('hidden');
+                jumboDimensionSliders.classList.add('hidden');
+                this.loadVehicle(savedVehicleType);
+            }
+        } else {
+            // Fallback to default 'standard' if saved type not found
+            options[0].classList.add('selected');
+            this.currentVehicle = 'standard';
+            this.loadVehicle('standard');
+        }
     }
     
     loadVehicle(vehicleType, previousVehicleType = null) {
@@ -471,15 +657,26 @@ class UI {
             : (vehicle.length * vehicle.width * vehicle.height).toFixed(1);
         document.getElementById('volumeInfo').textContent = `${volume} m³`;
         document.getElementById('maxLoadInput').value = (vehicle.maxLoad / 1000).toFixed(2);
-        
+
+        // Show axle load panel for standard vehicles
+        const axleLoadPanel = document.querySelector('.axle-load-indicator');
+        if (axleLoadPanel) {
+            axleLoadPanel.style.display = '';
+        }
+
         this.updateAxleIndicators();
-        
+
+        // Update 3D axle load visualization after vehicle change
+        if (this.scene3d.showAxleLoads) {
+            this.scene3d.updateAxleLoadVisualization();
+        }
+
         // Auto arrange cargo if there are items
         if (this.cargoManager.cargoItems.length > 0) {
             this.autoArrangeCargo();
         }
     }
-    
+
     updateSoloDimensions(length, height) {
         // Save SOLO dimensions to localStorage
         localStorage.setItem('soloDimensions', JSON.stringify({
@@ -547,15 +744,20 @@ class UI {
             distCargoStartToDrive: this.axleCalculator.axleConfig.distCargoStartToDrive
         });
         this.updateAxleIndicators();
-        
+
+        // Update 3D axle load visualization after SOLO dimensions change
+        if (this.scene3d.showAxleLoads) {
+            this.scene3d.updateAxleLoadVisualization();
+        }
+
         // Auto arrange cargo if there are items
         if (this.cargoManager.cargoItems.length > 0) {
             this.autoArrangeCargo();
         }
-        
+
         this.updateStatistics();
     }
-    
+
     updateJumboDimensions(section1Length, section1Height, section2Length, section2Height) {
         // Save JUMBO dimensions to localStorage
         localStorage.setItem('jumboDimensions', JSON.stringify({
@@ -630,54 +832,114 @@ class UI {
             trailerAxlePosition: trailerAxlePosition
         });
         this.updateAxleIndicators();
-        
+
+        // Update 3D axle load visualization after JUMBO dimensions change
+        if (this.scene3d.showAxleLoads) {
+            this.scene3d.updateAxleLoadVisualization();
+        }
+
         // Auto arrange cargo if there are items
         if (this.cargoManager.cargoItems.length > 0) {
             this.autoArrangeCargo();
         }
-        
+
         this.updateStatistics();
     }
-    
-    loadCustomVehicle() {
-        const length = parseFloat(document.getElementById('customLength').value);
-        const width = parseFloat(document.getElementById('customWidth').value);
-        const height = parseFloat(document.getElementById('customHeight').value);
-        
+
+    updateCustomDimensions(length, width, height) {
+        // Save Custom dimensions to localStorage
+        localStorage.setItem('customDimensions', JSON.stringify({
+            length: length,
+            width: width,
+            height: height
+        }));
+
         const customVehicle = {
             name: 'Własne wymiary',
             length: length,
             width: width,
             height: height,
             maxLoad: 24000,
-            axles: {
-                front: { position: length * 0.1, maxLoad: 7500 },
-                rear: { position: length * 0.85, maxLoad: 24000 }
-            }
+            isCustomSpace: true
         };
-        
+
+        const containerDimensions = {
+            length: length,
+            width: width,
+            height: height,
+            isCustomSpace: true
+        };
+
+        // Update the scene and cargo manager
+        this.cargoManager.setContainer(containerDimensions, customVehicle.maxLoad);
+        this.cargoManager.currentVehicleType = 'custom';
+
+        // Update UI info
+        document.getElementById('dimensionsInfo').textContent = `${length.toFixed(2)} × ${width.toFixed(2)} × ${height.toFixed(2)} m`;
+        const volume = (length * width * height).toFixed(1);
+        document.getElementById('volumeInfo').textContent = `${volume} m³`;
+
+        // Update dropdown display for Custom
+        const customSelect = document.getElementById('vehicleSelect');
+        const customSelectTrigger = customSelect.querySelector('.custom-select-trigger');
+        const customOption = customSelect.querySelector('.custom-option[data-value="custom"]');
+
+        if (customOption) {
+            const dimensionText = `${length.toFixed(1)}m × ${width.toFixed(2)}m × ${height.toFixed(1)}m`;
+            customOption.querySelector('.option-dimensions').textContent = dimensionText;
+
+            // If Custom is currently selected, update the trigger display too
+            if (this.currentVehicle === 'custom') {
+                customSelectTrigger.querySelector('.option-dimensions').textContent = dimensionText;
+            }
+        }
+
         // Store current vehicle config for modal
         this.currentVehicleConfig = customVehicle;
-        
+
+        this.updateStatistics();
+    }
+
+    loadCustomVehicle() {
+        const length = parseFloat(document.getElementById('customLengthSlider').value);
+        const width = parseFloat(document.getElementById('customWidthSlider').value);
+        const height = parseFloat(document.getElementById('customHeightSlider').value);
+
+        const customVehicle = {
+            name: 'Własne wymiary',
+            length: length,
+            width: width,
+            height: height,
+            maxLoad: 24000,
+            isCustomSpace: true  // Flag to indicate this is a pure cargo space without truck/axles
+        };
+
+        // Store current vehicle config for modal
+        this.currentVehicleConfig = customVehicle;
+
         // Update Steel Coil availability (custom vehicles don't have groove)
         this.updateSteelCoilAvailability(false);
-        
-        // First update axle configuration so it's available when creating container visualization
-        this.axleCalculator.setVehicle(customVehicle);
-        
+
+        // Hide axle load panel for custom space
+        const axleLoadPanel = document.querySelector('.axle-load-indicator');
+        if (axleLoadPanel) {
+            axleLoadPanel.style.display = 'none';
+        }
+
+        // Remove 3D axle load visualization if exists
+        this.scene3d.removeAxleLoadVisualization();
+
         this.cargoManager.setContainer(
-            { length: length, width: width, height: height },
+            { length: length, width: width, height: height, isCustomSpace: true },
             customVehicle.maxLoad
         );
         this.cargoManager.currentVehicleType = 'custom';
-        
+
         document.getElementById('dimensionsInfo').textContent = `${length} × ${width} × ${height} m`;
         const volume = (length * width * height).toFixed(1);
         document.getElementById('volumeInfo').textContent = `${volume} m³`;
         document.getElementById('maxLoadInput').value = (customVehicle.maxLoad / 1000).toFixed(2);
-        
-        this.updateAxleIndicators();
-        
+
         // Auto arrange cargo if there are items
         if (this.cargoManager.cargoItems.length > 0) {
             this.autoArrangeCargo();
@@ -728,7 +990,46 @@ class UI {
             }
         }
     }
-    
+
+    setupDimensionButtons() {
+        // Select all slider increment/decrement buttons
+        const sliderButtons = document.querySelectorAll('.slider-btn');
+
+        sliderButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Get the slider ID from data-slider attribute
+                const sliderId = button.dataset.slider;
+                const slider = document.getElementById(sliderId);
+
+                if (!slider) return;
+
+                // Get current value and step
+                const currentValue = parseFloat(slider.value);
+                const step = parseFloat(slider.step) || 0.05;
+                const min = parseFloat(slider.min);
+                const max = parseFloat(slider.max);
+
+                // Determine if this is increment (+) or decrement (-) button
+                const isIncrement = button.textContent.trim() === '+';
+
+                // Calculate new value
+                let newValue = isIncrement ? currentValue + step : currentValue - step;
+
+                // Clamp to min/max bounds
+                newValue = Math.max(min, Math.min(max, newValue));
+
+                // Round to avoid floating point precision issues
+                newValue = Math.round(newValue * 100) / 100;
+
+                // Update slider value
+                slider.value = newValue;
+
+                // Trigger 'input' event to activate existing handlers
+                slider.dispatchEvent(new Event('input'));
+            });
+        });
+    }
+
     setupCargoUnits() {
         const presetCards = document.querySelectorAll('.unit-preset-card');
         
@@ -2240,11 +2541,8 @@ class UI {
         this.updateStatistics();
         this.updateAxleIndicators();
         // Don't call updateLoadedUnitsList to avoid infinite loop
-        
-        // Update center of gravity
-        this.cargoManager.updateCenterOfGravity();
     }
-    
+
     addItemToGroup(groupId) {
         // Find first item in group to use as template
         const templateItem = this.cargoManager.cargoItems.find(item => item.groupId === groupId);
@@ -2682,9 +2980,14 @@ class UI {
     }
     
     updateAxleIndicators() {
+        // Skip for custom space (no axles)
+        if (this.currentVehicleConfig?.isCustomSpace) {
+            return;
+        }
+
         this.axleCalculator.updateCargo(this.cargoManager.cargoItems);
         const axleLoads = this.axleCalculator.calculateAxleLoads();
-        
+
         if (!axleLoads) return;
         
         const frontAxleElement = document.querySelector('.front-axle');
@@ -2772,9 +3075,12 @@ class UI {
             
             // Get cargo groups for annotations
             const cargoGroups = this.getCargoGroups();
-            
-            // Get multiple views from 3D scene with annotations (including side view for page 3)
-            const views = await this.scene3d.getMultipleViews(cargoGroups, true);
+
+            // Check if custom space (no truck/axles)
+            const isCustomSpace = this.currentVehicleConfig?.isCustomSpace || this.currentVehicle === 'custom';
+
+            // Get multiple views from 3D scene with annotations (including side view for page 3, unless custom space)
+            const views = await this.scene3d.getMultipleViews(cargoGroups, !isCustomSpace);
             
             // Initialize jsPDF (landscape A4) with compression enabled
             const { jsPDF } = window.jspdf;
@@ -2881,76 +3187,78 @@ class UI {
                 // Add top view image with JPEG format and FAST compression
                 pdf.addImage(topView.image, 'JPEG', xPos, yPos, imgWidth, imgHeight, undefined, 'FAST');
             }
-            
-            // Page 3: Vehicle Summary & Axle Configuration
-            pdf.addPage();
-            // Add plan name at the top
-            pdf.setFontSize(14);
-            pdf.setFont(undefined, 'bold');
-            pdf.text(planName, pageWidth / 2, 8, { align: 'center' });
-            
-            // Add summary title below plan name
-            pdf.setFontSize(12);
-            pdf.setFont(undefined, 'normal');
-            pdf.text('Vehicle Configuration & Load Summary', pageWidth / 2, 14, { align: 'center' });
-            
-            // Add watermark text
-            pdf.setFontSize(9);
-            pdf.setFont(undefined, 'italic');
-            pdf.setTextColor(100, 100, 100);
-            pdf.text('Planned and generated on', 5, 5, { align: 'left' });
-            pdf.text('Transport-Nomad.com', 5, 9, { align: 'left' });
-            pdf.setFont(undefined, 'normal');
-            pdf.setTextColor(0, 0, 0);
-            
-            let yPosition = 25;
-            
-            // Vehicle Specifications Section
-            this.addVehicleSpecificationsSection(pdf, yPosition);
-            yPosition = 90; // Fixed position after specifications
-            
-            // Side view with axle loads (bottom half of the page)
-            const sideView = views.find(v => v.name === 'side');
-            if (sideView) {
-                // Add section title
-                pdf.setFontSize(11);
+
+            // Page 3: Vehicle Summary & Axle Configuration (skip for custom space)
+            if (!isCustomSpace) {
+                pdf.addPage();
+                // Add plan name at the top
+                pdf.setFontSize(14);
                 pdf.setFont(undefined, 'bold');
-                pdf.setTextColor(41, 98, 255);
-                pdf.text('Load Distribution & Axle Loads', 15, yPosition);
-                yPosition += 5;
-                
-                // Add disclaimer about axle load calculations
-                pdf.setFontSize(8);
+                pdf.text(planName, pageWidth / 2, 8, { align: 'center' });
+
+                // Add summary title below plan name
+                pdf.setFontSize(12);
+                pdf.setFont(undefined, 'normal');
+                pdf.text('Vehicle Configuration & Load Summary', pageWidth / 2, 14, { align: 'center' });
+
+                // Add watermark text
+                pdf.setFontSize(9);
                 pdf.setFont(undefined, 'italic');
-                pdf.setTextColor(100, 116, 139);
-                const disclaimerText = 'Note: Axle load calculations are based on empty weights and distances between reference points which may vary depending on truck and trailer manufacturers. Always verify that the empty weights and distances match those used in the settings.';
-                const splitDisclaimer = pdf.splitTextToSize(disclaimerText, pageWidth - 30);
-                pdf.text(splitDisclaimer, 15, yPosition);
-                yPosition += splitDisclaimer.length * 3 + 2;
-                
-                // Add side view image with axle load visualization
-                // Full width of the page - the side view has 3:1 ratio for wide display
-                const xPos = 15;
-                const imgWidth = pageWidth - 30; // Full width minus margins
-                // The side view export is 3000x1000px (3:1 ratio)
-                const imgHeight = imgWidth / 3; // Maintain 3:1 ratio
-                
-                const imgYPos = yPosition;
-                
-                // Add subtle background for the visualization
-                pdf.setFillColor(248, 250, 252);
-                pdf.roundedRect(xPos - 2, imgYPos - 2, imgWidth + 4, imgHeight + 4, 3, 3, 'F');
-                
-                // Add border
-                pdf.setDrawColor(226, 232, 240);
-                pdf.setLineWidth(0.5);
-                pdf.roundedRect(xPos - 2, imgYPos - 2, imgWidth + 4, imgHeight + 4, 3, 3, 'S');
-                
-                // Add side view image with JPEG format and FAST compression
-                pdf.addImage(sideView.image, 'JPEG', xPos, imgYPos, imgWidth, imgHeight, undefined, 'FAST');
+                pdf.setTextColor(100, 100, 100);
+                pdf.text('Planned and generated on', 5, 5, { align: 'left' });
+                pdf.text('Transport-Nomad.com', 5, 9, { align: 'left' });
+                pdf.setFont(undefined, 'normal');
+                pdf.setTextColor(0, 0, 0);
+
+                let yPosition = 25;
+
+                // Vehicle Specifications Section
+                this.addVehicleSpecificationsSection(pdf, yPosition);
+                yPosition = 90; // Fixed position after specifications
+
+                // Side view with axle loads (bottom half of the page)
+                const sideView = views.find(v => v.name === 'side');
+                if (sideView) {
+                    // Add section title
+                    pdf.setFontSize(11);
+                    pdf.setFont(undefined, 'bold');
+                    pdf.setTextColor(41, 98, 255);
+                    pdf.text('Load Distribution & Axle Loads', 15, yPosition);
+                    yPosition += 5;
+
+                    // Add disclaimer about axle load calculations
+                    pdf.setFontSize(8);
+                    pdf.setFont(undefined, 'italic');
+                    pdf.setTextColor(100, 116, 139);
+                    const disclaimerText = 'Note: Axle load calculations are based on empty weights and distances between reference points which may vary depending on truck and trailer manufacturers. Always verify that the empty weights and distances match those used in the settings.';
+                    const splitDisclaimer = pdf.splitTextToSize(disclaimerText, pageWidth - 30);
+                    pdf.text(splitDisclaimer, 15, yPosition);
+                    yPosition += splitDisclaimer.length * 3 + 2;
+
+                    // Add side view image with axle load visualization
+                    // Full width of the page - the side view has 3:1 ratio for wide display
+                    const xPos = 15;
+                    const imgWidth = pageWidth - 30; // Full width minus margins
+                    // The side view export is 3000x1000px (3:1 ratio)
+                    const imgHeight = imgWidth / 3; // Maintain 3:1 ratio
+
+                    const imgYPos = yPosition;
+
+                    // Add subtle background for the visualization
+                    pdf.setFillColor(248, 250, 252);
+                    pdf.roundedRect(xPos - 2, imgYPos - 2, imgWidth + 4, imgHeight + 4, 3, 3, 'F');
+
+                    // Add border
+                    pdf.setDrawColor(226, 232, 240);
+                    pdf.setLineWidth(0.5);
+                    pdf.roundedRect(xPos - 2, imgYPos - 2, imgWidth + 4, imgHeight + 4, 3, 3, 'S');
+
+                    // Add side view image with JPEG format and FAST compression
+                    pdf.addImage(sideView.image, 'JPEG', xPos, imgYPos, imgWidth, imgHeight, undefined, 'FAST');
+                }
             }
-            
-            // Pages 4+: Individual cargo group views
+
+            // Pages 4+ (or 3+ for custom space): Individual cargo group views
             if (cargoGroups.length > 0) {
                 for (let index = 0; index < cargoGroups.length; index++) {
                     const group = cargoGroups[index];
@@ -3232,7 +3540,9 @@ class UI {
             const distKingpinToTrailer = axleSettings.distKingpinToTrailer || 7.7;
             const distFrontAxleToKingpin = axleSettings.distFrontAxleToKingpin || 3.1;
             const distKingpinToDrive = axleSettings.distKingpinToDrive || 0.5;
-            const distTrailerToEnd = axleSettings.distTrailerToEnd || 4.2;
+            // Calculate distTrailerToEnd from container length
+            const containerLength = this.cargoManager.containerDimensions?.length || 13.62;
+            const distTrailerToEnd = containerLength - distFrontToKingpin - distKingpinToTrailer;
             yPos += 4;
             pdf.text(`Kingpin: ${distFrontToKingpin.toFixed(1)}m from container front`, col2X + 35, yPos);
             yPos += 4;
@@ -3594,11 +3904,32 @@ class UI {
                 customDimensions.classList.remove('hidden');
                 soloDimensionSliders.classList.add('hidden');
                 jumboDimensionSliders.classList.add('hidden');
-                
-                // For custom dimensions, just set the container directly
+
+                // Update custom dimension sliders
                 if (config.container) {
-                    this.cargoManager.setContainer(config.container, config.maxLoad);
+                    const customLengthSlider = document.getElementById('customLengthSlider');
+                    const customWidthSlider = document.getElementById('customWidthSlider');
+                    const customHeightSlider = document.getElementById('customHeightSlider');
+                    const customLengthValue = document.getElementById('customLengthValue');
+                    const customWidthValue = document.getElementById('customWidthValue');
+                    const customHeightValue = document.getElementById('customHeightValue');
+
+                    if (customLengthSlider && config.container.length) {
+                        customLengthSlider.value = config.container.length;
+                        customLengthValue.textContent = `${config.container.length.toFixed(2)}m`;
+                    }
+                    if (customWidthSlider && config.container.width) {
+                        customWidthSlider.value = config.container.width;
+                        customWidthValue.textContent = `${config.container.width.toFixed(2)}m`;
+                    }
+                    if (customHeightSlider && config.container.height) {
+                        customHeightSlider.value = config.container.height;
+                        customHeightValue.textContent = `${config.container.height.toFixed(2)}m`;
+                    }
                 }
+
+                // Use loadCustomVehicle to properly set up custom space (with isCustomSpace flag and hidden axle panel)
+                this.loadCustomVehicle();
                 this.currentVehicle = 'custom';
             } else {
                 // Standard vehicles (standard, mega, coilmulde, containers etc.) - hide all dimension controls
@@ -3711,42 +4042,62 @@ class UI {
         if (isSolo) {
             // SOLO distances
             if (document.getElementById('distCargoStartToFront')) {
-                document.getElementById('distCargoStartToFront').value = config.distCargoStartToFront || 1.0;
+                const value = config.distCargoStartToFront || 1.0;
+                document.getElementById('distCargoStartToFront').value = value;
+                const display = document.getElementById('distCargoStartToFrontValue');
+                if (display) display.textContent = `${parseFloat(value).toFixed(2)}m`;
             }
             if (document.getElementById('distCargoStartToDrive')) {
-                // Round to 1 decimal place for display
                 const value = config.distCargoStartToDrive || 5.5;
-                document.getElementById('distCargoStartToDrive').value = (Math.round(value * 10) / 10).toFixed(1);
+                document.getElementById('distCargoStartToDrive').value = value;
+                const display = document.getElementById('distCargoStartToDriveValue');
+                if (display) display.textContent = `${parseFloat(value).toFixed(2)}m`;
             }
         } else if (isJumbo) {
             // JUMBO distances (truck + trailer)
             if (document.getElementById('distSection1StartToFront')) {
-                document.getElementById('distSection1StartToFront').value = config.distSection1StartToFront || 1.0;
+                const value = config.distSection1StartToFront || 1.0;
+                document.getElementById('distSection1StartToFront').value = value;
+                const display = document.getElementById('distSection1StartToFrontValue');
+                if (display) display.textContent = `${parseFloat(value).toFixed(2)}m`;
             }
             if (document.getElementById('distSection1StartToDrive')) {
                 const value = config.distSection1StartToDrive || 5.5;
-                document.getElementById('distSection1StartToDrive').value = (Math.round(value * 10) / 10).toFixed(1);
+                document.getElementById('distSection1StartToDrive').value = value;
+                const display = document.getElementById('distSection1StartToDriveValue');
+                if (display) display.textContent = `${parseFloat(value).toFixed(2)}m`;
             }
             if (document.getElementById('distSection2StartToTrailerAxles')) {
                 const value = config.distSection2StartToTrailerAxles || 5.5;
-                document.getElementById('distSection2StartToTrailerAxles').value = (Math.round(value * 10) / 10).toFixed(1);
+                document.getElementById('distSection2StartToTrailerAxles').value = value;
+                const display = document.getElementById('distSection2StartToTrailerAxlesValue');
+                if (display) display.textContent = `${parseFloat(value).toFixed(2)}m`;
             }
         } else {
             // Trailer distances
             if (document.getElementById('distFrontToKingpin')) {
-                document.getElementById('distFrontToKingpin').value = config.distFrontToKingpin || 1.7;
+                const value = config.distFrontToKingpin || 1.7;
+                document.getElementById('distFrontToKingpin').value = value;
+                const display = document.getElementById('distFrontToKingpinValue');
+                if (display) display.textContent = `${parseFloat(value).toFixed(2)}m`;
             }
             if (document.getElementById('distKingpinToTrailer')) {
-                document.getElementById('distKingpinToTrailer').value = config.distKingpinToTrailer || 7.7;
-            }
-            if (document.getElementById('distTrailerToEnd')) {
-                document.getElementById('distTrailerToEnd').value = config.distTrailerToEnd || 4.2;
+                const value = config.distKingpinToTrailer || 7.7;
+                document.getElementById('distKingpinToTrailer').value = value;
+                const display = document.getElementById('distKingpinToTrailerValue');
+                if (display) display.textContent = `${parseFloat(value).toFixed(2)}m`;
             }
             if (document.getElementById('distFrontAxleToKingpin')) {
-                document.getElementById('distFrontAxleToKingpin').value = config.distFrontAxleToKingpin || 3.1;
+                const value = config.distFrontAxleToKingpin || 3.1;
+                document.getElementById('distFrontAxleToKingpin').value = value;
+                const display = document.getElementById('distFrontAxleToKingpinValue');
+                if (display) display.textContent = `${parseFloat(value).toFixed(2)}m`;
             }
             if (document.getElementById('distKingpinToDrive')) {
-                document.getElementById('distKingpinToDrive').value = config.distKingpinToDrive || 0.5;
+                const value = config.distKingpinToDrive || 0.5;
+                document.getElementById('distKingpinToDrive').value = value;
+                const display = document.getElementById('distKingpinToDriveValue');
+                if (display) display.textContent = `${parseFloat(value).toFixed(2)}m`;
             }
         }
         
@@ -3802,7 +4153,6 @@ class UI {
             config.trailerAxles = parseInt(document.querySelector('input[name="trailerAxles"]:checked').value);
             config.distFrontToKingpin = parseFloat(document.getElementById('distFrontToKingpin').value);
             config.distKingpinToTrailer = parseFloat(document.getElementById('distKingpinToTrailer').value);
-            config.distTrailerToEnd = parseFloat(document.getElementById('distTrailerToEnd').value);
             config.distFrontAxleToKingpin = parseFloat(document.getElementById('distFrontAxleToKingpin').value);
             config.distKingpinToDrive = parseFloat(document.getElementById('distKingpinToDrive').value);
             config.emptyTrailerAxles = parseFloat(document.getElementById('emptyTrailerAxles').value);
@@ -3821,7 +4171,7 @@ class UI {
         
         // Update axle indicators
         this.updateAxleIndicators();
-        
+
         // Save and apply 3D axle loads display setting
         const showAxleLoadsCheckbox = document.getElementById('showAxleLoadsOn3D');
         if (showAxleLoadsCheckbox) {
@@ -3830,14 +4180,63 @@ class UI {
             // Toggle 3D axle load display
             this.scene3d.toggleAxleLoadDisplay(showAxleLoads);
         }
-        
+
         // Update 3D visualization
         this.scene3d.updateAxleVisualization(config);
+
+        // Update 3D axle load labels (positions and values)
+        if (this.scene3d.showAxleLoads) {
+            this.scene3d.updateAxleLoadVisualization();
+        }
     }
-    
+
+    updateAxleConfiguration() {
+        // Read current values from distance sliders and update axle calculator
+        const isSolo = this.currentVehicleConfig?.isSolo || false;
+        const isJumbo = this.currentVehicleConfig?.isJumbo || false;
+
+        const config = {
+            // Get axle counts
+            tractorAxles: parseInt(document.querySelector('input[name="tractorAxles"]:checked')?.value || 1)
+        };
+
+        if (isSolo) {
+            // SOLO settings
+            config.distCargoStartToFront = parseFloat(document.getElementById('distCargoStartToFront').value);
+            config.distCargoStartToDrive = parseFloat(document.getElementById('distCargoStartToDrive').value);
+        } else if (isJumbo) {
+            // JUMBO settings
+            config.trailerAxles = parseInt(document.querySelector('input[name="trailerAxles"]:checked')?.value || 2);
+            config.distSection1StartToFront = parseFloat(document.getElementById('distSection1StartToFront').value);
+            config.distSection1StartToDrive = parseFloat(document.getElementById('distSection1StartToDrive').value);
+            config.distSection2StartToTrailerAxles = parseFloat(document.getElementById('distSection2StartToTrailerAxles').value);
+        } else {
+            // Standard trailer settings
+            config.trailerAxles = parseInt(document.querySelector('input[name="trailerAxles"]:checked')?.value || 3);
+            config.distFrontToKingpin = parseFloat(document.getElementById('distFrontToKingpin').value);
+            config.distKingpinToTrailer = parseFloat(document.getElementById('distKingpinToTrailer').value);
+            config.distFrontAxleToKingpin = parseFloat(document.getElementById('distFrontAxleToKingpin').value);
+            config.distKingpinToDrive = parseFloat(document.getElementById('distKingpinToDrive').value);
+        }
+
+        // Update axle calculator configuration
+        this.axleCalculator.updateAxleConfiguration(config);
+
+        // Update axle indicators
+        this.updateAxleIndicators();
+
+        // Update 3D visualization
+        this.scene3d.updateAxleVisualization(config);
+
+        // Update 3D axle load labels (positions and values)
+        if (this.scene3d.showAxleLoads) {
+            this.scene3d.updateAxleLoadVisualization();
+        }
+    }
+
     // Removed - group selection is now only available via context menu (RMB)
     // handleGroupClick(event, group) { ... }
-    
+
     setupGroupSelectionCallbacks() {
         // Set up callback for group selection changes
         this.cargoManager.onGroupSelectionChanged = (groupId) => {

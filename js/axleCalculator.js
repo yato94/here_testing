@@ -5,24 +5,69 @@ class AxleConfiguration {
         // Load saved settings or use defaults
         this.loadSettings();
     }
-    
+
+    // Helper method to clamp distance values to valid ranges
+    clampDistance(value, min, max, defaultValue) {
+        const num = parseFloat(value);
+        if (isNaN(num)) return defaultValue;
+        return Math.max(min, Math.min(max, num));
+    }
+
+    // Define valid ranges for all distance parameters
+    getValidRanges() {
+        return {
+            // Standard trailer
+            distFrontToKingpin: { min: 1.0, max: 2.15, default: 1.7 },
+            distKingpinToTrailer: { min: 6.5, max: 9.0, default: 7.7 },
+            distFrontAxleToKingpin: { min: 2.5, max: 4.0, default: 3.1 },
+            distKingpinToDrive: { min: 0.2, max: 1.5, default: 0.5 },
+            // SOLO
+            distCargoStartToFront: { min: 0.5, max: 2.5, default: 1.0 },
+            distCargoStartToDrive: { min: 3.0, max: 7.5, default: 5.5 },
+            // JUMBO
+            distSection1StartToFront: { min: 0.5, max: 2.5, default: 1.0 },
+            distSection1StartToDrive: { min: 3.0, max: 7.5, default: 5.5 },
+            distSection2StartToTrailerAxles: { min: 3.0, max: 7.5, default: 5.5 }
+        };
+    }
+
     setVehicle(vehicleType, vehicleConfig = null) {
         this.currentVehicle = vehicleType;
         this.vehicleConfig = vehicleConfig;
         this.loadSettings();
-        
+
+        const ranges = this.getValidRanges();
+
         // If vehicleConfig has axle positions, update them AFTER loadSettings (for SOLO dynamic sizing)
         if (vehicleConfig?.axles?.rear?.position !== undefined && vehicleConfig?.isSolo) {
-            this.distCargoStartToDrive = vehicleConfig.axles.rear.position;
+            const range = ranges.distCargoStartToDrive;
+            this.distCargoStartToDrive = this.clampDistance(
+                vehicleConfig.axles.rear.position,
+                range.min,
+                range.max,
+                range.default
+            );
         }
-        
+
         // If vehicleConfig has axle positions, update them AFTER loadSettings (for JUMBO dynamic sizing)
         if (vehicleConfig?.isJumbo && vehicleConfig?.axles) {
             if (vehicleConfig.axles.rear?.position !== undefined) {
-                this.distSection1StartToDrive = vehicleConfig.axles.rear.position;
+                const range = ranges.distSection1StartToDrive;
+                this.distSection1StartToDrive = this.clampDistance(
+                    vehicleConfig.axles.rear.position,
+                    range.min,
+                    range.max,
+                    range.default
+                );
             }
             if (vehicleConfig.axles.trailer?.position !== undefined) {
-                this.distSection2StartToTrailerAxles = vehicleConfig.axles.trailer.position;
+                const range = ranges.distSection2StartToTrailerAxles;
+                this.distSection2StartToTrailerAxles = this.clampDistance(
+                    vehicleConfig.axles.trailer.position,
+                    range.min,
+                    range.max,
+                    range.default
+                );
             }
         }
     }
@@ -30,9 +75,22 @@ class AxleConfiguration {
     loadSettings() {
         const settingsKey = `axleSettings_${this.currentVehicle}`;
         const saved = localStorage.getItem(settingsKey);
+        const ranges = this.getValidRanges();
+
         if (saved) {
             const settings = JSON.parse(saved);
-            Object.assign(this, settings);
+
+            // Validate and clamp all distance values
+            for (const [key, value] of Object.entries(settings)) {
+                if (ranges[key]) {
+                    // This is a distance parameter - validate it
+                    const range = ranges[key];
+                    this[key] = this.clampDistance(value, range.min, range.max, range.default);
+                } else {
+                    // Not a distance parameter - assign directly
+                    this[key] = value;
+                }
+            }
         } else {
             // Check if this is a SOLO or JUMBO vehicle
             const isSolo = this.vehicleConfig?.isSolo || false;
@@ -89,7 +147,6 @@ class AxleConfiguration {
                 // Distances (in meters)
                 this.distFrontToKingpin = 1.7; // Front of trailer to kingpin
                 this.distKingpinToTrailer = 7.7; // Kingpin to center of trailer axle group
-                this.distTrailerToEnd = 4.2; // Center of trailer axles to end
                 this.distFrontAxleToKingpin = 3.1; // Front axle to kingpin
                 this.distKingpinToDrive = 0.5; // Kingpin to center of drive axles
                 
@@ -146,7 +203,6 @@ class AxleConfiguration {
                 trailerAxles: this.trailerAxles,
                 distFrontToKingpin: this.distFrontToKingpin,
                 distKingpinToTrailer: this.distKingpinToTrailer,
-                distTrailerToEnd: this.distTrailerToEnd,
                 distFrontAxleToKingpin: this.distFrontAxleToKingpin,
                 distKingpinToDrive: this.distKingpinToDrive,
                 emptyFrontAxle: this.emptyFrontAxle,
@@ -167,7 +223,26 @@ class AxleConfiguration {
         localStorage.removeItem(settingsKey);
         this.loadSettings();
     }
-    
+
+    // Calculate distance from trailer axles to container end
+    // This value is derived from: containerLength - distFrontToKingpin - distKingpinToTrailer
+    getDistTrailerToEnd() {
+        if (!this.vehicleConfig) {
+            return 4.2; // Default fallback
+        }
+
+        const isSolo = this.vehicleConfig?.isSolo || false;
+        const isJumbo = this.vehicleConfig?.isJumbo || false;
+
+        // Only applicable for standard trailer vehicles
+        if (isSolo || isJumbo) {
+            return null; // Not applicable for SOLO or JUMBO
+        }
+
+        const containerLength = this.vehicleConfig.length || 13.62;
+        return containerLength - this.distFrontToKingpin - this.distKingpinToTrailer;
+    }
+
     // Get individual axle positions for multi-axle groups
     getDriveAxlePositions() {
         const positions = [];
@@ -258,8 +333,9 @@ class AxleCalculator {
     getVehicleTypeFromConfig(vehicleConfig) {
         // Map vehicle names to types used in localStorage keys
         const nameToType = {
-            'Naczepa standardowa': 'standard',
-            'Mega trailer': 'mega',
+            'Standard': 'standard',
+            'MEGA': 'mega',
+            'Frigo': 'frigo',
             'JUMBO': 'jumbo',
             'Kontener 20\'': 'container20',
             'Kontener 40\'': 'container40',
@@ -296,7 +372,7 @@ class AxleCalculator {
         if (config.tractorAxles === 1) {
             config.maxDriveAxles = 11500; // 11.5 tons for single drive axle
         } else if (config.tractorAxles === 2) {
-            config.maxDriveAxles = 18000; // 18 tons for tandem drive axles
+            config.maxDriveAxles = 19000; // 19 tons for tandem drive axles
         }
         
         // Update max trailer axles load based on count (if not SOLO)
@@ -761,36 +837,5 @@ class AxleCalculator {
         });
         
         return optimizedOrder;
-    }
-    
-    validateStability(centerOfGravity) {
-        if (!centerOfGravity || !this.vehicleConfig) {
-            return { stable: true, warnings: [] };
-        }
-        
-        const warnings = [];
-        let stable = true;
-        
-        const maxHeightRatio = 0.6;
-        const heightRatio = centerOfGravity.y / this.vehicleConfig.height;
-        if (heightRatio > maxHeightRatio) {
-            warnings.push('Środek ciężkości jest zbyt wysoko - ryzyko wywrócenia');
-            stable = false;
-        }
-        
-        const maxLateralOffset = this.vehicleConfig.width * 0.2;
-        if (Math.abs(centerOfGravity.z) > maxLateralOffset) {
-            warnings.push('Środek ciężkości jest przesunięty na bok - nierównomierne obciążenie');
-            stable = false;
-        }
-        
-        const idealLongitudinalCenter = 0;
-        const maxLongitudinalOffset = this.vehicleConfig.length * 0.15;
-        if (Math.abs(centerOfGravity.x - idealLongitudinalCenter) > maxLongitudinalOffset) {
-            warnings.push('Środek ciężkości jest zbyt przesunięty wzdłuż pojazdu');
-            stable = false;
-        }
-        
-        return { stable, warnings };
     }
 }

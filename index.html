@@ -19,8 +19,8 @@
                         <div class="custom-select" id="vehicleSelect">
                             <div class="custom-select-trigger">
                                 <div class="selected-option">
-                                    <div class="option-name">Naczepa standardowa</div>
-                                    <div class="option-dimensions">13.6m × 2.48m × 2.7m</div>
+                                    <div class="option-name"></div>
+                                    <div class="option-dimensions"></div>
                                 </div>
                                 <svg class="select-arrow" viewBox="0 0 24 24" width="20" height="20">
                                     <path d="M7 10l5 5 5-5z" fill="currentColor"/>
@@ -28,12 +28,16 @@
                             </div>
                             <div class="custom-options hidden">
                                 <div class="custom-option" data-value="standard">
-                                    <div class="option-name">Naczepa standardowa</div>
+                                    <div class="option-name">Standard</div>
                                     <div class="option-dimensions">13.6m × 2.48m × 2.7m</div>
                                 </div>
                                 <div class="custom-option" data-value="mega">
-                                    <div class="option-name">Mega trailer</div>
+                                    <div class="option-name">MEGA</div>
                                     <div class="option-dimensions">13.6m × 2.48m × 3m</div>
+                                </div>
+                                <div class="custom-option" data-value="frigo">
+                                    <div class="option-name">Frigo</div>
+                                    <div class="option-dimensions">13.31m × 2.46m × 2.65m</div>
                                 </div>
                                 <div class="custom-option" data-value="jumbo">
                                     <div class="option-name">JUMBO</div>
@@ -70,8 +74,9 @@
                             </div>
                         </div>
                         <select id="vehicleType" class="hidden-select">
-                            <option value="standard">Naczepa standardowa</option>
-                            <option value="mega">Mega trailer</option>
+                            <option value="standard">Standard</option>
+                            <option value="mega">MEGA</option>
+                            <option value="frigo">Frigo</option>
                             <option value="jumbo">JUMBO</option>
                             <option value="solo">SOLO</option>
                             <option value="coilmuldeStandard">Coilmulde Standard</option>
@@ -83,39 +88,56 @@
                         </select>
                     </div>
                     
+                    <!-- Suwaki dla Własne wymiary -->
                     <div id="customDimensions" class="custom-dimensions hidden">
-                        <div class="input-group">
-                            <label>Długość (m)</label>
-                            <input type="number" id="customLength" step="0.1" value="13.6">
+                        <div class="slider-group-inline">
+                            <label for="customLengthSlider">Długość:</label>
+                            <button class="slider-btn" data-slider="customLengthSlider">-</button>
+                            <input type="range" id="customLengthSlider" class="dimension-slider"
+                                   min="0.5" max="20" step="0.05" value="13.6">
+                            <button class="slider-btn" data-slider="customLengthSlider">+</button>
+                            <span id="customLengthValue" class="slider-value">13.60m</span>
                         </div>
-                        <div class="input-group">
-                            <label>Szerokość (m)</label>
-                            <input type="number" id="customWidth" step="0.1" value="2.48">
+                        <div class="slider-group-inline">
+                            <label for="customWidthSlider">Szerokość:</label>
+                            <button class="slider-btn" data-slider="customWidthSlider">-</button>
+                            <input type="range" id="customWidthSlider" class="dimension-slider"
+                                   min="0.5" max="3" step="0.05" value="2.48">
+                            <button class="slider-btn" data-slider="customWidthSlider">+</button>
+                            <span id="customWidthValue" class="slider-value">2.48m</span>
                         </div>
-                        <div class="input-group">
-                            <label>Wysokość (m)</label>
-                            <input type="number" id="customHeight" step="0.1" value="2.7">
+                        <div class="slider-group-inline">
+                            <label for="customHeightSlider">Wysokość:</label>
+                            <button class="slider-btn" data-slider="customHeightSlider">-</button>
+                            <input type="range" id="customHeightSlider" class="dimension-slider"
+                                   min="0.5" max="4" step="0.05" value="2.7">
+                            <button class="slider-btn" data-slider="customHeightSlider">+</button>
+                            <span id="customHeightValue" class="slider-value">2.70m</span>
                         </div>
                     </div>
 
                     <div class="vehicle-info">
                         <div class="info-item">
                             <span class="info-label">Wymiary:</span>
-                            <span id="dimensionsInfo" class="info-value">13.6 × 2.48 × 2.7 m</span>
+                            <span id="dimensionsInfo" class="info-value"></span>
                         </div>
                         
                         <!-- Suwaki dla SOLO -->
                         <div id="soloDimensionSliders" class="solo-sliders hidden">
                             <div class="slider-group-inline">
                                 <label for="soloLengthSlider">Długość:</label>
-                                <input type="range" id="soloLengthSlider" class="dimension-slider" 
+                                <button class="slider-btn" data-slider="soloLengthSlider">-</button>
+                                <input type="range" id="soloLengthSlider" class="dimension-slider"
                                        min="6" max="10" step="0.05" value="7.7">
+                                <button class="slider-btn" data-slider="soloLengthSlider">+</button>
                                 <span id="soloLengthValue" class="slider-value">7.70m</span>
                             </div>
                             <div class="slider-group-inline">
                                 <label for="soloHeightSlider">Wysokość:</label>
-                                <input type="range" id="soloHeightSlider" class="dimension-slider" 
+                                <button class="slider-btn" data-slider="soloHeightSlider">-</button>
+                                <input type="range" id="soloHeightSlider" class="dimension-slider"
                                        min="2.4" max="3" step="0.05" value="3">
+                                <button class="slider-btn" data-slider="soloHeightSlider">+</button>
                                 <span id="soloHeightValue" class="slider-value">3.0m</span>
                             </div>
                         </div>
@@ -126,14 +148,18 @@
                                 <h4 class="section-title">Sekcja 1 (Ciężarówka):</h4>
                                 <div class="slider-group-inline">
                                     <label for="jumboSection1LengthSlider">Długość:</label>
-                                    <input type="range" id="jumboSection1LengthSlider" class="dimension-slider" 
+                                    <button class="slider-btn" data-slider="jumboSection1LengthSlider">-</button>
+                                    <input type="range" id="jumboSection1LengthSlider" class="dimension-slider"
                                            min="6" max="8" step="0.05" value="7.7">
+                                    <button class="slider-btn" data-slider="jumboSection1LengthSlider">+</button>
                                     <span id="jumboSection1LengthValue" class="slider-value">7.70m</span>
                                 </div>
                                 <div class="slider-group-inline">
                                     <label for="jumboSection1HeightSlider">Wysokość:</label>
-                                    <input type="range" id="jumboSection1HeightSlider" class="dimension-slider" 
+                                    <button class="slider-btn" data-slider="jumboSection1HeightSlider">-</button>
+                                    <input type="range" id="jumboSection1HeightSlider" class="dimension-slider"
                                            min="2.4" max="3" step="0.05" value="3">
+                                    <button class="slider-btn" data-slider="jumboSection1HeightSlider">+</button>
                                     <span id="jumboSection1HeightValue" class="slider-value">3.0m</span>
                                 </div>
                             </div>
@@ -141,14 +167,18 @@
                                 <h4 class="section-title">Sekcja 2 (Przyczepa):</h4>
                                 <div class="slider-group-inline">
                                     <label for="jumboSection2LengthSlider">Długość:</label>
-                                    <input type="range" id="jumboSection2LengthSlider" class="dimension-slider" 
+                                    <button class="slider-btn" data-slider="jumboSection2LengthSlider">-</button>
+                                    <input type="range" id="jumboSection2LengthSlider" class="dimension-slider"
                                            min="6" max="8" step="0.05" value="7.7">
+                                    <button class="slider-btn" data-slider="jumboSection2LengthSlider">+</button>
                                     <span id="jumboSection2LengthValue" class="slider-value">7.70m</span>
                                 </div>
                                 <div class="slider-group-inline">
                                     <label for="jumboSection2HeightSlider">Wysokość:</label>
-                                    <input type="range" id="jumboSection2HeightSlider" class="dimension-slider" 
+                                    <button class="slider-btn" data-slider="jumboSection2HeightSlider">-</button>
+                                    <input type="range" id="jumboSection2HeightSlider" class="dimension-slider"
                                            min="2.4" max="3" step="0.05" value="3">
+                                    <button class="slider-btn" data-slider="jumboSection2HeightSlider">+</button>
                                     <span id="jumboSection2HeightValue" class="slider-value">3.0m</span>
                                 </div>
                             </div>
@@ -156,12 +186,12 @@
                         
                         <div class="info-item">
                             <span class="info-label">Objętość:</span>
-                            <span id="volumeInfo" class="info-value">90 m³</span>
+                            <span id="volumeInfo" class="info-value"></span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Max. ładowność:</span>
                             <div class="max-load-container">
-                                <input type="number" id="maxLoadInput" class="max-load-input" value="24.00" min="0.01" step="0.01">
+                                <input type="number" id="maxLoadInput" class="max-load-input" min="0.01" step="0.01">
                                 <span class="input-unit">t</span>
                             </div>
                         </div>
@@ -1233,84 +1263,103 @@
                     <div class="settings-grid">
                         <!-- Standard trailer distances -->
                         <div class="settings-field trailer-distance">
-                            <label>Przód naczepy → Siodło</label>
-                            <div class="input-group">
-                                <input type="number" id="distFrontToKingpin" value="1.7" min="0.5" max="3" step="0.1">
-                                <span class="unit">m</span>
+                            <div class="slider-group-inline">
+                                <label for="distFrontToKingpin">Przód naczepy → Siodło:</label>
+                                <button class="slider-btn" data-slider="distFrontToKingpin">-</button>
+                                <input type="range" id="distFrontToKingpin" class="dimension-slider"
+                                       min="1.0" max="2.15" step="0.05" value="1.7">
+                                <button class="slider-btn" data-slider="distFrontToKingpin">+</button>
+                                <span id="distFrontToKingpinValue" class="slider-value">1.70m</span>
                             </div>
                         </div>
 
                         <div class="settings-field trailer-distance">
-                            <label>Siodło → Środek osi naczepy</label>
-                            <div class="input-group">
-                                <input type="number" id="distKingpinToTrailer" value="7.7" min="5" max="10" step="0.1">
-                                <span class="unit">m</span>
+                            <div class="slider-group-inline">
+                                <label for="distKingpinToTrailer">Siodło → Środek osi naczepy:</label>
+                                <button class="slider-btn" data-slider="distKingpinToTrailer">-</button>
+                                <input type="range" id="distKingpinToTrailer" class="dimension-slider"
+                                       min="6.5" max="9.0" step="0.05" value="7.7">
+                                <button class="slider-btn" data-slider="distKingpinToTrailer">+</button>
+                                <span id="distKingpinToTrailerValue" class="slider-value">7.70m</span>
                             </div>
                         </div>
 
                         <div class="settings-field trailer-distance">
-                            <label>Środek osi naczepy → Koniec naczepy</label>
-                            <div class="input-group">
-                                <input type="number" id="distTrailerToEnd" value="4.2" min="2" max="6" step="0.1">
-                                <span class="unit">m</span>
+                            <div class="slider-group-inline">
+                                <label for="distFrontAxleToKingpin">Oś przednia → Siodło:</label>
+                                <button class="slider-btn" data-slider="distFrontAxleToKingpin">-</button>
+                                <input type="range" id="distFrontAxleToKingpin" class="dimension-slider"
+                                       min="2.5" max="4.0" step="0.05" value="3.1">
+                                <button class="slider-btn" data-slider="distFrontAxleToKingpin">+</button>
+                                <span id="distFrontAxleToKingpinValue" class="slider-value">3.10m</span>
                             </div>
                         </div>
 
                         <div class="settings-field trailer-distance">
-                            <label>Oś przednia → Siodło</label>
-                            <div class="input-group">
-                                <input type="number" id="distFrontAxleToKingpin" value="3.1" min="2" max="4" step="0.1">
-                                <span class="unit">m</span>
-                            </div>
-                        </div>
-
-                        <div class="settings-field trailer-distance">
-                            <label>Siodło → Środek osi napędowych</label>
-                            <div class="input-group">
-                                <input type="number" id="distKingpinToDrive" value="0.5" min="0.3" max="2" step="0.1">
-                                <span class="unit">m</span>
+                            <div class="slider-group-inline">
+                                <label for="distKingpinToDrive">Siodło → Środek osi napędowych:</label>
+                                <button class="slider-btn" data-slider="distKingpinToDrive">-</button>
+                                <input type="range" id="distKingpinToDrive" class="dimension-slider"
+                                       min="0.2" max="1.5" step="0.05" value="0.5">
+                                <button class="slider-btn" data-slider="distKingpinToDrive">+</button>
+                                <span id="distKingpinToDriveValue" class="slider-value">0.50m</span>
                             </div>
                         </div>
                         
                         <!-- SOLO distances -->
                         <div class="settings-field solo-distance" style="display: none;">
-                            <label>Początek przestrzeni → Oś przednia</label>
-                            <div class="input-group">
-                                <input type="number" id="distCargoStartToFront" value="1.0" min="1" max="4" step="0.1">
-                                <span class="unit">m</span>
+                            <div class="slider-group-inline">
+                                <label for="distCargoStartToFront">Początek przestrzeni → Oś przednia:</label>
+                                <button class="slider-btn" data-slider="distCargoStartToFront">-</button>
+                                <input type="range" id="distCargoStartToFront" class="dimension-slider"
+                                       min="0.5" max="2.5" step="0.05" value="1.0">
+                                <button class="slider-btn" data-slider="distCargoStartToFront">+</button>
+                                <span id="distCargoStartToFrontValue" class="slider-value">1.00m</span>
                             </div>
                         </div>
 
                         <div class="settings-field solo-distance" style="display: none;">
-                            <label>Początek przestrzeni → Środek osi napędowych</label>
-                            <div class="input-group">
-                                <input type="number" id="distCargoStartToDrive" value="5.5" min="3" max="6" step="0.1">
-                                <span class="unit">m</span>
+                            <div class="slider-group-inline">
+                                <label for="distCargoStartToDrive">Początek przestrzeni → Środek osi napędowych:</label>
+                                <button class="slider-btn" data-slider="distCargoStartToDrive">-</button>
+                                <input type="range" id="distCargoStartToDrive" class="dimension-slider"
+                                       min="3.0" max="7.5" step="0.05" value="5.5">
+                                <button class="slider-btn" data-slider="distCargoStartToDrive">+</button>
+                                <span id="distCargoStartToDriveValue" class="slider-value">5.50m</span>
                             </div>
                         </div>
                         
                         <!-- JUMBO distances -->
                         <div class="settings-field jumbo-distance" style="display: none;">
-                            <label>Sekcja 1: Początek → Oś przednia</label>
-                            <div class="input-group">
-                                <input type="number" id="distSection1StartToFront" value="1.0" min="1" max="4" step="0.1">
-                                <span class="unit">m</span>
+                            <div class="slider-group-inline">
+                                <label for="distSection1StartToFront">Sekcja 1: Początek → Oś przednia:</label>
+                                <button class="slider-btn" data-slider="distSection1StartToFront">-</button>
+                                <input type="range" id="distSection1StartToFront" class="dimension-slider"
+                                       min="0.5" max="2.5" step="0.05" value="1.0">
+                                <button class="slider-btn" data-slider="distSection1StartToFront">+</button>
+                                <span id="distSection1StartToFrontValue" class="slider-value">1.00m</span>
                             </div>
                         </div>
 
                         <div class="settings-field jumbo-distance" style="display: none;">
-                            <label>Sekcja 1: Początek → Osie napędowe</label>
-                            <div class="input-group">
-                                <input type="number" id="distSection1StartToDrive" value="5.5" min="3" max="6" step="0.1">
-                                <span class="unit">m</span>
+                            <div class="slider-group-inline">
+                                <label for="distSection1StartToDrive">Sekcja 1: Początek → Osie napędowe:</label>
+                                <button class="slider-btn" data-slider="distSection1StartToDrive">-</button>
+                                <input type="range" id="distSection1StartToDrive" class="dimension-slider"
+                                       min="3.0" max="7.5" step="0.05" value="5.5">
+                                <button class="slider-btn" data-slider="distSection1StartToDrive">+</button>
+                                <span id="distSection1StartToDriveValue" class="slider-value">5.50m</span>
                             </div>
                         </div>
-                        
+
                         <div class="settings-field jumbo-distance" style="display: none;">
-                            <label>Sekcja 2: Początek → Osie przyczepy</label>
-                            <div class="input-group">
-                                <input type="number" id="distSection2StartToTrailerAxles" value="5.5" min="3" max="6" step="0.1">
-                                <span class="unit">m</span>
+                            <div class="slider-group-inline">
+                                <label for="distSection2StartToTrailerAxles">Sekcja 2: Początek → Osie przyczepy:</label>
+                                <button class="slider-btn" data-slider="distSection2StartToTrailerAxles">-</button>
+                                <input type="range" id="distSection2StartToTrailerAxles" class="dimension-slider"
+                                       min="3.0" max="7.5" step="0.05" value="5.5">
+                                <button class="slider-btn" data-slider="distSection2StartToTrailerAxles">+</button>
+                                <span id="distSection2StartToTrailerAxlesValue" class="slider-value">5.50m</span>
                             </div>
                         </div>
                     </div>

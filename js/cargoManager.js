@@ -568,8 +568,7 @@ class CargoManager {
                         }
                     });
                 });
-                
-                this.updateCenterOfGravity();
+
                 return { success: false, unpackedCount: totalUnpacked };
             }
         } else {
@@ -701,9 +700,8 @@ class CargoManager {
                         item.isOutside = true;
                     });
                 });
-                
+
                 const totalExceeded = itemsExceedingLimit.reduce((sum, stack) => sum + stack.items.length, 0);
-                this.updateCenterOfGravity();
                 return { success: false, unpackedCount: totalUnpacked, exceedingWeightCount: totalExceeded };
             }
         }
@@ -730,10 +728,9 @@ class CargoManager {
                 item.isOutside = true;
             });
         });
-        
+
         const totalExceeded = itemsExceedingLimit.reduce((sum, stack) => sum + stack.items.length, 0);
-        this.updateCenterOfGravity();
-        
+
         if (totalExceeded > 0) {
             return { success: true, unpackedCount: 0, exceedingWeightCount: totalExceeded };
         }
@@ -1084,9 +1081,7 @@ class CargoManager {
                 });
             });
         }
-        
-        this.updateCenterOfGravity();
-        
+
         if (totalUnpacked > 0) {
             return { success: false, unpackedCount: totalUnpacked };
         }
@@ -1108,44 +1103,8 @@ class CargoManager {
         };
         
         cargoItem.mesh = this.scene3d.addCargo(meshData);
-        this.updateCenterOfGravity();
     }
-    
-    calculateCenterOfGravity() {
-        if (this.cargoItems.length === 0) {
-            return null;
-        }
-        
-        let totalWeightedX = 0;
-        let totalWeightedY = 0;
-        let totalWeightedZ = 0;
-        let totalWeight = 0;
-        
-        this.cargoItems.forEach(item => {
-            // Only include items inside the container for center of gravity
-            if (item.position && !item.isOutside) {
-                totalWeightedX += item.position.x * item.weight;
-                totalWeightedY += item.position.y * item.weight;
-                totalWeightedZ += item.position.z * item.weight;
-                totalWeight += item.weight;
-            }
-        });
-        
-        if (totalWeight === 0) return null;
-        
-        return {
-            x: totalWeightedX / totalWeight,
-            y: totalWeightedY / totalWeight,
-            z: totalWeightedZ / totalWeight
-        };
-    }
-    
-    updateCenterOfGravity() {
-        const centerOfGravity = this.calculateCenterOfGravity();
-        this.scene3d.updateCenterOfGravity(centerOfGravity);
-        return centerOfGravity;
-    }
-    
+
     getStatistics() {
         // Separate items inside and outside the container
         const placedItems = this.cargoItems.filter(item => item.position !== null && !item.isOutside);
@@ -1169,8 +1128,7 @@ class CargoManager {
             insideWeight: insideWeight,
             maxLoad: this.maxLoad,
             weightUsage: (insideWeight / this.maxLoad) * 100,
-            volumeUsage: (usedVolume / containerVolume) * 100,
-            centerOfGravity: this.calculateCenterOfGravity()
+            volumeUsage: (usedVolume / containerVolume) * 100
         };
     }
     
@@ -1283,9 +1241,7 @@ class CargoManager {
                 }
             });
         }
-        
-        this.updateCenterOfGravity();
-        
+
         // Return the vehicle type so UI can update
         return { vehicleType };
     }
@@ -1304,11 +1260,8 @@ class CargoManager {
                 }
             }
         });
-        
-        // Update center of gravity after movement
-        this.updateCenterOfGravity();
     }
-    
+
     selectGroup(groupId) {
         if (this.selectedGroupId === groupId) {
             return; // Already selected

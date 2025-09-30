@@ -12,7 +12,6 @@ class Scene3D {
         this.cargoMeshes = [];
         this.cargoGroup = null;
         this.hoveredObject = null;
-        this.centerOfGravityMarker = null;
         this.geometryCache = new Map();
         
         // Ruler properties
@@ -143,17 +142,19 @@ class Scene3D {
         if (this.containerMesh) {
             this.scene.remove(this.containerMesh);
         }
-        
+
         // Store dimensions for later use
         this.containerDimensions = dimensions;
-        
+
         const containerGroup = new THREE.Group();
-        
+
         // Get trailer height (default 1.2m if not specified)
         const trailerHeight = dimensions.trailerHeight || 1.1;
-        
-        // Add truck and wheels visualization
-        this.addTruckAndWheels(containerGroup, dimensions, trailerHeight);
+
+        // Add truck and wheels visualization (skip for custom space)
+        if (!dimensions.isCustomSpace) {
+            this.addTruckAndWheels(containerGroup, dimensions, trailerHeight);
+        }
         
         // Check if this is a JUMBO with sections
         if (dimensions.sections && dimensions.sections.length > 0) {
@@ -491,7 +492,6 @@ class Scene3D {
             trailerAxles: isSolo ? 0 : (window.axleCalculator.axleConfig.trailerAxles || 3),
             distFrontToKingpin: window.axleCalculator.axleConfig.distFrontToKingpin || 1.7,
             distKingpinToTrailer: window.axleCalculator.axleConfig.distKingpinToTrailer || 7.7,
-            distTrailerToEnd: window.axleCalculator.axleConfig.distTrailerToEnd || 4.2,
             distFrontAxleToKingpin: window.axleCalculator.axleConfig.distFrontAxleToKingpin || 3.1,
             distKingpinToDrive: window.axleCalculator.axleConfig.distKingpinToDrive || 0.5,
             distCargoStartToFront: window.axleCalculator.axleConfig.distCargoStartToFront || 1.0,
@@ -506,7 +506,6 @@ class Scene3D {
             trailerAxles: isSolo ? 0 : 3,
             distFrontToKingpin: 1.7,
             distKingpinToTrailer: 7.7,
-            distTrailerToEnd: 4.2,
             distFrontAxleToKingpin: 3.1,
             distKingpinToDrive: 0.5,
             distCargoStartToFront: 1.0,
@@ -1178,24 +1177,7 @@ class Scene3D {
         }
         this.cargoMeshes = [];
     }
-    
-    updateCenterOfGravity(centerPoint) {
-        if (this.centerOfGravityMarker) {
-            this.scene.remove(this.centerOfGravityMarker);
-        }
-        
-        if (!centerPoint) return;
-        
-        const geometry = new THREE.SphereGeometry(0.1, 16, 16);
-        const material = new THREE.MeshBasicMaterial({ 
-            color: CONFIG.colors.centerOfGravity
-        });
-        
-        this.centerOfGravityMarker = new THREE.Mesh(geometry, material);
-        this.centerOfGravityMarker.position.copy(centerPoint);
-        this.scene.add(this.centerOfGravityMarker);
-    }
-    
+
     setView(viewType) {
         const container = this.containerMesh;
         if (!container) return;
@@ -2709,6 +2691,10 @@ class Scene3D {
     }
     
     removeUnit(mesh) {
+        // Hide ruler and dimension labels if visible
+        this.hideRuler();
+        this.hideDimensionLabels();
+
         // Get all units above this one (they will fall down)
         const unitsAbove = this.getAllObjectsAbove(mesh).filter(u => u !== mesh);
         
@@ -5752,7 +5738,7 @@ class Scene3D {
         return 'th';
     }
     
-    createInfoBoxSprite(group, position) {
+    createInfoBoxSprite(group, position, baseBoxWidth = 4.28) {
         // Create canvas for the info box - matching UI card style
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
@@ -5980,8 +5966,10 @@ class Scene3D {
         sprite.position.copy(position);
         // Default scale - can be overridden by caller
         const scaleFactor = position.userData?.scale || 1.0;
-        sprite.scale.set(4.28 * scaleFactor, 2.30 * scaleFactor, 1); // Base scale reduced by 20% total (was 5.31, 2.85)
-        
+        // Use dynamic box dimensions based on container size (maintaining aspect ratio)
+        const boxHeight = baseBoxWidth * 0.537; // Maintain original 4.28:2.30 ratio (≈2:1)
+        sprite.scale.set(baseBoxWidth * scaleFactor, boxHeight * scaleFactor, 1); // Dynamic scale based on container size
+
         return sprite;
     }
     
@@ -6085,12 +6073,16 @@ class Scene3D {
         const actualGroups = groupsWithPositions;
         
         // Calculate box dimensions in world space (accounting for scale)
+        // Dynamic sizing based on container length for better adaptation to custom dimensions
+        // Formula: 25% of container length, with min 2.0m and max 6.0m limits
+        const baseBoxWidth = Math.min(Math.max(containerLength * 0.25, 2.0), 6.0);
+
         // For SOLO in top view, apply additional 30% reduction (20% + 10% = 30%)
         let topRowScale = viewName === 'top' ? 0.95 : 1.0; // Top view boxes are 5% smaller
         if (isSolo && viewName === 'top') {
             topRowScale *= 0.7; // Additional 30% reduction for SOLO in top view (0.95 * 0.7 = 0.665)
         }
-        const boxWidth = 4.28 * topRowScale; // Current sprite scale X
+        const boxWidth = baseBoxWidth * topRowScale; // Dynamically scaled sprite width
         const minSpacing = 0.3; // Minimum space between boxes
         const effectiveBoxWidth = boxWidth + minSpacing;
         
@@ -6148,16 +6140,17 @@ class Scene3D {
                 boxPosition.userData = { scale: scale };
             }
             
-            // Create sprite for info box with full group data
-            const sprite = this.createInfoBoxSprite(group, boxPosition);
+            // Create sprite for info box with full group data (pass baseBoxWidth for dynamic sizing)
+            const sprite = this.createInfoBoxSprite(group, boxPosition, baseBoxWidth);
             annotationGroup.add(sprite);
             
             // Find the closest unit from the group to the infobox
             const closestUnitPosition = this.getClosestGroupItem(group.items, boxPosition);
-            
+
             // Calculate edge point on info box
             // For top row infoboxes: line goes to bottom edge
-            const infoBoxHeight = 2.30 * (boxPosition.userData?.scale || 1);
+            const boxHeight = baseBoxWidth * 0.537; // Maintain aspect ratio
+            const infoBoxHeight = boxHeight * (boxPosition.userData?.scale || 1);
             
             // Bottom center of the infobox (Y-axis is vertical)
             const edgePoint = new THREE.Vector3(
@@ -6253,18 +6246,19 @@ class Scene3D {
                     };
                 }
                 
-                // Create sprite for info box with full group data
-                const sprite = this.createInfoBoxSprite(group, boxPosition);
+                // Create sprite for info box with full group data (pass baseBoxWidth for dynamic sizing)
+                const sprite = this.createInfoBoxSprite(group, boxPosition, baseBoxWidth);
                 annotationGroup.add(sprite);
                 
                 // Skip leader lines for overflow markers
                 if (!group.isOverflowMarker) {
                     // Find the closest unit from the group to the infobox
                     const closestUnitPosition = this.getClosestGroupItem(group.items, boxPosition);
-                    
+
                     // Calculate edge point on info box
                     // For bottom row infoboxes: line goes to top edge
-                    const infoBoxHeight = 2.30 * (boxPosition.userData?.scale || 1);
+                    const boxHeight = baseBoxWidth * 0.537; // Maintain aspect ratio
+                    const infoBoxHeight = boxHeight * (boxPosition.userData?.scale || 1);
                     
                     // Top center of the infobox (Y-axis is vertical)
                     const edgePoint = new THREE.Vector3(
@@ -6916,11 +6910,16 @@ class Scene3D {
     }
     
     createAxleLoadVisualization() {
+        // Skip for custom space (no truck/axles)
+        if (this.containerDimensions?.isCustomSpace) {
+            return null;
+        }
+
         const group = new THREE.Group();
-        
+
         // Get axle load data from the UI - filter out hidden elements
         const allIndicators = document.querySelectorAll('.axle-load-indicator .axle-item');
-        const axleIndicators = Array.from(allIndicators).filter(el => 
+        const axleIndicators = Array.from(allIndicators).filter(el =>
             el.style.display !== 'none' && window.getComputedStyle(el).display !== 'none'
         );
         if (axleIndicators.length === 0) {
@@ -7312,37 +7311,17 @@ class Scene3D {
             this.removeAxleLoadVisualization();
             return;
         }
-        
-        // Get current axle configuration
-        const config = window.axleCalculator?.axleConfig || {};
-        const currentTractorAxles = config.tractorAxles || 1;
-        const currentTrailerAxles = config.trailerAxles || 3;
-        
-        // Check if axle configuration has changed (need to recreate visualization)
-        const configChanged = this.axleLoadGroup && (
-            this.axleLoadGroup.userData.tractorAxles !== currentTractorAxles ||
-            this.axleLoadGroup.userData.trailerAxles !== currentTrailerAxles
-        );
-        
-        // Check if we need to create new visualization or update existing
-        if (!this.axleLoadGroup || configChanged) {
-            // Remove old visualization if it exists
-            if (this.axleLoadGroup) {
-                this.scene.remove(this.axleLoadGroup);
-                this.axleLoadGroup = null;
-            }
-            
-            // Create new visualization
-            this.axleLoadGroup = this.createAxleLoadVisualization();
-            if (this.axleLoadGroup) {
-                // Store configuration for change detection
-                this.axleLoadGroup.userData.tractorAxles = currentTractorAxles;
-                this.axleLoadGroup.userData.trailerAxles = currentTrailerAxles;
-                this.scene.add(this.axleLoadGroup);
-            }
-        } else {
-            // Update existing labels with new values
-            this.updateExistingAxleLabels();
+
+        // Remove old visualization if it exists
+        if (this.axleLoadGroup) {
+            this.scene.remove(this.axleLoadGroup);
+            this.axleLoadGroup = null;
+        }
+
+        // Always create new visualization to ensure positions and values are correct
+        this.axleLoadGroup = this.createAxleLoadVisualization();
+        if (this.axleLoadGroup) {
+            this.scene.add(this.axleLoadGroup);
         }
     }
     

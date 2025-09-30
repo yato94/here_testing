@@ -1,7 +1,7 @@
 const CONFIG = {
     vehicles: {
         standard: {
-            name: 'Naczepa standardowa',
+            name: 'Standard',
             length: 13.62,
             width: 2.48,
             height: 2.7,
@@ -15,10 +15,24 @@ const CONFIG = {
             trailerHeight: 1.2  // wysokość podłogi naczepy nad ziemią
         },
         mega: {
-            name: 'Mega trailer',
+            name: 'MEGA',
             length: 13.62,
             width: 2.48,
             height: 3.0,
+            maxLoad: 24000,
+            axles: {
+                kingPin: { position: 1.7 },
+                trailer: { position: 9.4, maxLoad: 24000, emptyWeight: 5200 },
+                front: { position: -1.4, maxLoad: 10000, emptyWeight: 5800 },
+                rear: { position: 2.2, maxLoad: 11500, emptyWeight: 3600 }
+            },
+            trailerHeight: 1.2
+        },
+        frigo: {
+            name: 'Frigo',
+            length: 13.31,
+            width: 2.46,
+            height: 2.65,
             maxLoad: 24000,
             axles: {
                 kingPin: { position: 1.7 },
@@ -54,11 +68,11 @@ const CONFIG = {
             width: 2.44,
             height: 2.59,
             maxLoad: 28000,
+            isSolo: true,  // Flag to identify SOLO-type container (no trailer wheels)
             axles: {
-                kingPin: { position: 1.7 },
-                trailer: { position: 5.0, maxLoad: 24000, emptyWeight: 5200 },
-                front: { position: -1.4, maxLoad: 10000, emptyWeight: 5800 },
-                rear: { position: 1.2, maxLoad: 11500, emptyWeight: 3600 }
+                // For container on chassis: positions are from cargo space start
+                front: { position: -1.0, maxLoad: 10000, emptyWeight: 5800 },  // 1.0m before cargo start
+                rear: { position: 4.3, maxLoad: 11500, emptyWeight: 3600 }   // 4.3m from cargo start
             },
             trailerHeight: 1.2
         },
@@ -241,8 +255,7 @@ const CONFIG = {
         ground: 0xf0f0f0,
         gridHelper: 0x888888,
         selectedCargo: 0x00ff00,
-        hoveredCargo: 0xffff00,
-        centerOfGravity: 0xff0000
+        hoveredCargo: 0xffff00
     },
     
     grid: {
