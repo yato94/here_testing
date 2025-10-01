@@ -972,7 +972,7 @@
                 <div class="scene-top-bar">
                     <div class="logo-section">
                         <a href="https://transport-nomad.com" target="_blank" class="logo-link">
-                            <img src="https://transport-nomad.com/images/logo-black.png" alt="Transport Nomad" class="scene-logo">
+                            <img id="app-logo" src="" alt="Transport Nomad" class="scene-logo">
                         </a>
                     </div>
                     <div class="scene-controls">
@@ -1575,6 +1575,10 @@
     <script src="js/cargoManager.js"></script>
     <script src="js/axleCalculator.js"></script>
     <script src="js/ui.js"></script>
+    <script>
+        // Set logo URL from config
+        document.getElementById('app-logo').src = CONFIG.LOGO_URL;
+    </script>
     <script src="js/main.js"></script>
 </body>
 </html>

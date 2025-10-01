@@ -3064,20 +3064,42 @@ class UI {
             driveItem.title = '';
         }
     }
-    
+
+    async loadLogoAsDataURL(logoPath) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous"; // Enable CORS
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/png'));
+            };
+            img.onerror = function() {
+                reject(new Error('Failed to load logo'));
+            };
+            img.src = logoPath;
+        });
+    }
+
     async exportToPDF() {
         try {
             // Show loading indicator
             this.showNotification('Generating PDF...', 'info');
-            
+
             // Update axle load indicators to ensure current data is displayed
             this.updateAxleIndicators();
-            
+
             // Get cargo groups for annotations
             const cargoGroups = this.getCargoGroups();
 
             // Check if custom space (no truck/axles)
             const isCustomSpace = this.currentVehicleConfig?.isCustomSpace || this.currentVehicle === 'custom';
+
+            // Load logo as data URL
+            const logoDataURL = await this.loadLogoAsDataURL(CONFIG.LOGO_URL);
 
             // Get multiple views from 3D scene with annotations (including side view for page 3, unless custom space)
             const views = await this.scene3d.getMultipleViews(cargoGroups, !isCustomSpace);
@@ -3107,13 +3129,20 @@ class UI {
             pdf.setFont(undefined, 'normal');
             pdf.text('Load Plan - Perspective View', pageWidth / 2, 14, { align: 'center' });
             
-            // Add watermark text
+            // Add logo on the left
+            if (logoDataURL) {
+                const logoWidth = 25; // mm
+                const logoHeight = logoWidth / 3.39; // Aspect ratio 1351x398
+                pdf.addImage(logoDataURL, 'PNG', 5, 5, logoWidth, logoHeight);
+            }
+
+            // Add watermark text next to logo
             pdf.setFontSize(9);
             pdf.setFont(undefined, 'italic');
             pdf.setTextColor(100, 100, 100);
-            pdf.text('Planned and generated on', 5, 5, { align: 'left' });
-            pdf.text('Transport-Nomad.com', 5, 9, { align: 'left' });
-            
+            pdf.text('Planned and generated on', 32, 7, { align: 'left' });
+            pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
+
             // Add date
             pdf.setFontSize(10);
             pdf.setFont(undefined, 'normal');
@@ -3166,15 +3195,23 @@ class UI {
             pdf.setFont(undefined, 'normal');
             pdf.text('Load Plan - Top View', pageWidth / 2, 14, { align: 'center' });
             
-            // Add watermark text
+            // Add logo on the left
+            if (logoDataURL) {
+                const logoWidth = 25; // mm
+                const logoHeight = logoWidth / 3.39; // Aspect ratio 1351x398
+                pdf.addImage(logoDataURL, 'PNG', 5, 5, logoWidth, logoHeight);
+            }
+
+            // Add watermark text next to logo
             pdf.setFontSize(9);
             pdf.setFont(undefined, 'italic');
             pdf.setTextColor(100, 100, 100);
-            pdf.text('Planned and generated on', 5, 5, { align: 'left' });
-            pdf.text('Transport-Nomad.com', 5, 9, { align: 'left' });
+            pdf.text('Planned and generated on', 32, 7, { align: 'left' });
+            pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
+
             pdf.setFont(undefined, 'normal');
             pdf.setTextColor(0, 0, 0);
-            
+
             // Find top view
             const topView = views.find(v => v.name === 'top');
             
@@ -3201,12 +3238,20 @@ class UI {
                 pdf.setFont(undefined, 'normal');
                 pdf.text('Vehicle Configuration & Load Summary', pageWidth / 2, 14, { align: 'center' });
 
-                // Add watermark text
+                // Add logo on the left
+                if (logoDataURL) {
+                    const logoWidth = 25; // mm
+                    const logoHeight = logoWidth / 3.39; // Aspect ratio 1351x398
+                    pdf.addImage(logoDataURL, 'PNG', 5, 5, logoWidth, logoHeight);
+                }
+
+                // Add watermark text next to logo
                 pdf.setFontSize(9);
                 pdf.setFont(undefined, 'italic');
                 pdf.setTextColor(100, 100, 100);
-                pdf.text('Planned and generated on', 5, 5, { align: 'left' });
-                pdf.text('Transport-Nomad.com', 5, 9, { align: 'left' });
+                pdf.text('Planned and generated on', 32, 7, { align: 'left' });
+                pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
+
                 pdf.setFont(undefined, 'normal');
                 pdf.setTextColor(0, 0, 0);
 
@@ -3277,15 +3322,23 @@ class UI {
                     const groupTitle = `Group ${index + 1}: ${group.name || 'Unnamed'} (× ${group.count})`;
                     pdf.text(groupTitle, pageWidth / 2, 14, { align: 'center' });
                     
-                    // Add watermark text
+                    // Add logo on the left
+                    if (logoDataURL) {
+                        const logoWidth = 25; // mm
+                        const logoHeight = logoWidth / 3.39; // Aspect ratio 1351x398
+                        pdf.addImage(logoDataURL, 'PNG', 5, 5, logoWidth, logoHeight);
+                    }
+
+                    // Add watermark text next to logo
                     pdf.setFontSize(9);
                     pdf.setFont(undefined, 'italic');
                     pdf.setTextColor(100, 100, 100);
-                    pdf.text('Planned and generated on', 5, 5, { align: 'left' });
-                    pdf.text('Transport-Nomad.com', 5, 9, { align: 'left' });
+                    pdf.text('Planned and generated on', 32, 7, { align: 'left' });
+                    pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
+
                     pdf.setFont(undefined, 'normal');
                     pdf.setTextColor(0, 0, 0);
-                    
+
                     // Capture group view with transparency for other units
                     const groupId = group.items && group.items.length > 0 ? group.items[0].groupId : null;
                     

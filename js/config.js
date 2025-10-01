@@ -261,5 +261,8 @@ const CONFIG = {
     grid: {
         size: 20,
         divisions: 40
-    }
+    },
+
+    // Logo URL - relative path to logo file (works on GitHub Pages and local servers)
+    LOGO_URL: 'logo_black_small_com.png'
 };

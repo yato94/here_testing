@@ -751,7 +751,38 @@ class Scene3D {
         const cabinGeometry = new THREE.EdgesGeometry(cabinBoxGeometry);
         const cabinEdges = new THREE.LineSegments(cabinGeometry, lineMaterial);
         cabinEdges.position.set(cabinX, chassisTopY + cabinHeight/2, 0);
-        
+
+        // Add logo on cabin sides
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.crossOrigin = "anonymous"; // Enable CORS
+        const logoTexture = textureLoader.load(CONFIG.LOGO_URL);
+        const logoAspectRatio = 3.39; // Real aspect ratio of logo (1351x398)
+        const logoHeight = cabinHeight * 0.18; // 18% of cabin height
+        const logoWidth = logoHeight * logoAspectRatio;
+
+        const logoGeometry = new THREE.PlaneGeometry(logoWidth, logoHeight);
+        const logoMaterial = new THREE.MeshBasicMaterial({
+            map: logoTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+
+        // Calculate logo Y position (lower part of cabin)
+        const logoY = chassisTopY + cabinHeight * 0.10;
+
+        // Left side logo
+        const logoLeft = new THREE.Mesh(logoGeometry, logoMaterial);
+        logoLeft.position.set(cabinX, logoY, -cabinWidth/2 - 0.05);
+        logoLeft.rotation.y = Math.PI; // Rotate 180° to face outward (left)
+
+        // Right side logo
+        const logoRight = new THREE.Mesh(logoGeometry, logoMaterial);
+        logoRight.position.set(cabinX, logoY, cabinWidth/2 + 0.05);
+        logoRight.rotation.y = 0; // Face outward (right), no rotation needed
+
+        this.truckVisualizationGroup.add(logoLeft);
+        this.truckVisualizationGroup.add(logoRight);
+
         // Create filled chassis using ExtrudeGeometry
         // Extrude along Z axis
         const chassisExtrudeSettings = {
