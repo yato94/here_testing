@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,9 +12,9 @@
         <div class="main-content">
             <!-- Panel lewy -->
             <aside class="left-panel" id="leftPanel">
-                <!-- Wybór przestrzeni ładunkowej -->
+                <!-- Cargo Space Selection -->
                 <section class="panel-section container-settings-section">
-                    <h3 class="section-title">Przestrzeń ładunkowa</h3>
+                    <h3 class="section-title">Cargo Space</h3>
                     <div class="custom-select-wrapper">
                         <div class="custom-select" id="vehicleSelect">
                             <div class="custom-select-trigger">
@@ -49,27 +49,27 @@
                                 </div>
                                 <div class="custom-option" data-value="coilmuldeStandard">
                                     <div class="option-name">Coilmulde Standard</div>
-                                    <div class="option-dimensions">13.6m × 2.48m × 2.7m (z rowkiem)</div>
+                                    <div class="option-dimensions">13.6m × 2.48m × 2.7m (with groove)</div>
                                 </div>
                                 <div class="custom-option" data-value="coilmuldeMega">
                                     <div class="option-name">Coilmulde Mega</div>
-                                    <div class="option-dimensions">13.6m × 2.48m × 3m (z rowkiem)</div>
+                                    <div class="option-dimensions">13.6m × 2.48m × 3m (with groove)</div>
                                 </div>
                                 <div class="custom-option" data-value="container20">
-                                    <div class="option-name">Kontener 20'</div>
+                                    <div class="option-name">Container 20'</div>
                                     <div class="option-dimensions">6.06m × 2.44m × 2.59m</div>
                                 </div>
                                 <div class="custom-option" data-value="container40">
-                                    <div class="option-name">Kontener 40'</div>
+                                    <div class="option-name">Container 40'</div>
                                     <div class="option-dimensions">12.19m × 2.44m × 2.59m</div>
                                 </div>
                                 <div class="custom-option" data-value="container40hc">
-                                    <div class="option-name">Kontener 40' HC</div>
+                                    <div class="option-name">Container 40' HC</div>
                                     <div class="option-dimensions">12.19m × 2.44m × 2.90m</div>
                                 </div>
                                 <div class="custom-option" data-value="custom">
-                                    <div class="option-name">Własne wymiary</div>
-                                    <div class="option-dimensions">Zdefiniuj własne parametry</div>
+                                    <div class="option-name">Custom Dimensions</div>
+                                    <div class="option-dimensions">Define your own parameters</div>
                                 </div>
                             </div>
                         </div>
@@ -81,17 +81,17 @@
                             <option value="solo">SOLO</option>
                             <option value="coilmuldeStandard">Coilmulde Standard</option>
                             <option value="coilmuldeMega">Coilmulde Mega</option>
-                            <option value="container20">Kontener 20'</option>
-                            <option value="container40">Kontener 40'</option>
-                            <option value="container40hc">Kontener 40' HC</option>
-                            <option value="custom">Własne wymiary</option>
+                            <option value="container20">Container 20'</option>
+                            <option value="container40">Container 40'</option>
+                            <option value="container40hc">Container 40' HC</option>
+                            <option value="custom">Custom Dimensions</option>
                         </select>
                     </div>
                     
-                    <!-- Suwaki dla Własne wymiary -->
+                    <!-- Custom Dimensions Sliders -->
                     <div id="customDimensions" class="custom-dimensions hidden">
                         <div class="slider-group-inline">
-                            <label for="customLengthSlider">Długość:</label>
+                            <label for="customLengthSlider">Length:</label>
                             <button class="slider-btn" data-slider="customLengthSlider">-</button>
                             <input type="range" id="customLengthSlider" class="dimension-slider"
                                    min="0.5" max="20" step="0.05" value="13.6">
@@ -99,7 +99,7 @@
                             <span id="customLengthValue" class="slider-value">13.60m</span>
                         </div>
                         <div class="slider-group-inline">
-                            <label for="customWidthSlider">Szerokość:</label>
+                            <label for="customWidthSlider">Width:</label>
                             <button class="slider-btn" data-slider="customWidthSlider">-</button>
                             <input type="range" id="customWidthSlider" class="dimension-slider"
                                    min="0.5" max="3" step="0.05" value="2.48">
@@ -107,7 +107,7 @@
                             <span id="customWidthValue" class="slider-value">2.48m</span>
                         </div>
                         <div class="slider-group-inline">
-                            <label for="customHeightSlider">Wysokość:</label>
+                            <label for="customHeightSlider">Height:</label>
                             <button class="slider-btn" data-slider="customHeightSlider">-</button>
                             <input type="range" id="customHeightSlider" class="dimension-slider"
                                    min="0.5" max="4" step="0.05" value="2.7">
@@ -118,14 +118,14 @@
 
                     <div class="vehicle-info">
                         <div class="info-item">
-                            <span class="info-label">Wymiary:</span>
+                            <span class="info-label">Dimensions:</span>
                             <span id="dimensionsInfo" class="info-value"></span>
                         </div>
-                        
-                        <!-- Suwaki dla SOLO -->
+
+                        <!-- SOLO Sliders -->
                         <div id="soloDimensionSliders" class="solo-sliders hidden">
                             <div class="slider-group-inline">
-                                <label for="soloLengthSlider">Długość:</label>
+                                <label for="soloLengthSlider">Length:</label>
                                 <button class="slider-btn" data-slider="soloLengthSlider">-</button>
                                 <input type="range" id="soloLengthSlider" class="dimension-slider"
                                        min="6" max="10" step="0.05" value="7.7">
@@ -133,7 +133,7 @@
                                 <span id="soloLengthValue" class="slider-value">7.70m</span>
                             </div>
                             <div class="slider-group-inline">
-                                <label for="soloHeightSlider">Wysokość:</label>
+                                <label for="soloHeightSlider">Height:</label>
                                 <button class="slider-btn" data-slider="soloHeightSlider">-</button>
                                 <input type="range" id="soloHeightSlider" class="dimension-slider"
                                        min="2.4" max="3" step="0.05" value="3">
@@ -141,13 +141,13 @@
                                 <span id="soloHeightValue" class="slider-value">3.0m</span>
                             </div>
                         </div>
-                        
-                        <!-- Suwaki dla JUMBO -->
+
+                        <!-- JUMBO Sliders -->
                         <div id="jumboDimensionSliders" class="jumbo-sliders hidden">
                             <div class="jumbo-section">
-                                <h4 class="section-title">Sekcja 1 (Ciężarówka):</h4>
+                                <h4 class="section-title">Section 1 (Truck):</h4>
                                 <div class="slider-group-inline">
-                                    <label for="jumboSection1LengthSlider">Długość:</label>
+                                    <label for="jumboSection1LengthSlider">Length:</label>
                                     <button class="slider-btn" data-slider="jumboSection1LengthSlider">-</button>
                                     <input type="range" id="jumboSection1LengthSlider" class="dimension-slider"
                                            min="6" max="8" step="0.05" value="7.7">
@@ -155,7 +155,7 @@
                                     <span id="jumboSection1LengthValue" class="slider-value">7.70m</span>
                                 </div>
                                 <div class="slider-group-inline">
-                                    <label for="jumboSection1HeightSlider">Wysokość:</label>
+                                    <label for="jumboSection1HeightSlider">Height:</label>
                                     <button class="slider-btn" data-slider="jumboSection1HeightSlider">-</button>
                                     <input type="range" id="jumboSection1HeightSlider" class="dimension-slider"
                                            min="2.4" max="3" step="0.05" value="3">
@@ -164,9 +164,9 @@
                                 </div>
                             </div>
                             <div class="jumbo-section">
-                                <h4 class="section-title">Sekcja 2 (Przyczepa):</h4>
+                                <h4 class="section-title">Section 2 (Trailer):</h4>
                                 <div class="slider-group-inline">
-                                    <label for="jumboSection2LengthSlider">Długość:</label>
+                                    <label for="jumboSection2LengthSlider">Length:</label>
                                     <button class="slider-btn" data-slider="jumboSection2LengthSlider">-</button>
                                     <input type="range" id="jumboSection2LengthSlider" class="dimension-slider"
                                            min="6" max="8" step="0.05" value="7.7">
@@ -174,7 +174,7 @@
                                     <span id="jumboSection2LengthValue" class="slider-value">7.70m</span>
                                 </div>
                                 <div class="slider-group-inline">
-                                    <label for="jumboSection2HeightSlider">Wysokość:</label>
+                                    <label for="jumboSection2HeightSlider">Height:</label>
                                     <button class="slider-btn" data-slider="jumboSection2HeightSlider">-</button>
                                     <input type="range" id="jumboSection2HeightSlider" class="dimension-slider"
                                            min="2.4" max="3" step="0.05" value="3">
@@ -183,13 +183,13 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="info-item">
-                            <span class="info-label">Objętość:</span>
+                            <span class="info-label">Volume:</span>
                             <span id="volumeInfo" class="info-value"></span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Max. ładowność:</span>
+                            <span class="info-label">Max. Load Capacity:</span>
                             <div class="max-load-container">
                                 <input type="number" id="maxLoadInput" class="max-load-input" min="0.01" step="0.01">
                                 <span class="input-unit">t</span>
@@ -198,10 +198,10 @@
                     </div>
                 </section>
 
-                <!-- Jednostki ładunkowe -->
+                <!-- Cargo Units -->
                 <div class="units-scrollable-wrapper">
                 <section class="panel-section">
-                    <h3 class="section-title">Jednostki ładunkowe</h3>
+                    <h3 class="section-title">Cargo Units</h3>
                     <div class="cargo-units">
                         <div class="unit-preset-card" data-type="eur-pallet">
                             <div class="unit-preset-header">
@@ -212,21 +212,21 @@
                             <div class="unit-preset-params">
                                 <div class="unit-preset-dimensions">
                                     <div class="unit-preset-dim-field">
-                                        <label>Długość</label>
+                                        <label>Length</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-length" value="120" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Szerokość</label>
+                                        <label>Width</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-width" value="80" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Wysokość</label>
+                                        <label>Height</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-height" value="100" min="1" step="1">
                                             <span class="input-unit">cm</span>
@@ -235,7 +235,7 @@
                                 </div>
                                 <div class="unit-preset-weight-field">
                                     <div class="weight-label-container">
-                                        <span class="weight-label-text">Waga jednej jednostki</span>
+                                        <span class="weight-label-text">Weight per unit</span>
                                         <div class="weight-mode-switch" data-mode="single"></div>
                                     </div>
                                     <div class="unit-preset-weight-container">
@@ -252,11 +252,11 @@
                                 </div>
                                 <div class="unit-preset-grid">
                                     <div class="unit-preset-field">
-                                        <label>Piętrowanie</label>
+                                        <label>Stacking</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
                                                 <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
-                                                <span class="input-unit">szt</span>
+                                                <span class="input-unit">pcs</span>
                                             </div>
                                             <span class="field-separator">/</span>
                                             <div class="stack-input-group">
@@ -308,21 +308,21 @@
                             <div class="unit-preset-params">
                                 <div class="unit-preset-dimensions">
                                     <div class="unit-preset-dim-field">
-                                        <label>Długość</label>
+                                        <label>Length</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-length" value="120" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Szerokość</label>
+                                        <label>Width</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-width" value="100" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Wysokość</label>
+                                        <label>Height</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-height" value="100" min="1" step="1">
                                             <span class="input-unit">cm</span>
@@ -331,7 +331,7 @@
                                 </div>
                                 <div class="unit-preset-weight-field">
                                     <div class="weight-label-container">
-                                        <span class="weight-label-text">Waga jednej jednostki</span>
+                                        <span class="weight-label-text">Weight per unit</span>
                                         <div class="weight-mode-switch" data-mode="single"></div>
                                     </div>
                                     <div class="unit-preset-weight-container">
@@ -348,11 +348,11 @@
                                 </div>
                                 <div class="unit-preset-grid">
                                     <div class="unit-preset-field">
-                                        <label>Piętrowanie</label>
+                                        <label>Stacking</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
                                                 <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
-                                            <span class="input-unit">szt</span>
+                                            <span class="input-unit">pcs</span>
                                         </div>
                                         <span class="field-separator">/</span>
                                         <div class="stack-input-group">
@@ -404,21 +404,21 @@
                             <div class="unit-preset-params">
                                 <div class="unit-preset-dimensions">
                                     <div class="unit-preset-dim-field">
-                                        <label>Długość</label>
+                                        <label>Length</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-length" value="120" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Szerokość</label>
+                                        <label>Width</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-width" value="80" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Wysokość</label>
+                                        <label>Height</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-height" value="90" min="1" step="1">
                                             <span class="input-unit">cm</span>
@@ -427,7 +427,7 @@
                                 </div>
                                 <div class="unit-preset-weight-field">
                                     <div class="weight-label-container">
-                                        <span class="weight-label-text">Waga jednej jednostki</span>
+                                        <span class="weight-label-text">Weight per unit</span>
                                         <div class="weight-mode-switch" data-mode="single"></div>
                                     </div>
                                     <div class="unit-preset-weight-container">
@@ -444,11 +444,11 @@
                                 </div>
                                 <div class="unit-preset-grid">
                                     <div class="unit-preset-field">
-                                        <label>Piętrowanie</label>
+                                        <label>Stacking</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
                                                 <input type="number" class="unit-preset-stack" value="3" min="0" max="10">
-                                            <span class="input-unit">szt</span>
+                                            <span class="input-unit">pcs</span>
                                         </div>
                                         <span class="field-separator">/</span>
                                         <div class="stack-input-group">
@@ -500,21 +500,21 @@
                             <div class="unit-preset-params">
                                 <div class="unit-preset-dimensions">
                                     <div class="unit-preset-dim-field">
-                                        <label>Długość</label>
+                                        <label>Length</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-length" value="120" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Szerokość</label>
+                                        <label>Width</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-width" value="100" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Wysokość</label>
+                                        <label>Height</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-height" value="118" min="1" step="1">
                                             <span class="input-unit">cm</span>
@@ -523,7 +523,7 @@
                                 </div>
                                 <div class="unit-preset-weight-field">
                                     <div class="weight-label-container">
-                                        <span class="weight-label-text">Waga jednej jednostki</span>
+                                        <span class="weight-label-text">Weight per unit</span>
                                         <div class="weight-mode-switch" data-mode="single"></div>
                                     </div>
                                     <div class="unit-preset-weight-container">
@@ -540,11 +540,11 @@
                                 </div>
                                 <div class="unit-preset-grid">
                                     <div class="unit-preset-field">
-                                        <label>Piętrowanie</label>
+                                        <label>Stacking</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
                                                 <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
-                                            <span class="input-unit">szt</span>
+                                            <span class="input-unit">pcs</span>
                                         </div>
                                         <span class="field-separator">/</span>
                                         <div class="stack-input-group">
@@ -596,21 +596,21 @@
                             <div class="unit-preset-params">
                                 <div class="unit-preset-dimensions">
                                     <div class="unit-preset-dim-field">
-                                        <label>Długość</label>
+                                        <label>Length</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-length" value="120" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Szerokość</label>
+                                        <label>Width</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-width" value="120" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Wysokość</label>
+                                        <label>Height</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-height" value="100" min="1" step="1">
                                             <span class="input-unit">cm</span>
@@ -619,7 +619,7 @@
                                 </div>
                                 <div class="unit-preset-weight-field">
                                     <div class="weight-label-container">
-                                        <span class="weight-label-text">Waga jednej jednostki</span>
+                                        <span class="weight-label-text">Weight per unit</span>
                                         <div class="weight-mode-switch" data-mode="single"></div>
                                     </div>
                                     <div class="unit-preset-weight-container">
@@ -636,11 +636,11 @@
                                 </div>
                                 <div class="unit-preset-grid">
                                     <div class="unit-preset-field">
-                                        <label>Piętrowanie</label>
+                                        <label>Stacking</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
                                                 <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
-                                            <span class="input-unit">szt</span>
+                                            <span class="input-unit">pcs</span>
                                         </div>
                                         <span class="field-separator">/</span>
                                         <div class="stack-input-group">
@@ -692,7 +692,7 @@
                             <div class="unit-preset-params">
                                 <div class="unit-preset-dimensions steel-coil-dimensions">
                                     <div class="unit-preset-dim-field">
-                                        <label>Długość</label>
+                                        <label>Length</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-length" value="180" min="1" step="1">
                                             <span class="input-unit">cm</span>
@@ -704,7 +704,7 @@
                                 </div>
                                 <div class="unit-preset-weight-field">
                                     <div class="weight-label-container">
-                                        <span class="weight-label-text">Waga jednej jednostki</span>
+                                        <span class="weight-label-text">Weight per unit</span>
                                         <div class="weight-mode-switch" data-mode="single"></div>
                                     </div>
                                     <div class="unit-preset-weight-container">
@@ -721,11 +721,11 @@
                                 </div>
                                 <div class="unit-preset-grid">
                                     <div class="unit-preset-field">
-                                        <label>Piętrowanie</label>
+                                        <label>Stacking</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
                                                 <input type="number" class="unit-preset-stack" value="0" min="0" max="0" disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;">
-                                            <span class="input-unit">szt</span>
+                                            <span class="input-unit">pcs</span>
                                         </div>
                                         <span class="field-separator">/</span>
                                         <div class="stack-input-group">
@@ -784,7 +784,7 @@
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Wysokość</label>
+                                        <label>Height</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-width unit-preset-roll-height" data-dimension="height" value="120" min="1" step="1">
                                             <span class="input-unit">cm</span>
@@ -802,7 +802,7 @@
                                 </div>
                                 <div class="unit-preset-weight-field">
                                     <div class="weight-label-container">
-                                        <span class="weight-label-text">Waga jednej jednostki</span>
+                                        <span class="weight-label-text">Weight per unit</span>
                                         <div class="weight-mode-switch" data-mode="single"></div>
                                     </div>
                                     <div class="unit-preset-weight-container">
@@ -819,11 +819,11 @@
                                 </div>
                                 <div class="unit-preset-grid">
                                     <div class="unit-preset-field">
-                                        <label>Piętrowanie</label>
+                                        <label>Stacking</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
                                                 <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
-                                            <span class="input-unit">szt</span>
+                                            <span class="input-unit">pcs</span>
                                         </div>
                                         <span class="field-separator">/</span>
                                         <div class="stack-input-group">
@@ -870,26 +870,26 @@
                             <div class="unit-preset-header">
                                 <div class="unit-preset-icon">📋</div>
                                 <div class="unit-preset-color"></div>
-                                <input type="text" class="unit-preset-name" value="Własne wymiary">
+                                <input type="text" class="unit-preset-name" value="Custom Dimensions">
                             </div>
                             <div class="unit-preset-params">
                                 <div class="unit-preset-dimensions">
                                     <div class="unit-preset-dim-field">
-                                        <label>Długość</label>
+                                        <label>Length</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-length" placeholder="100" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Szerokość</label>
+                                        <label>Width</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-width" placeholder="80" min="1" step="1">
                                             <span class="input-unit">cm</span>
                                         </div>
                                     </div>
                                     <div class="unit-preset-dim-field">
-                                        <label>Wysokość</label>
+                                        <label>Height</label>
                                         <div class="dim-input-group">
                                             <input type="number" class="unit-preset-height" placeholder="60" min="1" step="1">
                                             <span class="input-unit">cm</span>
@@ -898,7 +898,7 @@
                                 </div>
                                 <div class="unit-preset-weight-field">
                                     <div class="weight-label-container">
-                                        <span class="weight-label-text">Waga jednej jednostki</span>
+                                        <span class="weight-label-text">Weight per unit</span>
                                         <div class="weight-mode-switch" data-mode="single"></div>
                                     </div>
                                     <div class="unit-preset-weight-container">
@@ -915,11 +915,11 @@
                                 </div>
                                 <div class="unit-preset-grid">
                                     <div class="unit-preset-field">
-                                        <label>Piętrowanie</label>
+                                        <label>Stacking</label>
                                         <div class="unit-preset-stack-group">
                                             <div class="stack-input-group">
                                                 <input type="number" class="unit-preset-stack" value="0" min="0" max="10">
-                                            <span class="input-unit">szt</span>
+                                            <span class="input-unit">pcs</span>
                                         </div>
                                         <span class="field-separator">/</span>
                                         <div class="stack-input-group">
@@ -980,75 +980,75 @@
                             <svg class="icon" viewBox="0 0 24 24">
                                 <path d="M9 3L5 7l4 4V8h7v3l4-4-4-4v3H9V3zm-4 9l-4 4 4 4v-3h7v3l4-4-4-4v3H5v-3z"/>
                             </svg>
-                            Rozmieszczenie
+                            Arrange
                         </button>
                         <button id="clearSpace" class="btn btn-secondary">
                             <svg class="icon" viewBox="0 0 24 24">
                                 <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                             </svg>
-                            Wyczyść
+                            Clear
                         </button>
                         <button id="exportPNG" class="btn btn-secondary">
                             <svg class="icon" viewBox="0 0 24 24">
                                 <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                             </svg>
-                            Eksport PDF
+                            Export PDF
                         </button>
                     </div>
                 </div>
                 
                 <div id="threejs-container"></div>
                 
-                <!-- Kontrolki widoku -->
+                <!-- View Controls -->
                 <div class="view-controls">
-                    <button class="view-btn" data-view="3d" title="Widok 3D">
+                    <button class="view-btn" data-view="3d" title="3D View">
                         <svg viewBox="0 0 24 24">
                             <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
                         </svg>
                     </button>
-                    <button class="view-btn" data-view="top" title="Widok z góry">
+                    <button class="view-btn" data-view="top" title="Top View">
                         <svg viewBox="0 0 24 24">
                             <path d="M3 3h18v18H3V3zm2 2v14h14V5H5z"/>
                         </svg>
                     </button>
-                    <button class="view-btn" data-view="side" title="Widok z boku">
+                    <button class="view-btn" data-view="side" title="Side View">
                         <svg viewBox="0 0 24 24">
                             <path d="M3 9h18v6H3V9zm0-4h18v2H3V5zm0 12h18v2H3v-2z"/>
                         </svg>
                     </button>
-                    <button class="view-btn" data-view="front" title="Widok z przodu">
+                    <button class="view-btn" data-view="front" title="Front View">
                         <svg viewBox="0 0 24 24">
                             <path d="M5 5h14v14H5V5zm2 2v10h10V7H7z"/>
                         </svg>
                     </button>
                 </div>
 
-                <!-- Wskaźnik obciążenia osi -->
+                <!-- Axle Load Indicator -->
                 <div class="axle-load-indicator">
                     <div class="axle-header">
-                        <h4>Obciążenie osi</h4>
-                        <button class="axle-settings-btn" id="axleSettingsBtn" title="Ustawienia osi">
+                        <h4>Axle Load</h4>
+                        <button class="axle-settings-btn" id="axleSettingsBtn" title="Axle Settings">
                             <svg viewBox="0 0 24 24" width="20" height="20">
                                 <path fill="currentColor" d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
                             </svg>
                         </button>
                     </div>
                     <div class="axle-item">
-                        <span class="axle-label">Oś przednia (ciągnik)</span>
+                        <span class="axle-label">Front Axle (Tractor)</span>
                         <div class="progress-bar">
                             <div class="progress-fill front-axle" style="width: 0%"></div>
                         </div>
                         <span class="axle-value">0 / 7500 kg</span>
                     </div>
                     <div class="axle-item">
-                        <span class="axle-label">Osie napędowe (ciągnik)</span>
+                        <span class="axle-label">Drive Axles (Tractor)</span>
                         <div class="progress-bar">
                             <div class="progress-fill rear-axle" style="width: 0%"></div>
                         </div>
                         <span class="axle-value">0 / 11500 kg</span>
                     </div>
                     <div class="axle-item">
-                        <span class="axle-label">Osie naczepy</span>
+                        <span class="axle-label">Trailer Axles</span>
                         <div class="progress-bar">
                             <div class="progress-fill trailer-axle" style="width: 0%"></div>
                         </div>
@@ -1069,64 +1069,64 @@
                 </button>
             </main>
 
-            <!-- Panel prawy -->
+            <!-- Right Panel -->
             <aside class="right-panel" id="rightPanel">
-                <!-- Lista załadowanych jednostek -->
+                <!-- Loaded Units List -->
                 <section class="panel-section units-section">
-                    <h3 class="section-title">Załadowane jednostki</h3>
+                    <h3 class="section-title">Loaded Units</h3>
                     <div id="loadedUnits" class="loaded-units-list">
-                        <!-- Dynamicznie generowana lista -->
+                        <!-- Dynamically generated list -->
                     </div>
                 </section>
 
-                <!-- Dolna sekcja z statystykami i akcjami -->
+                <!-- Bottom Section with Statistics and Actions -->
                 <div class="bottom-section">
-                    <!-- Statystyki -->
+                    <!-- Statistics -->
                     <section class="panel-section statistics-section">
-                        <h3 class="section-title">Statystyki</h3>
+                        <h3 class="section-title">Statistics</h3>
                         <div class="statistics compact">
                             <div class="stat-row">
                                 <div class="stat-item-compact">
-                                    <span class="stat-label">Przestrzeń</span>
+                                    <span class="stat-label">Space</span>
                                     <span class="stat-value">0%</span>
                                 </div>
                                 <div class="stat-item-compact">
-                                    <span class="stat-label">Ładowność</span>
+                                    <span class="stat-label">Load Capacity</span>
                                     <span class="stat-value">0%</span>
                                 </div>
                             </div>
                             <div class="stat-row single-line">
                                 <div class="stat-item-compact">
-                                    <span class="stat-label">Waga</span>
+                                    <span class="stat-label">Weight</span>
                                     <span class="stat-value">0 / 0 kg</span>
                                 </div>
                                 <div class="stat-item-compact">
-                                    <span class="stat-label">Jednostki</span>
+                                    <span class="stat-label">Units</span>
                                     <span class="stat-value">0</span>
                                 </div>
                                 <div class="stat-item-compact">
-                                    <span class="stat-label">Grupy</span>
+                                    <span class="stat-label">Groups</span>
                                     <span class="stat-value">0</span>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    <!-- Akcje -->
+                    <!-- Actions -->
                     <section class="panel-section actions-section">
                         <!-- Current configuration display -->
                         <div id="currentConfigDisplay" class="current-config-display">
-                            <span class="config-label">Konfiguracja:</span>
-                            <input type="text" id="currentConfigName" class="config-name-input" 
-                                   placeholder="Wprowadź nazwę konfiguracji..." 
-                                   autocomplete="off" 
+                            <span class="config-label">Configuration:</span>
+                            <input type="text" id="currentConfigName" class="config-name-input"
+                                   placeholder="Enter configuration name..."
+                                   autocomplete="off"
                                    spellcheck="false">
-                            <button id="quickSaveBtn" class="btn-quick-save" title="Zapisz w pamięci">
+                            <button id="quickSaveBtn" class="btn-quick-save" title="Save to memory">
                                 <svg viewBox="0 0 24 24" width="16" height="16">
                                     <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
                                 </svg>
                             </button>
-                            <button id="quickSaveDownloadBtn" class="btn-quick-save btn-quick-save-download" title="Zapisz i pobierz">
+                            <button id="quickSaveDownloadBtn" class="btn-quick-save btn-quick-save-download" title="Save and download">
                                 <div class="btn-icons-group">
                                     <svg viewBox="0 0 24 24" width="16" height="16">
                                         <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
@@ -1138,19 +1138,19 @@
                             </button>
                         </div>
                         <div class="action-buttons compact">
-                            <button id="saveConfig" class="btn btn-small" title="Zapisz konfigurację">
+                            <button id="saveConfig" class="btn btn-small" title="Save configuration">
                                 <svg class="icon" viewBox="0 0 24 24">
                                     <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
                                 </svg>
-                                Zapisz
+                                Save
                             </button>
-                            <button id="loadConfig" class="btn btn-small" title="Wczytaj konfigurację">
+                            <button id="loadConfig" class="btn btn-small" title="Load configuration">
                                 <svg class="icon" viewBox="0 0 24 24">
                                     <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
                                 </svg>
-                                Wczytaj
+                                Load
                             </button>
-                            <button id="exportPDF2" class="btn btn-small" title="Eksportuj do PDF">
+                            <button id="exportPDF2" class="btn btn-small" title="Export to PDF">
                                 <svg class="icon" viewBox="0 0 24 24">
                                     <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                                 </svg>
@@ -1163,108 +1163,109 @@
         </div>
     </div>
 
-    <!-- Modal dla własnych wymiarów jednostki -->
+    <!-- Custom Unit Modal -->
     <div id="customUnitModal" class="modal hidden">
         <div class="modal-content">
-            <h3>Definiuj własną jednostkę</h3>
+            <h3>Define Custom Unit</h3>
             <div class="modal-body">
                 <div class="input-group">
-                    <label>Nazwa</label>
-                    <input type="text" id="customUnitName" placeholder="np. Karton">
+                    <label>Name</label>
+                    <input type="text" id="customUnitName" placeholder="e.g. Box">
                 </div>
                 <div class="input-group">
-                    <label>Długość (cm)</label>
+                    <label>Length (cm)</label>
                     <input type="number" id="customUnitLength" step="1" value="100">
                 </div>
                 <div class="input-group">
-                    <label>Szerokość (cm)</label>
+                    <label>Width (cm)</label>
                     <input type="number" id="customUnitWidth" step="1" value="60">
                 </div>
                 <div class="input-group">
-                    <label>Wysokość (cm)</label>
+                    <label>Height (cm)</label>
                     <input type="number" id="customUnitHeight" step="1" value="50">
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeCustomUnitModal()">Anuluj</button>
-                <button class="btn btn-primary" onclick="addCustomUnit()">Dodaj</button>
+                <button class="btn btn-secondary" onclick="closeCustomUnitModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="addCustomUnit()">Add</button>
             </div>
         </div>
     </div>
 
     <!-- Skrypty -->
+    <!-- Config must be loaded first -->
+    <script src="js/config.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- Biblioteka bin packing będzie zaimplementowana lokalnie -->
     <script src="js/binPacking.js"></script>
-    <script src="js/config.js"></script>
-    <!-- Modal ustawień osi -->
+    <!-- Axle Settings Modal -->
     <div id="axleSettingsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Ustawienia osi i obciążeń</h2>
+                <h2>Axle and Load Settings</h2>
                 <div class="modal-header-buttons">
-                    <button class="btn btn-secondary btn-sm" id="resetAxleSettings">Przywróć domyślne</button>
+                    <button class="btn btn-secondary btn-sm" id="resetAxleSettings">Reset to Default</button>
                     <button class="btn btn-primary btn-sm" id="saveAxleSettings">OK</button>
                     <button class="modal-close" id="closeAxleSettings">&times;</button>
                 </div>
             </div>
             <div class="modal-body">
-                <!-- Konfiguracja liczby osi -->
+                <!-- Axle Configuration -->
                 <div class="settings-section">
-                    <h3>Konfiguracja osi</h3>
-                    
+                    <h3>Axle Configuration</h3>
+
                     <!-- Toggle for axle load display -->
                     <div class="settings-group">
                         <label class="settings-label checkbox-label">
                             <input type="checkbox" id="showAxleLoadsOn3D" class="settings-checkbox">
-                            <span>Pokaż obciążenie na osiach w widoku 3D</span>
+                            <span>Show axle loads in 3D view</span>
                         </label>
                     </div>
                     
                     <div class="settings-group">
-                        <label class="settings-label">Liczba osi ciągnących (ciągnik):</label>
+                        <label class="settings-label">Number of drive axles (tractor):</label>
                         <div class="radio-group">
                             <label class="radio-label">
                                 <input type="radio" name="tractorAxles" value="1" checked>
-                                <span>1 oś</span>
+                                <span>1 axle</span>
                             </label>
                             <label class="radio-label">
                                 <input type="radio" name="tractorAxles" value="2">
-                                <span>2 osie</span>
+                                <span>2 axles</span>
                             </label>
                         </div>
                     </div>
 
                     <div class="settings-group" id="trailerAxlesGroup">
-                        <label class="settings-label">Liczba osi naczepy:</label>
+                        <label class="settings-label">Number of trailer axles:</label>
                         <div class="radio-group">
                             <label class="radio-label">
                                 <input type="radio" name="trailerAxles" value="1">
-                                <span>1 oś</span>
+                                <span>1 axle</span>
                             </label>
                             <label class="radio-label">
                                 <input type="radio" name="trailerAxles" value="2">
-                                <span>2 osie</span>
+                                <span>2 axles</span>
                             </label>
                             <label class="radio-label">
                                 <input type="radio" name="trailerAxles" value="3" checked>
-                                <span>3 osie</span>
+                                <span>3 axles</span>
                             </label>
                         </div>
                     </div>
                 </div>
 
-                <!-- Odległości między osiami -->
+                <!-- Distances Between Points -->
                 <div class="settings-section">
-                    <h3>Odległości między punktami</h3>
+                    <h3>Distances Between Points</h3>
                     
                     <div class="settings-grid">
                         <!-- Standard trailer distances -->
                         <div class="settings-field trailer-distance">
                             <div class="slider-group-inline">
-                                <label for="distFrontToKingpin">Przód naczepy → Siodło:</label>
+                                <label for="distFrontToKingpin">Trailer Front → Kingpin:</label>
                                 <button class="slider-btn" data-slider="distFrontToKingpin">-</button>
                                 <input type="range" id="distFrontToKingpin" class="dimension-slider"
                                        min="1.0" max="2.15" step="0.05" value="1.7">
@@ -1275,7 +1276,7 @@
 
                         <div class="settings-field trailer-distance">
                             <div class="slider-group-inline">
-                                <label for="distKingpinToTrailer">Siodło → Środek osi naczepy:</label>
+                                <label for="distKingpinToTrailer">Kingpin → Trailer Axle Center:</label>
                                 <button class="slider-btn" data-slider="distKingpinToTrailer">-</button>
                                 <input type="range" id="distKingpinToTrailer" class="dimension-slider"
                                        min="6.5" max="9.0" step="0.05" value="7.7">
@@ -1286,7 +1287,7 @@
 
                         <div class="settings-field trailer-distance">
                             <div class="slider-group-inline">
-                                <label for="distFrontAxleToKingpin">Oś przednia → Siodło:</label>
+                                <label for="distFrontAxleToKingpin">Front Axle → Kingpin:</label>
                                 <button class="slider-btn" data-slider="distFrontAxleToKingpin">-</button>
                                 <input type="range" id="distFrontAxleToKingpin" class="dimension-slider"
                                        min="2.5" max="4.0" step="0.05" value="3.1">
@@ -1297,7 +1298,7 @@
 
                         <div class="settings-field trailer-distance">
                             <div class="slider-group-inline">
-                                <label for="distKingpinToDrive">Siodło → Środek osi napędowych:</label>
+                                <label for="distKingpinToDrive">Kingpin → Drive Axles Center:</label>
                                 <button class="slider-btn" data-slider="distKingpinToDrive">-</button>
                                 <input type="range" id="distKingpinToDrive" class="dimension-slider"
                                        min="0.2" max="1.5" step="0.05" value="0.5">
@@ -1309,7 +1310,7 @@
                         <!-- SOLO distances -->
                         <div class="settings-field solo-distance" style="display: none;">
                             <div class="slider-group-inline">
-                                <label for="distCargoStartToFront">Początek przestrzeni → Oś przednia:</label>
+                                <label for="distCargoStartToFront">Cargo Start → Front Axle:</label>
                                 <button class="slider-btn" data-slider="distCargoStartToFront">-</button>
                                 <input type="range" id="distCargoStartToFront" class="dimension-slider"
                                        min="0.5" max="2.5" step="0.05" value="1.0">
@@ -1320,7 +1321,7 @@
 
                         <div class="settings-field solo-distance" style="display: none;">
                             <div class="slider-group-inline">
-                                <label for="distCargoStartToDrive">Początek przestrzeni → Środek osi napędowych:</label>
+                                <label for="distCargoStartToDrive">Cargo Start → Drive Axles Center:</label>
                                 <button class="slider-btn" data-slider="distCargoStartToDrive">-</button>
                                 <input type="range" id="distCargoStartToDrive" class="dimension-slider"
                                        min="3.0" max="7.5" step="0.05" value="5.5">
@@ -1332,7 +1333,7 @@
                         <!-- JUMBO distances -->
                         <div class="settings-field jumbo-distance" style="display: none;">
                             <div class="slider-group-inline">
-                                <label for="distSection1StartToFront">Sekcja 1: Początek → Oś przednia:</label>
+                                <label for="distSection1StartToFront">Section 1: Start → Front Axle:</label>
                                 <button class="slider-btn" data-slider="distSection1StartToFront">-</button>
                                 <input type="range" id="distSection1StartToFront" class="dimension-slider"
                                        min="0.5" max="2.5" step="0.05" value="1.0">
@@ -1343,7 +1344,7 @@
 
                         <div class="settings-field jumbo-distance" style="display: none;">
                             <div class="slider-group-inline">
-                                <label for="distSection1StartToDrive">Sekcja 1: Początek → Osie napędowe:</label>
+                                <label for="distSection1StartToDrive">Section 1: Start → Drive Axles:</label>
                                 <button class="slider-btn" data-slider="distSection1StartToDrive">-</button>
                                 <input type="range" id="distSection1StartToDrive" class="dimension-slider"
                                        min="3.0" max="7.5" step="0.05" value="5.5">
@@ -1354,7 +1355,7 @@
 
                         <div class="settings-field jumbo-distance" style="display: none;">
                             <div class="slider-group-inline">
-                                <label for="distSection2StartToTrailerAxles">Sekcja 2: Początek → Osie przyczepy:</label>
+                                <label for="distSection2StartToTrailerAxles">Section 2: Start → Trailer Axles:</label>
                                 <button class="slider-btn" data-slider="distSection2StartToTrailerAxles">-</button>
                                 <input type="range" id="distSection2StartToTrailerAxles" class="dimension-slider"
                                        min="3.0" max="7.5" step="0.05" value="5.5">
@@ -1365,13 +1366,13 @@
                     </div>
                 </div>
 
-                <!-- Obciążenia na pusto -->
+                <!-- Empty Loads -->
                 <div class="settings-section">
-                    <h3>Obciążenia na pusto</h3>
+                    <h3>Empty Loads</h3>
                     
                     <div class="settings-grid">
                         <div class="settings-field">
-                            <label>Oś przednia (kierująca)</label>
+                            <label>Front Axle (Steering)</label>
                             <div class="input-group">
                                 <input type="number" id="emptyFrontAxle" value="5800" min="3000" max="7000" step="100">
                                 <span class="unit">kg</span>
@@ -1379,7 +1380,7 @@
                         </div>
 
                         <div class="settings-field">
-                            <label>Osie napędowe (razem)</label>
+                            <label>Drive Axles (Total)</label>
                             <div class="input-group">
                                 <input type="number" id="emptyDriveAxles" value="3600" min="2000" max="6000" step="100">
                                 <span class="unit">kg</span>
@@ -1387,7 +1388,7 @@
                         </div>
 
                         <div class="settings-field trailer-weight">
-                            <label>Osie naczepy (razem)</label>
+                            <label>Trailer Axles (Total)</label>
                             <div class="input-group">
                                 <input type="number" id="emptyTrailerAxles" value="5200" min="3000" max="8000" step="100">
                                 <span class="unit">kg</span>
@@ -1396,13 +1397,13 @@
                     </div>
                 </div>
 
-                <!-- Limity obciążeń -->
+                <!-- Load Limits -->
                 <div class="settings-section">
-                    <h3>Limity obciążeń osi</h3>
+                    <h3>Axle Load Limits</h3>
                     
                     <div class="settings-grid">
                         <div class="settings-field">
-                            <label>Max oś przednia</label>
+                            <label>Max Front Axle</label>
                             <div class="input-group">
                                 <input type="number" id="maxFrontAxle" value="7500" min="6000" max="8000" step="100">
                                 <span class="unit">kg</span>
@@ -1410,7 +1411,7 @@
                         </div>
 
                         <div class="settings-field">
-                            <label>Max osie napędowe</label>
+                            <label>Max Drive Axles</label>
                             <div class="input-group">
                                 <input type="number" id="maxDriveAxles" value="11500" min="9000" max="13000" step="100">
                                 <span class="unit">kg</span>
@@ -1418,7 +1419,7 @@
                         </div>
 
                         <div class="settings-field trailer-weight">
-                            <label>Max osie naczepy</label>
+                            <label>Max Trailer Axles</label>
                             <div class="input-group">
                                 <input type="number" id="maxTrailerAxles" value="24000" min="15000" max="27000" step="100">
                                 <span class="unit">kg</span>
@@ -1426,7 +1427,7 @@
                         </div>
                         
                         <div class="settings-field">
-                            <label>Min obciążenie osi napędowej</label>
+                            <label>Min Drive Axle Load</label>
                             <div class="input-group">
                                 <input type="number" id="minDriveAxleLoad" value="25" min="15" max="40" step="1">
                                 <span class="unit">%</span>
@@ -1442,7 +1443,7 @@
     <div id="saveConfigModal" class="modal">
         <div class="modal-content modal-content-wide">
             <div class="modal-header">
-                <h2>Zapisz konfigurację</h2>
+                <h2>Save Configuration</h2>
                 <button class="modal-close" id="closeSaveConfig">&times;</button>
             </div>
             <div class="modal-body">
@@ -1450,69 +1451,69 @@
                     <!-- Left side - Save form -->
                     <div class="save-config-main">
                         <div class="settings-section">
-                            <label class="settings-label">Nazwa konfiguracji:</label>
-                            <input type="text" id="configNameInput" class="form-control" 
-                                   placeholder="Wprowadź nazwę konfiguracji" maxlength="230">
-                            <small class="text-muted">Naciśnij Enter aby zapisać lub Escape aby anulować</small>
+                            <label class="settings-label">Configuration name:</label>
+                            <input type="text" id="configNameInput" class="form-control"
+                                   placeholder="Enter configuration name" maxlength="230">
+                            <small class="text-muted">Press Enter to save or Escape to cancel</small>
                             <small class="text-muted" style="display: block; margin-top: 5px;">
-                                Konfiguracja zostanie zapisana w pamięci Twojej przeglądarki oraz w pliku na dysku Twojego komputera
+                                Configuration will be saved in your browser memory and as a file on your computer disk
                             </small>
                         </div>
-                        
+
                         <div class="settings-section config-preview">
-                            <h4>Podgląd konfiguracji:</h4>
+                            <h4>Configuration preview:</h4>
                             <div id="configPreview" class="config-preview-content">
                                 <!-- Will be filled dynamically -->
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Right side - Existing configurations -->
                     <div class="save-config-sidebar">
-                        <h4>Nadpisz istniejącą konfigurację:</h4>
+                        <h4>Overwrite existing configuration:</h4>
                         <div class="existing-configs-list" id="existingConfigsList">
                             <!-- Will be filled dynamically -->
                         </div>
                         <div class="no-existing-configs" id="noExistingConfigs" style="display:none;">
-                            <p>Brak zapisanych konfiguracji</p>
+                            <p>No saved configurations</p>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelSaveConfig">Anuluj</button>
+                <button class="btn btn-secondary" id="cancelSaveConfig">Cancel</button>
                 <div class="save-buttons-group">
-                    <button class="btn btn-primary" id="confirmSaveConfig" title="Zapisz tylko w pamięci przeglądarki">
+                    <button class="btn btn-primary" id="confirmSaveConfig" title="Save only in browser memory">
                         <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px;">
                             <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
                         </svg>
-                        <span id="saveConfigText">Zapisz jako nową</span>
+                        <span id="saveConfigText">Save as new</span>
                     </button>
-                    <button class="btn btn-success" id="confirmSaveDownloadConfig" title="Zapisz w pamięci i pobierz plik">
+                    <button class="btn btn-success" id="confirmSaveDownloadConfig" title="Save in memory and download file">
                         <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px;">
                             <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
                         </svg>
                         <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px; margin-left: -6px;">
                             <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/>
                         </svg>
-                        <span id="saveDownloadConfigText">Zapisz i pobierz</span>
+                        <span id="saveDownloadConfigText">Save and download</span>
                     </button>
                 </div>
                 <div class="overwrite-buttons-group" style="display:none;">
-                    <button class="btn btn-warning" id="overwriteSaveConfig" title="Nadpisz tylko w pamięci">
+                    <button class="btn btn-warning" id="overwriteSaveConfig" title="Overwrite only in memory">
                         <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px;">
                             <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
                         </svg>
-                        Nadpisz wybraną
+                        Overwrite selected
                     </button>
-                    <button class="btn btn-warning" id="overwriteSaveDownloadConfig" title="Nadpisz w pamięci i pobierz plik">
+                    <button class="btn btn-warning" id="overwriteSaveDownloadConfig" title="Overwrite in memory and download file">
                         <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px;">
                             <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" fill="currentColor"/>
                         </svg>
                         <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px; margin-left: -6px;">
                             <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/>
                         </svg>
-                        Nadpisz i pobierz
+                        Overwrite and download
                     </button>
                 </div>
             </div>
@@ -1523,46 +1524,46 @@
     <div id="loadConfigModal" class="modal">
         <div class="modal-content modal-content-wide">
             <div class="modal-header">
-                <h2>Wczytaj konfigurację</h2>
+                <h2>Load Configuration</h2>
                 <button class="modal-close" id="closeLoadConfig">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="load-config-container">
                     <!-- Left side - Saved Configurations -->
                     <div class="config-column saved-configs-column">
-                        <h3>Zapisane konfiguracje</h3>
+                        <h3>Saved Configurations</h3>
                         <div class="saved-configs-header">
-                            <input type="text" id="configSearch" class="form-control" 
-                                   placeholder="Szukaj konfiguracji...">
+                            <input type="text" id="configSearch" class="form-control"
+                                   placeholder="Search configurations...">
                         </div>
                         <div id="savedConfigsList" class="saved-configs-list">
                             <!-- Will be filled dynamically -->
                         </div>
                         <div class="no-configs-message" id="noConfigsMessage" style="display:none;">
-                            <p>Brak zapisanych konfiguracji</p>
+                            <p>No saved configurations</p>
                         </div>
                     </div>
-                    
+
                     <!-- Divider -->
                     <div class="config-divider">
                         <div class="divider-line"></div>
-                        <div class="divider-text">lub</div>
+                        <div class="divider-text">or</div>
                         <div class="divider-line"></div>
                     </div>
-                    
+
                     <!-- Right side - File Upload -->
                     <div class="config-column file-upload-column">
-                        <h3>Wczytaj z pliku</h3>
+                        <h3>Load from File</h3>
                         <div class="file-upload-area">
                             <input type="file" id="configFileInput" accept=".transportnomad,.json" style="display:none;">
                             <div class="file-drop-zone" id="fileDropZone">
                                 <svg class="upload-icon" width="60" height="60" viewBox="0 0 24 24" fill="none">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5-5 5 5M12 15V3" 
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5-5 5 5M12 15V3"
                                           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
-                                <h3>Przeciągnij plik tutaj</h3>
-                                <p>lub <button class="btn-link" id="browseFileBtn">wybierz plik</button></p>
-                                <small class="text-muted">Akceptowane formaty: .transportnomad, .json</small>
+                                <h3>Drag file here</h3>
+                                <p>or <button class="btn-link" id="browseFileBtn">browse file</button></p>
+                                <small class="text-muted">Accepted formats: .transportnomad, .json</small>
                             </div>
                         </div>
                     </div>
@@ -1576,8 +1577,12 @@
     <script src="js/axleCalculator.js"></script>
     <script src="js/ui.js"></script>
     <script>
-        // Set logo URL from config
-        document.getElementById('app-logo').src = CONFIG.LOGO_URL;
+        // Set logo URL from config (after DOM is ready)
+        if (typeof CONFIG !== 'undefined' && CONFIG.LOGO_URL) {
+            document.getElementById('app-logo').src = CONFIG.LOGO_URL;
+        } else {
+            console.error('CONFIG.LOGO_URL is not defined');
+        }
     </script>
     <script src="js/main.js"></script>
 </body>

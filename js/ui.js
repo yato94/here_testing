@@ -599,7 +599,7 @@ class UI {
                 this.updateLoadedUnitsList();
                 this.updateStatistics();
                 this.updateAxleIndicators();
-                this.showNotification(`${steelCoils.length} Steel Coils zostały usunięte - wymagana przestrzeń typu Coilmulde`, 'warning');
+                this.showNotification(`${steelCoils.length} Steel Coils have been removed - Coilmulde space required`, 'warning');
             }
         }
         
@@ -1257,7 +1257,7 @@ class UI {
                     
                     // Validate dimensions - for all types, not just custom-box
                     if (!params.dimensions || params.dimensions.length <= 0 || params.dimensions.width <= 0 || params.dimensions.height <= 0) {
-                        this.showNotification('Wprowadź prawidłowe wymiary', 'error');
+                        this.showNotification('Enter valid dimensions', 'error');
                         return;
                     }
                     
@@ -1285,13 +1285,13 @@ class UI {
                             // Some items didn't fit or exceeded weight limit
                             const messages = [];
                             if (result.unpackedCount > 0) {
-                                messages.push(`${result.unpackedCount} jednostek nie zmieściło się w przestrzeni`);
+                                messages.push(`${result.unpackedCount} units did not fit in the space`);
                             }
                             if (result.exceedingWeightCount > 0) {
-                                messages.push(`${result.exceedingWeightCount} jednostek przekroczyło limit wagowy`);
+                                messages.push(`${result.exceedingWeightCount} units exceeded weight limit`);
                             }
                             if (messages.length > 0) {
-                                this.showNotification(`${messages.join(' i ')} - umieszczono poza przestrzenią`, 'warning');
+                                this.showNotification(`${messages.join(' i ')} - placed outside the space`, 'warning');
                             }
                             
                             // Update unit counts after removal
@@ -1301,7 +1301,7 @@ class UI {
                             });
                         } else if (this.cargoManager.cargoItems.length > 50) {
                             // For performance, show message for manual arrangement when many items
-                            this.showNotification('Dla dużej liczby jednostek użyj "Automatyczne rozmieszczenie"', 'info');
+                            this.showNotification('For large number of units use "Arrange"', 'info');
                         }
                         
                         this.updateLoadedUnitsList();
@@ -1329,7 +1329,7 @@ class UI {
                     
                     // Validate dimensions - for all types, not just custom-box
                     if (!params.dimensions || params.dimensions.length <= 0 || params.dimensions.width <= 0 || params.dimensions.height <= 0) {
-                        this.showNotification('Wprowadź prawidłowe wymiary', 'error');
+                        this.showNotification('Enter valid dimensions', 'error');
                         return;
                     }
                     
@@ -1357,13 +1357,13 @@ class UI {
                             // Some items didn't fit or exceeded weight limit
                             const messages = [];
                             if (result.unpackedCount > 0) {
-                                messages.push(`${result.unpackedCount} jednostek nie zmieściło się w przestrzeni`);
+                                messages.push(`${result.unpackedCount} units did not fit in the space`);
                             }
                             if (result.exceedingWeightCount > 0) {
-                                messages.push(`${result.exceedingWeightCount} jednostek przekroczyło limit wagowy`);
+                                messages.push(`${result.exceedingWeightCount} units exceeded weight limit`);
                             }
                             if (messages.length > 0) {
-                                this.showNotification(`${messages.join(' i ')} - umieszczono poza przestrzenią`, 'warning');
+                                this.showNotification(`${messages.join(' i ')} - placed outside the space`, 'warning');
                             }
                             
                             // Update unit counts after removal
@@ -1373,7 +1373,7 @@ class UI {
                             });
                         } else if (this.cargoManager.cargoItems.length > 50) {
                             // For performance, show message for manual arrangement when many items
-                            this.showNotification('Dla dużej liczby jednostek użyj "Automatyczne rozmieszczenie"', 'info');
+                            this.showNotification('For large number of units use "Arrange"', 'info');
                         }
                         
                         this.updateLoadedUnitsList();
@@ -1756,7 +1756,7 @@ class UI {
         const result = this.cargoManager.autoArrange();
         
         if (!result) {
-            this.showNotification('Nie można rozmieścić ładunku', 'error');
+            this.showNotification('Cannot arrange cargo', 'error');
             return;
         }
         
@@ -1770,17 +1770,17 @@ class UI {
         }
         
         if (result.success) {
-            this.showNotification('Ładunek rozmieszczony automatycznie', 'success');
+            this.showNotification('Cargo arranged automatically', 'success');
         } else {
             const messages = [];
             if (result.unpackedCount > 0) {
-                messages.push(`${result.unpackedCount} jednostek nie zmieściło się`);
+                messages.push(`${result.unpackedCount} units did not fit`);
             }
             if (result.exceedingWeightCount > 0) {
-                messages.push(`${result.exceedingWeightCount} jednostek przekroczyło limit wagowy`);
+                messages.push(`${result.exceedingWeightCount} units exceeded weight limit`);
             }
             if (messages.length > 0) {
-                this.showNotification(`Uwaga! ${messages.join(' i ')} - umieszczono poza przestrzenią ładunkową`, 'warning');
+                this.showNotification(`Warning! ${messages.join(' and ')} - placed outside the space`, 'warning');
             }
             // Update unit counts after removal
             this.unitCounts = {};
@@ -2026,12 +2026,12 @@ class UI {
                     <div class="unit-box-header">
                         <span class="unit-order-number">${index + 1}</span>
                         <span class="unit-color-dot" ${colorStyle}></span>
-                        <span class="unit-quantity-badge">× ${itemsInside}${itemsOutside > 0 ? ` <span style="color: #ef4444; font-size: 0.9em;">(+${itemsOutside} poza)</span>` : ''}</span>
-                        <input type="text" class="unit-title-input edit-name" value="${group.sample.name}" data-group-id="${group.groupId}" title="Nazwa grupy" />
+                        <span class="unit-quantity-badge">× ${itemsInside}${itemsOutside > 0 ? ` <span style="color: #ef4444; font-size: 0.9em;">(+${itemsOutside} outside)</span>` : ''}</span>
+                        <input type="text" class="unit-title-input edit-name" value="${group.sample.name}" data-group-id="${group.groupId}" title="Group name" />
                         <div class="unit-quantity-controls">
-                            <button class="unit-btn-remove" data-group-id="${group.groupId}" title="Usuń jednostkę">−</button>
-                            <button class="unit-btn-add" data-group-id="${group.groupId}" title="Dodaj jednostkę">+</button>
-                            <button class="unit-btn-delete-all" data-group-id="${group.groupId}" title="Usuń całą grupę">
+                            <button class="unit-btn-remove" data-group-id="${group.groupId}" title="Remove unit">−</button>
+                            <button class="unit-btn-add" data-group-id="${group.groupId}" title="Add unit">+</button>
+                            <button class="unit-btn-delete-all" data-group-id="${group.groupId}" title="Delete entire group">
                                 <svg viewBox="0 0 24 24" width="16" height="16">
                                     <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/>
                                 </svg>
@@ -2041,36 +2041,36 @@ class UI {
                     <div class="unit-box-content">
                         <div class="unit-grid">
                             <div class="unit-item">
-                                <div class="unit-item-label">Wymiary</div>
+                                <div class="unit-item-label">Dimensions</div>
                                 <div class="unit-dimensions-editable">
                                     ${this.createDimensionInputs(group)}
                                 </div>
                                 <div class="unit-item-sublabel">
-                                    ${group.sample.type === 'roll' && !group.sample.fixedDiameter ? 
+                                    ${group.sample.type === 'roll' && !group.sample.fixedDiameter ?
                                         `<button class="orientation-toggle-btn" data-group-id="${group.groupId}" style="background: none; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 11px;">
-                                            ${group.sample.isVerticalRoll ? '⬆ Pionowo' : '➡ Poziomo'}
-                                        </button>` : 
-                                        (group.sample.type === 'steel-coil' ? '(dł. × śred. × śred.)' : '(dł. / szer. / wys.)')}
+                                            ${group.sample.isVerticalRoll ? '⬆ Vertical' : '➡ Horizontal'}
+                                        </button>` :
+                                        (group.sample.type === 'steel-coil' ? '(len. × diam. × diam.)' : '(len. / width / height)')}
                                 </div>
                             </div>
                             <div class="unit-item">
-                                <div class="unit-item-label">Waga jedn.</div>
+                                <div class="unit-item-label">Weight per unit</div>
                                 <input type="text" class="unit-editable-input edit-weight" value="${parseFloat(group.sample.weight.toFixed(2))} kg" data-group-id="${group.groupId}" />
                             </div>
                             <div class="unit-item">
                                 <div class="unit-item-label">
-                                    Piętrowanie
+                                    Stacking
                                     <span class="help-icon">
                                         ?
                                         <span class="tooltip">
-                                            Maksymalna ilość przesyłek którą można położyć na daną jednostkę oraz maksymalna łączna waga którą można położyć na daną jednostkę
+                                            Maximum number of units that can be placed on top of this unit and maximum total weight that can be placed on top
                                         </span>
                                     </span>
                                 </div>
                                 <div class="stacking-inputs-container">
-                                    <input type="text" class="stacking-input-small edit-stack" value="${group.sample.maxStack}" data-group-id="${group.groupId}" title="Ilość warstw" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
+                                    <input type="text" class="stacking-input-small edit-stack" value="${group.sample.maxStack}" data-group-id="${group.groupId}" title="Number of layers" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
                                     <span class="stacking-separator">/</span>
-                                    <input type="text" class="stacking-input-small edit-max-weight auto-resize-input" value="${(group.sample.maxStackWeight || 0).toString().replace(/[^\d.]/g, '')}kg" data-group-id="${group.groupId}" maxlength="6" title="Max waga na górze" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
+                                    <input type="text" class="stacking-input-small edit-max-weight auto-resize-input" value="${(group.sample.maxStackWeight || 0).toString().replace(/[^\d.]/g, '')}kg" data-group-id="${group.groupId}" maxlength="6" title="Max weight on top" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
                                 </div>
                             </div>
                             <div class="unit-item">
@@ -2090,15 +2090,15 @@ class UI {
                     <div class="unit-box-footer">
                         <div class="unit-footer-item">
                             <div class="unit-footer-value">${totalWeight} kg</div>
-                            <div class="unit-footer-label">ŁĄCZNA WAGA</div>
+                            <div class="unit-footer-label">TOTAL WEIGHT</div>
                         </div>
                         <div class="unit-footer-item">
                             <div class="unit-footer-value">${totalVolume.toFixed(2)} m³</div>
-                            <div class="unit-footer-label">OBJĘTOŚĆ</div>
+                            <div class="unit-footer-label">VOLUME</div>
                         </div>
                         <div class="unit-footer-item">
                             <div class="unit-footer-value">${floorArea.toFixed(2)} m²</div>
-                            <div class="unit-footer-label">POWIERZCHNIA</div>
+                            <div class="unit-footer-label">FLOOR AREA</div>
                         </div>
                         <div class="unit-footer-item">
                             <div class="unit-footer-value">${ldm.toFixed(2)}</div>
@@ -2204,7 +2204,7 @@ class UI {
                     
                     if (valueInCm < 1 || valueInCm > maxValue) {
                         const maxText = dimension === 'height' ? '300cm' : '1360cm';
-                        this.showNotification(`${dimension === 'height' ? 'Wysokość' : 'Wymiar'} musi być między 1cm a ${maxText}`, 'error');
+                        this.showNotification(`${dimension === 'height' ? 'Height' : 'Dimension'} must be between 1cm and ${maxText}`, 'error');
                         return;
                     }
                     
@@ -2486,14 +2486,14 @@ class UI {
         if (result && !result.success) {
             const messages = [];
             if (result.unpackedCount > 0) {
-                messages.push(`${result.unpackedCount} jednostek nie zmieściło się w przestrzeni`);
+                messages.push(`${result.unpackedCount} units did not fit in the space`);
             }
             if (result.exceedingWeightCount > 0) {
-                messages.push(`${result.exceedingWeightCount} jednostek przekracza limit wagi`);
+                messages.push(`${result.exceedingWeightCount} units exceed weight limit`);
             }
             this.showNotification(messages.join(', '), 'warning');
         } else {
-            this.showNotification(`Wymiary grupy zostały zaktualizowane`, 'success');
+            this.showNotification(`Group dimensions have been updated`, 'success');
         }
     }
     
@@ -3634,11 +3634,11 @@ class UI {
         const vehicleName = CONFIG.vehicles[this.currentVehicle]?.name || 'Własne wymiary';
         
         preview.innerHTML = `
-            <div><strong>Przestrzeń:</strong> ${vehicleName}</div>
-            <div><strong>Liczba jednostek:</strong> ${stats.totalItems} ${stats.outsideItems > 0 ? `(+${stats.outsideItems} poza)` : ''}</div>
-            <div><strong>Waga całkowita:</strong> ${stats.totalWeight} kg</div>
-            <div><strong>Wykorzystanie przestrzeni:</strong> ${stats.volumeUsage.toFixed(1)}%</div>
-            <div><strong>Wykorzystanie ładowności:</strong> ${stats.weightUsage.toFixed(1)}%</div>
+            <div><strong>Cargo Space:</strong> ${vehicleName}</div>
+            <div><strong>Number of Units:</strong> ${stats.totalItems} ${stats.outsideItems > 0 ? `(+${stats.outsideItems} outside)` : ''}</div>
+            <div><strong>Total Weight:</strong> ${stats.totalWeight} kg</div>
+            <div><strong>Space Usage:</strong> ${stats.volumeUsage.toFixed(1)}%</div>
+            <div><strong>Load Capacity Usage:</strong> ${stats.weightUsage.toFixed(1)}%</div>
         `;
         
         // Load existing configurations for selection
@@ -3674,8 +3674,8 @@ class UI {
         // Reset selected config
         this.selectedConfigToOverwrite = null;
         this.selectedConfigOriginalName = null;
-        document.getElementById('saveConfigText').textContent = 'Zapisz jako nową';
-        document.getElementById('saveDownloadConfigText').textContent = 'Zapisz i pobierz';
+        document.getElementById('saveConfigText').textContent = 'Save as new';
+        document.getElementById('saveDownloadConfigText').textContent = 'Save and download';
         const saveButtonsGroup = document.querySelector('.save-buttons-group');
         const overwriteButtonsGroup = document.querySelector('.overwrite-buttons-group');
         if (saveButtonsGroup && overwriteButtonsGroup) {
@@ -3723,17 +3723,17 @@ class UI {
         if (savedId) {
             let message;
             if (overwriteId && downloadFile) {
-                message = 'Konfiguracja nadpisana i pobrana';
+                message = 'Configuration overwritten and downloaded';
             } else if (overwriteId) {
-                message = 'Konfiguracja nadpisana w pamięci przeglądarki';
+                message = 'Configuration overwritten in browser memory';
             } else if (downloadFile) {
-                message = 'Konfiguracja zapisana do pliku i pamięci przeglądarki';
+                message = 'Configuration saved to file and browser memory';
             } else {
-                message = 'Konfiguracja zapisana w pamięci przeglądarki';
+                message = 'Configuration saved in browser memory';
             }
             this.showNotification(message, 'success');
         } else {
-            this.showNotification(downloadFile ? 'Konfiguracja zapisana do pliku' : 'Błąd zapisu', 'error');
+            this.showNotification(downloadFile ? 'Configuration saved to file' : 'Save error', 'error');
         }
     }
     
@@ -3810,7 +3810,7 @@ class UI {
             this.updateCurrentConfigDisplay();
             
             document.getElementById('loadConfigModal').style.display = 'none';
-            this.showNotification('Konfiguracja wczytana', 'success');
+            this.showNotification('Configuration loaded', 'success');
         }
     }
     
@@ -3850,13 +3850,13 @@ class UI {
                 document.getElementById('loadConfigModal').style.display = 'none';
                 
                 if (existingConfig) {
-                    this.showNotification('Konfiguracja wczytana z pliku i zaktualizowana w pamięci', 'success');
+                    this.showNotification('Configuration loaded from file and updated in memory', 'success');
                 } else {
-                    this.showNotification('Konfiguracja wczytana z pliku i zapisana w pamięci', 'success');
+                    this.showNotification('Configuration loaded from file and saved in memory', 'success');
                 }
             } catch (error) {
                 console.error('Error loading configuration:', error);
-                this.showNotification('Błąd wczytywania konfiguracji', 'error');
+                this.showNotification('Error loading configuration', 'error');
             }
         };
         reader.readAsText(file);
@@ -4069,14 +4069,14 @@ class UI {
         saveBtn.addEventListener('click', () => {
             this.saveAxleSettings();
             modal.style.display = 'none';
-            this.showNotification('Ustawienia osi zapisane', 'success');
+            this.showNotification('Axle settings saved', 'success');
         });
         
         // Reset to defaults
         resetBtn.addEventListener('click', () => {
             this.axleCalculator.axleConfig.resetToDefaults();
             this.loadAxleSettings();
-            this.showNotification('Przywrócono domyślne ustawienia', 'info');
+            this.showNotification('Default settings restored', 'info');
         });
     }
     
@@ -4379,8 +4379,8 @@ class UI {
                 nameInput.value = this.generateUniqueConfigName(originalName);
                 
                 // Show/hide appropriate buttons
-                document.getElementById('saveConfigText').textContent = 'Zapisz jako nową';
-                document.getElementById('saveDownloadConfigText').textContent = 'Zapisz jako nową i pobierz';
+                document.getElementById('saveConfigText').textContent = 'Save as new';
+                document.getElementById('saveDownloadConfigText').textContent = 'Save as new and download';
                 if (saveButtonsGroup && overwriteButtonsGroup) {
                     saveButtonsGroup.style.display = 'none';
                     overwriteButtonsGroup.style.display = 'flex';
@@ -4409,8 +4409,8 @@ class UI {
             });
             this.selectedConfigToOverwrite = null;
             this.selectedConfigOriginalName = null;
-            document.getElementById('saveConfigText').textContent = 'Zapisz jako nową';
-            document.getElementById('saveDownloadConfigText').textContent = 'Zapisz i pobierz';
+            document.getElementById('saveConfigText').textContent = 'Save as new';
+            document.getElementById('saveDownloadConfigText').textContent = 'Save and download';
             if (saveButtonsGroup && overwriteButtonsGroup) {
                 saveButtonsGroup.style.display = 'flex';
                 overwriteButtonsGroup.style.display = 'none';
@@ -4477,7 +4477,7 @@ class UI {
                 if (file.name.endsWith('.transportnomad') || file.name.endsWith('.json')) {
                     this.loadFromFile(file);
                 } else {
-                    this.showNotification('Nieprawidłowy format pliku', 'error');
+                    this.showNotification('Invalid file format', 'error');
                 }
             }
         };
@@ -4671,11 +4671,11 @@ class UI {
             this.currentConfigName = finalName;
             nameInput.value = finalName;
             
-            const message = overwriteId ? 'Konfiguracja nadpisana' : 'Konfiguracja zapisana';
-            this.showNotification(message + ' w pamięci tej przeglądarki', 'success');
+            const message = overwriteId ? 'Configuration overwritten' : 'Configuration saved';
+            this.showNotification(message + ' in this browser memory', 'success');
             this.checkConfigNameExists(finalName);
         } else {
-            this.showNotification('Błąd zapisu konfiguracji', 'error');
+            this.showNotification('Configuration save error', 'error');
         }
     }
     
@@ -4737,7 +4737,7 @@ class UI {
             this.showNotification(message, 'success');
             this.checkConfigNameExists(finalName);
         } else {
-            this.showNotification('Błąd zapisu konfiguracji', 'error');
+            this.showNotification('Configuration save error', 'error');
         }
     }
     
@@ -4812,14 +4812,14 @@ class UI {
             // Orange color for overwrite
             saveBtn.classList.add('btn-overwrite');
             saveDownloadBtn.classList.add('btn-overwrite');
-            saveBtn.title = 'Nadpisz w pamięci';
-            saveDownloadBtn.title = 'Nadpisz i pobierz';
+            saveBtn.title = 'Overwrite in memory';
+            saveDownloadBtn.title = 'Overwrite and download';
         } else {
             // Normal colors
             saveBtn.classList.remove('btn-overwrite');
             saveDownloadBtn.classList.remove('btn-overwrite');
-            saveBtn.title = 'Zapisz w pamięci';
-            saveDownloadBtn.title = 'Zapisz i pobierz';
+            saveBtn.title = 'Save to memory';
+            saveDownloadBtn.title = 'Save and download';
         }
         
         return exists;

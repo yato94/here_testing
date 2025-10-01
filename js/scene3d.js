@@ -1835,7 +1835,7 @@ class Scene3D {
         // Check if it's a Roll and add orientation info
         let orientationInfo = '';
         if (cargoData.isRoll && !cargoData.fixedDiameter) {
-            orientationInfo = `Orientacja: ${cargoData.isVerticalRoll ? '⬆ Pionowo' : '➡ Poziomo'}<br>`;
+            orientationInfo = `Orientation: ${cargoData.isVerticalRoll ? '⬆ Vertical' : '➡ Horizontal'}<br>`;
         }
         
         // Get group info if selected and unit is inside
@@ -1846,18 +1846,18 @@ class Scene3D {
                 m.userData.groupId === cargoData.groupId && 
                 !this.isPositionOutsideContainer(m.position)
             );
-            groupInfo = `<div style="color: #10b981; font-weight: bold; margin-bottom: 4px;">✓ ZAZNACZONA GRUPA (${groupMeshesInside.length} szt. w przestrzeni)</div>`;
+            groupInfo = `<div style="color: #10b981; font-weight: bold; margin-bottom: 4px;">✓ SELECTED GROUP (${groupMeshesInside.length} pcs in space)</div>`;
         }
         
         detailsSection.innerHTML = `
             ${groupInfo}
-            <strong style="color: #333;">${cargoData.name || 'Jednostka'}</strong><br>
-            Wymiary: ${(cargoData.length*100).toFixed(0)}×${(cargoData.width*100).toFixed(0)}×${(cargoData.height*100).toFixed(0)} cm<br>
-            Waga: ${cargoData.weight} kg<br>
+            <strong style="color: #333;">${cargoData.name || 'Unit'}</strong><br>
+            Dimensions: ${(cargoData.length*100).toFixed(0)}×${(cargoData.width*100).toFixed(0)}×${(cargoData.height*100).toFixed(0)} cm<br>
+            Weight: ${cargoData.weight} kg<br>
             ${orientationInfo}
-            Piętrowanie: ${cargoData.maxStack || 0} szt.<br>
-            Załadunek: ${this.formatMethods(cargoData.loadingMethods)}<br>
-            Rozładunek: ${this.formatMethods(cargoData.unloadingMethods)}
+            Stacking: ${cargoData.maxStack || 0} pcs<br>
+            Loading: ${this.formatMethods(cargoData.loadingMethods)}<br>
+            Unloading: ${this.formatMethods(cargoData.unloadingMethods)}
         `;
         menu.appendChild(detailsSection);
         
@@ -1876,8 +1876,8 @@ class Scene3D {
                     if (!cargoData.isVerticalRoll) {
                         // Horizontal roll - can rotate 90/-90
                         menuItems.push(
-                            { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
-                            { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                            { text: '↻ Rotate right (90°)', action: () => this.rotateUnit(mesh, 90) },
+                            { text: '↺ Rotate left (-90°)', action: () => this.rotateUnit(mesh, -90) },
                             { separator: true }
                         );
                     }
@@ -1890,14 +1890,14 @@ class Scene3D {
                 } else {
                     // Regular units - can rotate 90/-90
                     menuItems.push(
-                        { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
-                        { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                        { text: '↻ Rotate right (90°)', action: () => this.rotateUnit(mesh, 90) },
+                        { text: '↺ Rotate left (-90°)', action: () => this.rotateUnit(mesh, -90) },
                         { separator: true }
                     );
                 }
             }
             menuItems.push(
-                { text: '🗑️ Usuń jednostkę', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
+                { text: '🗑️ Remove unit', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
             );
         } else if (isGroupSelected) {
             // Group operations - only for units inside container
@@ -1908,8 +1908,8 @@ class Scene3D {
                     if (!cargoData.isVerticalRoll) {
                         // Horizontal roll group - can rotate 90/-90
                         menuItems.push(
-                            { text: '↻ Obróć grupę w prawo (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
-                            { text: '↺ Obróć grupę w lewo (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
+                            { text: '↻ Rotate group right (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
+                            { text: '↺ Rotate group left (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
                             { separator: true }
                         );
                     }
@@ -1917,24 +1917,24 @@ class Scene3D {
                 } else {
                     // Regular unit groups - can rotate 90/-90
                     menuItems.push(
-                        { text: '↻ Obróć grupę w prawo (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
-                        { text: '↺ Obróć grupę w lewo (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
+                        { text: '↻ Rotate group right (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
+                        { text: '↺ Rotate group left (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
                         { separator: true }
                     );
                 }
             }
             menuItems.push(
-                { text: '📦 Przenieś grupę poza przestrzeń', action: () => this.moveGroupOutsideContainer(cargoData.groupId), style: 'font-weight: bold; color: #10b981;' },
-                { text: '🗑️ Usuń całą grupę', action: () => this.removeGroup(cargoData.groupId), style: 'font-weight: bold; color: #dc3545;' },
+                { text: '📦 Move group outside space', action: () => this.moveGroupOutsideContainer(cargoData.groupId), style: 'font-weight: bold; color: #10b981;' },
+                { text: '🗑️ Delete entire group', action: () => this.removeGroup(cargoData.groupId), style: 'font-weight: bold; color: #dc3545;' },
                 { separator: true },
-                { text: '❌ Odznacz grupę', action: () => this.onGroupDeselectionRequested && this.onGroupDeselectionRequested() }
+                { text: '❌ Deselect group', action: () => this.onGroupDeselectionRequested && this.onGroupDeselectionRequested() }
             );
         } else {
             // Individual unit operations for units inside container
             // Only show "Select group" if group has more than 1 unit inside container
             if (groupUnitsInside > 1) {
                 menuItems.push(
-                    { text: '🎯 Zaznacz grupę', action: () => this.onGroupSelectionRequested && this.onGroupSelectionRequested(cargoData.groupId), style: 'font-weight: bold; color: #3b82f6;' },
+                    { text: '🎯 Select group', action: () => this.onGroupSelectionRequested && this.onGroupSelectionRequested(cargoData.groupId), style: 'font-weight: bold; color: #3b82f6;' },
                     { separator: true }
                 );
             }
@@ -1946,8 +1946,8 @@ class Scene3D {
                     if (!cargoData.isVerticalRoll) {
                         // Horizontal roll - can rotate 90/-90
                         menuItems.push(
-                            { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
-                            { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                            { text: '↻ Rotate right (90°)', action: () => this.rotateUnit(mesh, 90) },
+                            { text: '↺ Rotate left (-90°)', action: () => this.rotateUnit(mesh, -90) },
                             { separator: true }
                         );
                     }
@@ -1960,15 +1960,15 @@ class Scene3D {
                 } else {
                     // Regular units - can rotate 90/-90
                     menuItems.push(
-                        { text: '↻ Obróć w prawo (90°)', action: () => this.rotateUnit(mesh, 90) },
-                        { text: '↺ Obróć w lewo (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                        { text: '↻ Rotate right (90°)', action: () => this.rotateUnit(mesh, 90) },
+                        { text: '↺ Rotate left (-90°)', action: () => this.rotateUnit(mesh, -90) },
                         { separator: true }
                     );
                 }
             }
             menuItems.push(
-                { text: '📦 Przenieś poza przestrzeń', action: () => this.moveOutsideContainer(mesh) },
-                { text: '🗑️ Usuń jednostkę', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
+                { text: '📦 Move outside space', action: () => this.moveOutsideContainer(mesh) },
+                { text: '🗑️ Remove unit', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
             );
         }
         
@@ -3992,11 +3992,11 @@ class Scene3D {
     }
     
     formatMethods(methods) {
-        if (!methods || methods.length === 0) return 'Brak';
+        if (!methods || methods.length === 0) return 'None';
         const methodNames = {
-            'rear': 'Tył',
-            'side': 'Bok',
-            'top': 'Góra'
+            'rear': 'Back',
+            'side': 'Side',
+            'top': 'Top'
         };
         return methods.map(m => methodNames[m] || m).join(', ');
     }
