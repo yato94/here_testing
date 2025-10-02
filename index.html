@@ -1026,7 +1026,14 @@
                 <!-- Axle Load Indicator -->
                 <div class="axle-load-indicator">
                     <div class="axle-header">
-                        <h4>Axle Load</h4>
+                        <h4>Axle Load
+                            <button class="axle-info-btn" id="axleInfoBtn" title="How are axle loads calculated?">
+                                <svg viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                                    <text x="12" y="16" text-anchor="middle" fill="currentColor" font-size="14" font-weight="bold">?</text>
+                                </svg>
+                            </button>
+                        </h4>
                         <button class="axle-settings-btn" id="axleSettingsBtn" title="Axle Settings">
                             <svg viewBox="0 0 24 24" width="20" height="20">
                                 <path fill="currentColor" d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
@@ -1204,7 +1211,14 @@
     <div id="axleSettingsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Axle and Load Settings</h2>
+                <h2>Axle and Load Settings
+                    <button class="axle-info-btn axle-info-btn-modal" id="axleInfoBtnModal" title="How are axle loads calculated?">
+                        <svg viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                            <text x="12" y="16" text-anchor="middle" fill="currentColor" font-size="14" font-weight="bold">?</text>
+                        </svg>
+                    </button>
+                </h2>
                 <div class="modal-header-buttons">
                     <button class="btn btn-secondary btn-sm" id="resetAxleSettings">Reset to Default</button>
                     <button class="btn btn-primary btn-sm" id="saveAxleSettings">OK</button>
@@ -1366,9 +1380,9 @@
                     </div>
                 </div>
 
-                <!-- Empty Loads -->
+                <!-- Empty Weights -->
                 <div class="settings-section">
-                    <h3>Empty Loads</h3>
+                    <h3>Empty Weights</h3>
                     
                     <div class="settings-grid">
                         <div class="settings-field">
@@ -1568,6 +1582,23 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Axle Load Info Modal -->
+    <div id="axleInfoModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Axle Load Calculation</h2>
+                <button class="modal-close" id="closeAxleInfo">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>The axle load calculations in this application are based on physical equations and force moment equilibrium principles. The calculations use axle distances measured from reference points (kingpin, front axle, etc.), empty vehicle weights representing the base weight distribution of the unloaded vehicle, cargo position and weight determining the center of mass of each loaded unit, and moment calculations applying force multiplied by distance around pivot points.</p>
+
+                <p><strong>Important Disclaimer:</strong> These calculations are theoretical estimates and may differ from real-world measurements. Actual axle loads depend on many additional factors that cannot be precisely calculated, including road angle and surface inclination, fuel tank fill level and location, air tank pressure and AdBlue levels, actual axle distances which may vary from manufacturer specifications, vehicle homologation and certification tolerances, suspension type and air balancer systems, tire pressure and wear conditions, and dynamic load shifts during acceleration, braking, and cornering.</p>
+
+                <p class="warning-text">Always verify axle loads using certified weighing equipment before transport. This tool is for planning purposes only and should not be used as the sole basis for legal compliance decisions.</p>
             </div>
         </div>
     </div>

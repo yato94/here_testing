@@ -274,7 +274,7 @@ class Scene3D {
                 context.fillStyle = '#333333';
                 context.font = 'bold 48px Arial';
                 context.textAlign = 'center';
-                context.fillText(`Sekcja ${index + 1}`, 128, 48);
+                context.fillText(`Section ${index + 1}`, 128, 48);
                 
                 const labelTexture = new THREE.CanvasTexture(canvas);
                 const labelMaterial = new THREE.MeshBasicMaterial({ 
@@ -632,12 +632,27 @@ class Scene3D {
         
         // Draw simplified truck cabin outline
         const cabinHeight = 2.3;
-        const cabinLength = 2.2; // Reduced by 10cm
+        const defaultCabinLength = 2.2; // Default cabin length (reduced by 10cm)
         const cabinWidth = 2.4;
-        
-        // Add chassis rectangle under the cabin first to calculate its position
-        const cabinX = frontAxleX - 0.2; // Moved 10cm closer to reduce gap to 45cm
-        const cabinFrontX = cabinX - cabinLength/2; // Front of both cabin and chassis align
+
+        // Fixed cabin front position (always at frontAxle - 1.3)
+        const cabinFrontX = frontAxleX - 1.3;
+
+        // Check for collision with cargo space and adjust cabin length if needed
+        // Cabin shortens from the BACK when front would collide with cargo space
+        let cabinLength = defaultCabinLength;
+        const cabinBackX = cabinFrontX + defaultCabinLength; // Ideal back position
+
+        if (cabinBackX > containerFront) {
+            // Collision detected - calculate maximum allowed cabin length with small buffer
+            // cabinBackX = cabinFrontX + cabinLength must be <= containerFront - buffer
+            const buffer = 0.02; // 2cm buffer to prevent visual overlap
+            const maxCabinLength = containerFront - cabinFrontX - buffer;
+            cabinLength = Math.max(0.3, Math.min(defaultCabinLength, maxCabinLength)); // Clamp between 0.3m and default
+        }
+
+        // Center position based on actual cabin length (front is fixed, back adjusts)
+        const cabinX = cabinFrontX + cabinLength/2;
         // For SOLO, extend chassis to the end of cargo space
         // For JUMBO, extend chassis to the end of first section
         let chassisEndX;
@@ -6956,13 +6971,13 @@ class Scene3D {
         if (axleIndicators.length === 0) {
             return null;
         }
-        
+
         const axleData = [];
         axleIndicators.forEach((indicator, index) => {
             const label = indicator.querySelector('.axle-label')?.textContent || '';
             const value = indicator.querySelector('.axle-value')?.textContent || '';
             const progressBar = indicator.querySelector('.progress-fill');
-            
+
             // Get percentage from value (load / max)
             let percentage = 0;
             if (value) {
@@ -6975,8 +6990,8 @@ class Scene3D {
                     }
                 }
             }
-            
-            
+
+
             // Determine color based on percentage and warning class
             let color = '#22c55e'; // Green
             if (indicator.classList.contains('warning-min')) {
@@ -6986,7 +7001,7 @@ class Scene3D {
             } else if (percentage > 90) {
                 color = '#fbbf24'; // Yellow for warning
             }
-            
+
             axleData.push({ label, value, percentage, color });
         });
         

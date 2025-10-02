@@ -1580,6 +1580,43 @@ body {
     color: var(--text-primary);
 }
 
+.axle-info-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-left: 6px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: baseline;
+    position: relative;
+    top: 1px;
+}
+
+.axle-info-btn:hover {
+    color: var(--primary);
+    transform: scale(1.1);
+}
+
+.axle-info-btn svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+}
+
+.axle-info-btn-modal {
+    margin-left: 8px;
+    top: 2px;
+}
+
+.axle-info-btn-modal svg {
+    width: 18px;
+    height: 18px;
+}
+
 .axle-settings-btn {
     background: none;
     border: 1px solid var(--border-color);
@@ -1674,6 +1711,22 @@ body {
 
 .modal-body {
     padding: 1.5rem;
+}
+
+.modal-body p {
+    margin-bottom: 1rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    text-align: justify;
+}
+
+.warning-text {
+    color: var(--danger);
+    font-weight: 500;
+    background: rgba(239, 68, 68, 0.1);
+    padding: 0.75rem;
+    border-radius: 4px;
+    border-left: 3px solid var(--danger);
 }
 
 .settings-section {

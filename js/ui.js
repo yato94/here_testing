@@ -28,6 +28,7 @@ class UI {
         this.setupModalHandlers();
         this.setupMobileToggles();
         this.setupAxleSettingsModal();
+        this.setupAxleInfoModal();
         this.setupSaveConfigModal();
         this.setupLoadConfigModal();
         this.setupGroupSelectionCallbacks();
@@ -855,7 +856,7 @@ class UI {
         }));
 
         const customVehicle = {
-            name: 'Własne wymiary',
+            name: 'Custom Dimensions',
             length: length,
             width: width,
             height: height,
@@ -906,7 +907,7 @@ class UI {
         const height = parseFloat(document.getElementById('customHeightSlider').value);
 
         const customVehicle = {
-            name: 'Własne wymiary',
+            name: 'Custom Dimensions',
             length: length,
             width: width,
             height: height,
@@ -1098,7 +1099,7 @@ class UI {
                     
                     // Update all labels in all forms
                     document.querySelectorAll('.weight-label-text').forEach(labelEl => {
-                        labelEl.textContent = isActive ? 'Waga wszystkich jednostek razem' : 'Waga jednej jednostki';
+                        labelEl.textContent = isActive ? 'Total weight of all units' : 'Weight per unit';
                     });
                 });
             }
@@ -1627,7 +1628,30 @@ class UI {
         });
         
         document.getElementById('clearSpace').addEventListener('click', () => {
-            this.clearAllCargo();
+            // Clear all cargo data
+            this.cargoManager.cargoItems = [];
+            this.cargoManager.totalWeight = 0;
+            this.cargoManager.colorIndex = 0;
+            this.cargoManager.selectedGroupId = null;
+            this.scene3d.clearAllCargo();
+
+            // Force axle calculator to recalculate with empty cargo
+            this.axleCalculator.updateCargo([]);
+
+            // Update UI
+            this.updateLoadedUnitsList();
+            this.updateStatistics();
+            this.updateAxleIndicators();
+
+            // Reset unit counts in left panel
+            document.querySelectorAll('.unit-count').forEach(countSpan => {
+                countSpan.textContent = '0';
+            });
+
+            // Update 3D axle load visualization
+            if (this.scene3d.showAxleLoads) {
+                this.scene3d.updateAxleLoadVisualization();
+            }
         });
         
         document.getElementById('exportPNG').addEventListener('click', () => {
@@ -1805,25 +1829,12 @@ class UI {
         }
     }
     
-    clearAllCargo() {
-        this.cargoManager.clearAllCargo();
-        
-        // Clear current config tracking
-        this.currentConfigId = null;
-        this.currentConfigName = null;
-        this.updateCurrentConfigDisplay();
-        
-        this.updateLoadedUnitsList();
-        this.updateStatistics();
-        this.updateAxleIndicators();
-    }
-    
     formatAccessMethods(methods) {
-        if (!methods || methods.length === 0) return 'Brak';
+        if (!methods || methods.length === 0) return 'None';
         const methodNames = {
-            'rear': 'Tył',
-            'side': 'Bok',
-            'top': 'Góra'
+            'rear': 'Back',
+            'side': 'Side',
+            'top': 'Top'
         };
         return methods.map(m => methodNames[m] || m).join(', ');
     }
@@ -1840,7 +1851,7 @@ class UI {
                            data-dimension="length"
                            min="50" max="1360" step="1"
                            maxlength="4"
-                           title="Długość (cm)" />×180×180 <span class="dimension-unit-small">cm</span>`;
+                           title="Length (cm)" />×180×180 <span class="dimension-unit-small">cm</span>`;
         } else if (sample.type === 'roll' && !sample.fixedDiameter) {
             // Roll: diameter and height are editable
             return `<input type="number" class="dimension-input-compact edit-dimension-diameter" 
@@ -1855,7 +1866,7 @@ class UI {
                            data-dimension="height"
                            min="10" max="300" step="1"
                            maxlength="3"
-                           title="Wysokość (cm)" /> <span class="dimension-unit-small">cm</span>`;
+                           title="Height (cm)" /> <span class="dimension-unit-small">cm</span>`;
         } else {
             // Regular units: all dimensions editable - keep original display format
             return `<input type="number" class="dimension-input-compact edit-dimension-length" 
@@ -1864,19 +1875,19 @@ class UI {
                            data-dimension="length"
                            min="1" max="1360" step="1"
                            maxlength="4"
-                           title="Długość (cm)" />×<input type="number" class="dimension-input-compact edit-dimension-width" 
+                           title="Length (cm)" />×<input type="number" class="dimension-input-compact edit-dimension-width" 
                            value="${Math.round(sample.width * 100)}" 
                            data-group-id="${groupId}" 
                            data-dimension="width"
                            min="1" max="1360" step="1"
                            maxlength="4"
-                           title="Szerokość (cm)" />×<input type="number" class="dimension-input-compact edit-dimension-height" 
+                           title="Width (cm)" />×<input type="number" class="dimension-input-compact edit-dimension-height" 
                            value="${Math.round(sample.height * 100)}" 
                            data-group-id="${groupId}" 
                            data-dimension="height"
                            min="1" max="300" step="1"
                            maxlength="3"
-                           title="Wysokość (cm)" /> <span class="dimension-unit-small">cm</span>`;
+                           title="Height (cm)" /> <span class="dimension-unit-small">cm</span>`;
         }
     }
     
@@ -2026,7 +2037,7 @@ class UI {
                     <div class="unit-box-header">
                         <span class="unit-order-number">${index + 1}</span>
                         <span class="unit-color-dot" ${colorStyle}></span>
-                        <span class="unit-quantity-badge">× ${itemsInside}${itemsOutside > 0 ? ` <span style="color: #ef4444; font-size: 0.9em;">(+${itemsOutside} outside)</span>` : ''}</span>
+                        <span class="unit-quantity-badge">× ${itemsInside}${itemsOutside > 0 ? ` <span style="font-size: 0.9em;">(+${itemsOutside} outside)</span>` : ''}</span>
                         <input type="text" class="unit-title-input edit-name" value="${group.sample.name}" data-group-id="${group.groupId}" title="Group name" />
                         <div class="unit-quantity-controls">
                             <button class="unit-btn-remove" data-group-id="${group.groupId}" title="Remove unit">−</button>
@@ -3058,7 +3069,7 @@ class UI {
         if (drive.warning || drive.belowMinimum) {
             driveItem.classList.add('warning-min');
             // Show warning tooltip or message
-            driveItem.title = drive.warning || 'Obciążenie osi napędowej poniżej minimum';
+            driveItem.title = drive.warning || 'Drive axle load below minimum';
         } else {
             driveItem.classList.remove('warning-min');
             driveItem.title = '';
@@ -3631,7 +3642,7 @@ class UI {
         
         // Generate preview
         const stats = this.cargoManager.getStatistics();
-        const vehicleName = CONFIG.vehicles[this.currentVehicle]?.name || 'Własne wymiary';
+        const vehicleName = CONFIG.vehicles[this.currentVehicle]?.name || 'Custom Dimensions';
         
         preview.innerHTML = `
             <div><strong>Cargo Space:</strong> ${vehicleName}</div>
@@ -3766,11 +3777,11 @@ class UI {
             const date = new Date(config.date);
             const dateStr = date.toLocaleDateString('pl-PL');
             const timeStr = date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
-            const vehicleName = CONFIG.vehicles[config.vehicleType]?.name || 'Własne';
+            const vehicleName = CONFIG.vehicles[config.vehicleType]?.name || 'Custom';
             
             // Show groups summary or use stats
             const groupsInfo = config.groupsSummary || 
-                (config.stats.totalItems > 0 ? `${config.stats.totalItems} jednostek` : 'Brak ładunku');
+                (config.stats.totalItems > 0 ? `${config.stats.totalItems} units` : 'No cargo');
             
             return `
                 <div class="config-item" data-config-id="${config.id}">
@@ -4018,21 +4029,29 @@ class UI {
     showNotification(message, type = 'info') {
         const notification = document.createElement('div');
         notification.style.cssText = `
-            position: fixed;
-            top: 20px;
+            position: absolute;
+            bottom: 20px;
             right: 20px;
             padding: 12px 20px;
-            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
             color: white;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            z-index: 10000;
+            z-index: 1000;
             animation: slideIn 0.3s ease;
+            max-width: 300px;
+            word-wrap: break-word;
         `;
         notification.textContent = message;
-        
-        document.body.appendChild(notification);
-        
+
+        // Append to scene-container instead of body
+        const sceneContainer = document.querySelector('.scene-container');
+        if (sceneContainer) {
+            sceneContainer.appendChild(notification);
+        } else {
+            document.body.appendChild(notification);
+        }
+
         setTimeout(() => {
             notification.style.animation = 'slideOut 0.3s ease';
             setTimeout(() => notification.remove(), 300);
@@ -4079,7 +4098,36 @@ class UI {
             this.showNotification('Default settings restored', 'info');
         });
     }
-    
+
+    setupAxleInfoModal() {
+        const modal = document.getElementById('axleInfoModal');
+        const openBtn = document.getElementById('axleInfoBtn');
+        const openBtnModal = document.getElementById('axleInfoBtnModal');
+        const closeBtn = document.getElementById('closeAxleInfo');
+
+        // Open modal
+        const openModal = () => {
+            modal.style.display = 'block';
+        };
+
+        openBtn.addEventListener('click', openModal);
+        openBtnModal.addEventListener('click', openModal);
+
+        // Close modal
+        const closeModal = () => {
+            modal.style.display = 'none';
+        };
+
+        closeBtn.addEventListener('click', closeModal);
+
+        // Close on outside click
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+    }
+
     loadAxleSettings() {
         const config = this.axleCalculator.axleConfig;
         const isSolo = this.currentVehicleConfig?.isSolo || false;
@@ -4546,7 +4594,7 @@ class UI {
                 date: new Date().toISOString(),
                 vehicleType: this.currentVehicle,
                 stats: this.cargoManager.getStatistics(),
-                groupsSummary: groupsList || 'Brak ładunku',
+                groupsSummary: groupsList || 'No cargo',
                 data: configData
             };
             
@@ -4733,7 +4781,7 @@ class UI {
             
             URL.revokeObjectURL(url);
             
-            const message = overwriteId ? 'Konfiguracja nadpisana i pobrana' : 'Konfiguracja zapisana i pobrana';
+            const message = overwriteId ? 'Configuration overwritten and downloaded' : 'Configuration saved and downloaded';
             this.showNotification(message, 'success');
             this.checkConfigNameExists(finalName);
         } else {

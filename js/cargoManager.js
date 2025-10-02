@@ -191,13 +191,6 @@ class CargoManager {
         }
     }
     
-    clearAllCargo() {
-        this.scene3d.clearAllCargo();
-        this.cargoItems = [];
-        this.totalWeight = 0;
-        this.colorIndex = 0; // Reset color index
-    }
-    
     autoArrangeGroup(groupId) {
         // Arrange only specific group, keeping other groups in place
         if (!this.containerDimensions || this.cargoItems.length === 0) {
@@ -1164,8 +1157,13 @@ class CargoManager {
     }
     
     importConfiguration(config) {
-        this.clearAllCargo();
-        
+        // Clear all cargo data
+        this.cargoItems = [];
+        this.totalWeight = 0;
+        this.colorIndex = 0;
+        this.selectedGroupId = null;
+        this.scene3d.clearAllCargo();
+
         // Store the vehicle type to return it
         const vehicleType = config.vehicleType || 'custom';
         this.currentVehicleType = vehicleType;

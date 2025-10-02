@@ -63,7 +63,7 @@ const CONFIG = {
             trailerHeight: 1.2
         },
         container20: {
-            name: 'Kontener 20\'',
+            name: 'Container 20\'',
             length: 6.06,
             width: 2.44,
             height: 2.59,
@@ -77,7 +77,7 @@ const CONFIG = {
             trailerHeight: 1.2
         },
         container40: {
-            name: 'Kontener 40\'',
+            name: 'Container 40\'',
             length: 12.19,
             width: 2.44,
             height: 2.59,
@@ -91,7 +91,7 @@ const CONFIG = {
             trailerHeight: 1.2
         },
         container40hc: {
-            name: 'Kontener 40\' HC',
+            name: 'Container 40\' HC',
             length: 12.19,
             width: 2.44,
             height: 2.90,
@@ -160,7 +160,7 @@ const CONFIG = {
     
     cargoUnits: {
         'eur-pallet': {
-            name: 'Paleta EUR',
+            name: 'EUR Pallet',
             length: 1.2,
             width: 0.8,
             height: 0.15,
@@ -172,7 +172,7 @@ const CONFIG = {
             color: 0x8B4513
         },
         'industrial-pallet': {
-            name: 'Paleta przemysłowa',
+            name: 'Industrial Pallet',
             length: 1.2,
             width: 1.0,
             height: 1.0,
@@ -184,7 +184,7 @@ const CONFIG = {
             color: 0x654321
         },
         'uk-pallet': {
-            name: 'Paleta UK',
+            name: 'UK Pallet',
             length: 1.2,
             width: 1.0,
             height: 0.15,
@@ -196,7 +196,7 @@ const CONFIG = {
             color: 0xA0522D
         },
         'half-pallet': {
-            name: 'Półpaleta',
+            name: 'Half Pallet',
             length: 0.6,
             width: 0.8,
             height: 0.15,
@@ -263,6 +263,6 @@ const CONFIG = {
         divisions: 40
     },
 
-    // Logo URL - relative path to logo file (works on GitHub Pages and local servers)
+    // Logo URL - relative path to logo file
     LOGO_URL: 'logo_black_small_com.png'
 };

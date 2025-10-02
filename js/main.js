@@ -141,11 +141,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedConfig) {
         try {
             const config = JSON.parse(savedConfig);
-            console.log('Znaleziono zapisaną konfigurację');
+            console.log('Found saved configuration');
         } catch (error) {
-            console.log('Brak zapisanej konfiguracji');
+            console.log('No saved configuration');
         }
     }
     
-    console.log('Planer Ładunków 3D - Gotowy');
+    console.log('3D Load Planner - Ready');
 });

@@ -337,13 +337,13 @@ class AxleCalculator {
             'MEGA': 'mega',
             'Frigo': 'frigo',
             'JUMBO': 'jumbo',
-            'Kontener 20\'': 'container20',
-            'Kontener 40\'': 'container40',
-            'Kontener 40\' HC': 'container40hc',
+            'Container 20\'': 'container20',
+            'Container 40\'': 'container40',
+            'Container 40\' HC': 'container40hc',
             'Coilmulde Standard': 'coilmuldeStandard',
             'Coilmulde Mega': 'coilmuldeMega',
             'SOLO': 'solo',
-            'Własne wymiary': 'custom'
+            'Custom Dimensions': 'custom'
         };
         return nameToType[vehicleConfig.name] || 'custom';
     }
@@ -467,7 +467,7 @@ class AxleCalculator {
         let driveAxleWarning = null;
         
         if (driveAxlePercentage < minDrivePercentage) {
-            driveAxleWarning = `Uwaga: Obciążenie osi napędowej (${driveAxlePercentage.toFixed(1)}%) jest poniżej minimum (${minDrivePercentage}%)`;
+            driveAxleWarning = `Warning: Drive axle load (${driveAxlePercentage.toFixed(1)}%) is below minimum (${minDrivePercentage}%)`;
         }
         
         // Calculate center of gravity of cargo from front axle for reference
@@ -726,7 +726,7 @@ class AxleCalculator {
         let driveAxleWarning = null;
         
         if (driveAxlePercentage < minDrivePercentage) {
-            driveAxleWarning = `Uwaga: Obciążenie osi napędowej (${driveAxlePercentage.toFixed(1)}%) jest poniżej minimum (${minDrivePercentage}%)`;
+            driveAxleWarning = `Warning: Drive axle load (${driveAxlePercentage.toFixed(1)}%) is below minimum (${minDrivePercentage}%)`;
         }
         
         return {
