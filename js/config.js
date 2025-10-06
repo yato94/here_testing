@@ -151,8 +151,8 @@ const CONFIG = {
             isSolo: true,  // Flag to identify SOLO type
             axles: {
                 // For SOLO: positions are from cargo space start
-                front: { position: -1.0, maxLoad: 10000, emptyWeight: 5800 },  // 1.0m before cargo start
-                rear: { position: 5.5, maxLoad: 11500, emptyWeight: 3600 }   // 5.5m from cargo start
+                front: { position: -1.0, maxLoad: 10000, emptyWeight: 5000 },  // 1.0m before cargo start
+                rear: { position: 5.5, maxLoad: 11500, emptyWeight: 2200 }   // 5.5m from cargo start
             },
             trailerHeight: 1.2  // Same floor height as trailer
         }

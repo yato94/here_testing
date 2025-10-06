@@ -1,11 +1,14 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize i18n first - detect language and load translations
+    await i18n.init();
+
     const scene3d = new Scene3D('threejs-container');
     const cargoManager = new CargoManager(scene3d);
     const axleCalculator = new AxleCalculator();
-    
+
     // Make axleCalculator globally available for scene3d
     window.axleCalculator = axleCalculator;
-    
+
     const ui = new UI(scene3d, cargoManager, axleCalculator);
     
     // Connect drag & drop callback
@@ -67,6 +70,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Connect group rotation callback
     scene3d.onGroupRotationRequested = (groupId, angle) => {
+        // Remember the ID of the hovered object before rotation (if any)
+        const hoveredId = scene3d.hoveredObject?.userData?.id;
+        const hoveredGroupId = scene3d.hoveredObject?.userData?.groupId;
+
         cargoManager.rotateGroup(groupId, angle);
         ui.updateLoadedUnitsList();
         ui.updateStatistics();
@@ -74,6 +81,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update 3D axle load visualization if enabled
         if (scene3d.showAxleLoads) {
             scene3d.updateAxleLoadVisualization();
+        }
+
+        // If a unit from the rotated group was hovered, update dimension labels with new mesh
+        if (hoveredId && hoveredGroupId === groupId) {
+            // Find the new mesh with the same ID (after rotation, meshes are recreated)
+            const newMesh = scene3d.cargoMeshes.find(m => m.userData.id === hoveredId);
+            if (newMesh) {
+                // Update hoveredObject to point to the new mesh
+                scene3d.hoveredObject = newMesh;
+                // Recreate dimension labels with updated dimensions
+                scene3d.createDimensionLabels(newMesh);
+                // Update ruler if unit is inside container
+                if (!scene3d.isPositionOutsideContainer(newMesh.position)) {
+                    scene3d.showRulerForCargo(newMesh);
+                }
+            }
         }
     };
     
@@ -112,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         .loaded-unit-group.selected-group::before {
-            content: "✓ ZAZNACZONA GRUPA";
+            content: "${i18n.t('selectedGroup')}";
             position: absolute;
             top: -8px;
             left: 12px;

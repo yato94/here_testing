@@ -600,7 +600,7 @@ class UI {
                 this.updateLoadedUnitsList();
                 this.updateStatistics();
                 this.updateAxleIndicators();
-                this.showNotification(`${steelCoils.length} Steel Coils have been removed - Coilmulde space required`, 'warning');
+                this.showNotification(i18n.t('steelCoilsRemovedCount').replace('{count}', steelCoils.length), 'warning');
             }
         }
         
@@ -1067,7 +1067,7 @@ class UI {
                         
                         // Update button
                         orientationToggleBtn.dataset.orientation = newOrientation;
-                        orientationToggleBtn.textContent = newOrientation === 'vertical' ? '⬆ Pionowo' : '➡ Poziomo';
+                        orientationToggleBtn.textContent = newOrientation === 'vertical' ? `⬆ ${i18n.t('vertical')}` : `➡ ${i18n.t('horizontal')}`;
                         
                         // Update hidden switch data attribute
                         if (orientationSwitch) {
@@ -1099,7 +1099,7 @@ class UI {
                     
                     // Update all labels in all forms
                     document.querySelectorAll('.weight-label-text').forEach(labelEl => {
-                        labelEl.textContent = isActive ? 'Total weight of all units' : 'Weight per unit';
+                        labelEl.textContent = isActive ? i18n.t('totalWeightAllUnits') : i18n.t('weightPerUnit');
                     });
                 });
             }
@@ -1258,7 +1258,7 @@ class UI {
                     
                     // Validate dimensions - for all types, not just custom-box
                     if (!params.dimensions || params.dimensions.length <= 0 || params.dimensions.width <= 0 || params.dimensions.height <= 0) {
-                        this.showNotification('Enter valid dimensions', 'error');
+                        this.showNotification(i18n.t('enterValidDimensions'), 'error');
                         return;
                     }
                     
@@ -1292,7 +1292,7 @@ class UI {
                                 messages.push(`${result.exceedingWeightCount} units exceeded weight limit`);
                             }
                             if (messages.length > 0) {
-                                this.showNotification(`${messages.join(' i ')} - placed outside the space`, 'warning');
+                                this.showNotification(`${messages.join(` ${i18n.t('and')} `)} - ${i18n.t('placedOutside')}`, 'warning');
                             }
                             
                             // Update unit counts after removal
@@ -1302,7 +1302,7 @@ class UI {
                             });
                         } else if (this.cargoManager.cargoItems.length > 50) {
                             // For performance, show message for manual arrangement when many items
-                            this.showNotification('For large number of units use "Arrange"', 'info');
+                            this.showNotification(i18n.t('forLargeNumberUseArrange'), 'info');
                         }
                         
                         this.updateLoadedUnitsList();
@@ -1330,7 +1330,7 @@ class UI {
                     
                     // Validate dimensions - for all types, not just custom-box
                     if (!params.dimensions || params.dimensions.length <= 0 || params.dimensions.width <= 0 || params.dimensions.height <= 0) {
-                        this.showNotification('Enter valid dimensions', 'error');
+                        this.showNotification(i18n.t('enterValidDimensions'), 'error');
                         return;
                     }
                     
@@ -1364,7 +1364,7 @@ class UI {
                                 messages.push(`${result.exceedingWeightCount} units exceeded weight limit`);
                             }
                             if (messages.length > 0) {
-                                this.showNotification(`${messages.join(' i ')} - placed outside the space`, 'warning');
+                                this.showNotification(`${messages.join(` ${i18n.t('and')} `)} - ${i18n.t('placedOutside')}`, 'warning');
                             }
                             
                             // Update unit counts after removal
@@ -1374,7 +1374,7 @@ class UI {
                             });
                         } else if (this.cargoManager.cargoItems.length > 50) {
                             // For performance, show message for manual arrangement when many items
-                            this.showNotification('For large number of units use "Arrange"', 'info');
+                            this.showNotification(i18n.t('forLargeNumberUseArrange'), 'info');
                         }
                         
                         this.updateLoadedUnitsList();
@@ -1780,7 +1780,7 @@ class UI {
         const result = this.cargoManager.autoArrange();
         
         if (!result) {
-            this.showNotification('Cannot arrange cargo', 'error');
+            this.showNotification(i18n.t('cannotArrangeCargo'), 'error');
             return;
         }
         
@@ -1794,7 +1794,7 @@ class UI {
         }
         
         if (result.success) {
-            this.showNotification('Cargo arranged automatically', 'success');
+            this.showNotification(i18n.t('cargoArrangedAutomatically'), 'success');
         } else {
             const messages = [];
             if (result.unpackedCount > 0) {
@@ -1804,7 +1804,7 @@ class UI {
                 messages.push(`${result.exceedingWeightCount} units exceeded weight limit`);
             }
             if (messages.length > 0) {
-                this.showNotification(`Warning! ${messages.join(' and ')} - placed outside the space`, 'warning');
+                this.showNotification(i18n.t('warningPlacedOutside').replace('{items}', messages.join(` ${i18n.t('and')} `)), 'warning');
             }
             // Update unit counts after removal
             this.unitCounts = {};
@@ -1894,11 +1894,11 @@ class UI {
     formatAccessMethodsWithColor(methods, groupId = null, type = null) {
         const allMethods = ['rear', 'side', 'top'];
         const methodNames = {
-            'rear': 'Back',
-            'side': 'Side',
-            'top': 'Top'
+            'rear': i18n.t('back'),
+            'side': i18n.t('side'),
+            'top': i18n.t('top')
         };
-        
+
         return allMethods.map(m => {
             const isActive = methods && methods.includes(m);
             const className = isActive ? 'active' : '';
@@ -2037,12 +2037,12 @@ class UI {
                     <div class="unit-box-header">
                         <span class="unit-order-number">${index + 1}</span>
                         <span class="unit-color-dot" ${colorStyle}></span>
-                        <span class="unit-quantity-badge">× ${itemsInside}${itemsOutside > 0 ? ` <span style="font-size: 0.9em;">(+${itemsOutside} outside)</span>` : ''}</span>
-                        <input type="text" class="unit-title-input edit-name" value="${group.sample.name}" data-group-id="${group.groupId}" title="Group name" />
+                        <span class="unit-quantity-badge">× ${itemsInside}${itemsOutside > 0 ? ` <span style="font-size: 0.9em;">(+${itemsOutside} ${i18n.t('outside')})</span>` : ''}</span>
+                        <input type="text" class="unit-title-input edit-name" value="${group.sample.name}" data-group-id="${group.groupId}" title="${i18n.t('groups')}" />
                         <div class="unit-quantity-controls">
-                            <button class="unit-btn-remove" data-group-id="${group.groupId}" title="Remove unit">−</button>
-                            <button class="unit-btn-add" data-group-id="${group.groupId}" title="Add unit">+</button>
-                            <button class="unit-btn-delete-all" data-group-id="${group.groupId}" title="Delete entire group">
+                            <button class="unit-btn-remove" data-group-id="${group.groupId}" title="${i18n.t('removeUnit')}">−</button>
+                            <button class="unit-btn-add" data-group-id="${group.groupId}" title="${i18n.t('units')}">+</button>
+                            <button class="unit-btn-delete-all" data-group-id="${group.groupId}" title="${i18n.t('deleteEntireGroup')}">
                                 <svg viewBox="0 0 24 24" width="16" height="16">
                                     <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/>
                                 </svg>
@@ -2052,46 +2052,46 @@ class UI {
                     <div class="unit-box-content">
                         <div class="unit-grid">
                             <div class="unit-item">
-                                <div class="unit-item-label">Dimensions</div>
+                                <div class="unit-item-label">${i18n.t('dimensions')}</div>
                                 <div class="unit-dimensions-editable">
                                     ${this.createDimensionInputs(group)}
                                 </div>
                                 <div class="unit-item-sublabel">
                                     ${group.sample.type === 'roll' && !group.sample.fixedDiameter ?
                                         `<button class="orientation-toggle-btn" data-group-id="${group.groupId}" style="background: none; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 11px;">
-                                            ${group.sample.isVerticalRoll ? '⬆ Vertical' : '➡ Horizontal'}
+                                            ${group.sample.isVerticalRoll ? `⬆ ${i18n.t('vertical')}` : `➡ ${i18n.t('horizontal')}`}
                                         </button>` :
-                                        (group.sample.type === 'steel-coil' ? '(len. × diam. × diam.)' : '(len. / width / height)')}
+                                        (group.sample.type === 'steel-coil' ? `(${i18n.t('length')} × ${i18n.t('height')} × ${i18n.t('height')})` : `(${i18n.t('length')} / ${i18n.t('width')} / ${i18n.t('height')})`)}
                                 </div>
                             </div>
                             <div class="unit-item">
-                                <div class="unit-item-label">Weight per unit</div>
+                                <div class="unit-item-label">${i18n.t('weightPerUnitShort')}</div>
                                 <input type="text" class="unit-editable-input edit-weight" value="${parseFloat(group.sample.weight.toFixed(2))} kg" data-group-id="${group.groupId}" />
                             </div>
                             <div class="unit-item">
                                 <div class="unit-item-label">
-                                    Stacking
+                                    ${i18n.t('stacking')}
                                     <span class="help-icon">
                                         ?
                                         <span class="tooltip">
-                                            Maximum number of units that can be placed on top of this unit and maximum total weight that can be placed on top
+                                            ${i18n.t('stackingHelp')}
                                         </span>
                                     </span>
                                 </div>
                                 <div class="stacking-inputs-container">
-                                    <input type="text" class="stacking-input-small edit-stack" value="${group.sample.maxStack}" data-group-id="${group.groupId}" title="Number of layers" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
+                                    <input type="text" class="stacking-input-small edit-stack" value="${group.sample.maxStack}" data-group-id="${group.groupId}" title="${i18n.t('units')}" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
                                     <span class="stacking-separator">/</span>
-                                    <input type="text" class="stacking-input-small edit-max-weight auto-resize-input" value="${(group.sample.maxStackWeight || 0).toString().replace(/[^\d.]/g, '')}kg" data-group-id="${group.groupId}" maxlength="6" title="Max weight on top" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
+                                    <input type="text" class="stacking-input-small edit-max-weight auto-resize-input" value="${(group.sample.maxStackWeight || 0).toString().replace(/[^\d.]/g, '')}kg" data-group-id="${group.groupId}" maxlength="6" title="${i18n.t('weight')}" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
                                 </div>
                             </div>
                             <div class="unit-item">
                                 <div class="unit-access-container">
                                     <div class="access-group">
-                                        <div class="access-label">Loading</div>
+                                        <div class="access-label">${i18n.t('loading')}</div>
                                         <div class="access-methods">${this.formatAccessMethodsWithColor(group.sample.loadingMethods, group.groupId, 'loading')}</div>
                                     </div>
                                     <div class="access-group">
-                                        <div class="access-label">Unloading</div>
+                                        <div class="access-label">${i18n.t('unloading')}</div>
                                         <div class="access-methods">${this.formatAccessMethodsWithColor(group.sample.unloadingMethods, group.groupId, 'unloading')}</div>
                                     </div>
                                 </div>
@@ -2101,19 +2101,19 @@ class UI {
                     <div class="unit-box-footer">
                         <div class="unit-footer-item">
                             <div class="unit-footer-value">${totalWeight} kg</div>
-                            <div class="unit-footer-label">TOTAL WEIGHT</div>
+                            <div class="unit-footer-label">${i18n.t('totalWeight')}</div>
                         </div>
                         <div class="unit-footer-item">
                             <div class="unit-footer-value">${totalVolume.toFixed(2)} m³</div>
-                            <div class="unit-footer-label">VOLUME</div>
+                            <div class="unit-footer-label">${i18n.t('volume').toUpperCase()}</div>
                         </div>
                         <div class="unit-footer-item">
                             <div class="unit-footer-value">${floorArea.toFixed(2)} m²</div>
-                            <div class="unit-footer-label">FLOOR AREA</div>
+                            <div class="unit-footer-label">${i18n.t('floorArea')}</div>
                         </div>
                         <div class="unit-footer-item">
                             <div class="unit-footer-value">${ldm.toFixed(2)}</div>
-                            <div class="unit-footer-label">LDM</div>
+                            <div class="unit-footer-label">${i18n.t('ldm')}</div>
                         </div>
                     </div>
                 </div>
@@ -2215,7 +2215,7 @@ class UI {
                     
                     if (valueInCm < 1 || valueInCm > maxValue) {
                         const maxText = dimension === 'height' ? '300cm' : '1360cm';
-                        this.showNotification(`${dimension === 'height' ? 'Height' : 'Dimension'} must be between 1cm and ${maxText}`, 'error');
+                        this.showNotification(i18n.t('dimensionMustBeBetween').replace('{dimension}', dimension === 'height' ? i18n.t('Height') : i18n.t('Dimension')).replace('{max}', maxText), 'error');
                         return;
                     }
                     
@@ -2504,7 +2504,7 @@ class UI {
             }
             this.showNotification(messages.join(', '), 'warning');
         } else {
-            this.showNotification(`Group dimensions have been updated`, 'success');
+            this.showNotification(i18n.t('groupDimensionsUpdated'), 'success');
         }
     }
     
@@ -3098,7 +3098,7 @@ class UI {
     async exportToPDF() {
         try {
             // Show loading indicator
-            this.showNotification('Generating PDF...', 'info');
+            this.showNotification(i18n.t('generatingPDF'), 'info');
 
             // Update axle load indicators to ensure current data is displayed
             this.updateAxleIndicators();
@@ -3383,11 +3383,11 @@ class UI {
             const filename = `load_plan_${new Date().toISOString().split('T')[0]}.pdf`;
             pdf.save(filename);
             
-            this.showNotification('PDF has been generated', 'success');
+            this.showNotification(i18n.t('pdfGenerated'), 'success');
             
         } catch (error) {
             console.error('Error generating PDF:', error);
-            this.showNotification('Error generating PDF', 'error');
+            this.showNotification(i18n.t('errorGeneratingPDF'), 'error');
         }
     }
     
@@ -3744,7 +3744,7 @@ class UI {
             }
             this.showNotification(message, 'success');
         } else {
-            this.showNotification(downloadFile ? 'Configuration saved to file' : 'Save error', 'error');
+            this.showNotification(downloadFile ? i18n.t('configSavedToFile') : i18n.t('saveError'), 'error');
         }
     }
     
@@ -3821,12 +3821,12 @@ class UI {
             this.updateCurrentConfigDisplay();
             
             document.getElementById('loadConfigModal').style.display = 'none';
-            this.showNotification('Configuration loaded', 'success');
+            this.showNotification(i18n.t('configurationLoaded'), 'success');
         }
     }
     
     deleteAndRefresh(configId) {
-        if (confirm('Czy na pewno chcesz usunąć tę konfigurację?')) {
+        if (confirm(i18n.t('confirmDelete'))) {
             this.deleteStoredConfiguration(configId);
             this.refreshSavedConfigsList();
         }
@@ -3861,13 +3861,13 @@ class UI {
                 document.getElementById('loadConfigModal').style.display = 'none';
                 
                 if (existingConfig) {
-                    this.showNotification('Configuration loaded from file and updated in memory', 'success');
+                    this.showNotification(i18n.t('configLoadedFromFile'), 'success');
                 } else {
-                    this.showNotification('Configuration loaded from file and saved in memory', 'success');
+                    this.showNotification(i18n.t('configLoadedFromFileSaved'), 'success');
                 }
             } catch (error) {
                 console.error('Error loading configuration:', error);
-                this.showNotification('Error loading configuration', 'error');
+                this.showNotification(i18n.t('errorLoadingConfiguration'), 'error');
             }
         };
         reader.readAsText(file);
@@ -4021,7 +4021,7 @@ class UI {
             }
         } catch (error) {
             console.error('Error applying configuration:', error);
-            this.showNotification('Błąd wczytywania konfiguracji', 'error');
+            this.showNotification(i18n.t('errorLoadingConfiguration'), 'error');
         }
     }
     
@@ -4088,14 +4088,14 @@ class UI {
         saveBtn.addEventListener('click', () => {
             this.saveAxleSettings();
             modal.style.display = 'none';
-            this.showNotification('Axle settings saved', 'success');
+            this.showNotification(i18n.t('axleSettingsSaved'), 'success');
         });
         
         // Reset to defaults
         resetBtn.addEventListener('click', () => {
             this.axleCalculator.axleConfig.resetToDefaults();
             this.loadAxleSettings();
-            this.showNotification('Default settings restored', 'info');
+            this.showNotification(i18n.t('defaultSettingsRestored'), 'info');
         });
     }
 
@@ -4104,6 +4104,17 @@ class UI {
         const openBtn = document.getElementById('axleInfoBtn');
         const openBtnModal = document.getElementById('axleInfoBtnModal');
         const closeBtn = document.getElementById('closeAxleInfo');
+
+        // Check if elements exist
+        if (!modal || !openBtn || !openBtnModal || !closeBtn) {
+            console.error('Axle Info Modal elements not found:', {
+                modal: !!modal,
+                openBtn: !!openBtn,
+                openBtnModal: !!openBtnModal,
+                closeBtn: !!closeBtn
+            });
+            return;
+        }
 
         // Open modal
         const openModal = () => {
@@ -4525,7 +4536,7 @@ class UI {
                 if (file.name.endsWith('.transportnomad') || file.name.endsWith('.json')) {
                     this.loadFromFile(file);
                 } else {
-                    this.showNotification('Invalid file format', 'error');
+                    this.showNotification(i18n.t('invalidFileFormat'), 'error');
                 }
             }
         };
@@ -4720,10 +4731,10 @@ class UI {
             nameInput.value = finalName;
             
             const message = overwriteId ? 'Configuration overwritten' : 'Configuration saved';
-            this.showNotification(message + ' in this browser memory', 'success');
+            this.showNotification(i18n.t('configSavedInMemory').replace('{message}', message), 'success');
             this.checkConfigNameExists(finalName);
         } else {
-            this.showNotification('Configuration save error', 'error');
+            this.showNotification(i18n.t('configurationSaveError'), 'error');
         }
     }
     
@@ -4785,7 +4796,7 @@ class UI {
             this.showNotification(message, 'success');
             this.checkConfigNameExists(finalName);
         } else {
-            this.showNotification('Configuration save error', 'error');
+            this.showNotification(i18n.t('configurationSaveError'), 'error');
         }
     }
     

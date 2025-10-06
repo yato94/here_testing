@@ -1850,29 +1850,29 @@ class Scene3D {
         // Check if it's a Roll and add orientation info
         let orientationInfo = '';
         if (cargoData.isRoll && !cargoData.fixedDiameter) {
-            orientationInfo = `Orientation: ${cargoData.isVerticalRoll ? '⬆ Vertical' : '➡ Horizontal'}<br>`;
+            orientationInfo = `${i18n.t('orientation')}: ${cargoData.isVerticalRoll ? `⬆ ${i18n.t('vertical')}` : `➡ ${i18n.t('horizontal')}`}<br>`;
         }
-        
+
         // Get group info if selected and unit is inside
         let groupInfo = '';
         if (isGroupSelected) {
-            const groupMeshesInside = this.cargoMeshes.filter(m => 
-                m.userData && 
-                m.userData.groupId === cargoData.groupId && 
+            const groupMeshesInside = this.cargoMeshes.filter(m =>
+                m.userData &&
+                m.userData.groupId === cargoData.groupId &&
                 !this.isPositionOutsideContainer(m.position)
             );
-            groupInfo = `<div style="color: #10b981; font-weight: bold; margin-bottom: 4px;">✓ SELECTED GROUP (${groupMeshesInside.length} pcs in space)</div>`;
+            groupInfo = `<div style="color: #10b981; font-weight: bold; margin-bottom: 4px;">✓ ${i18n.t('selectedGroupInfo').replace('{count}', groupMeshesInside.length)}</div>`;
         }
-        
+
         detailsSection.innerHTML = `
             ${groupInfo}
             <strong style="color: #333;">${cargoData.name || 'Unit'}</strong><br>
-            Dimensions: ${(cargoData.length*100).toFixed(0)}×${(cargoData.width*100).toFixed(0)}×${(cargoData.height*100).toFixed(0)} cm<br>
-            Weight: ${cargoData.weight} kg<br>
+            ${i18n.t('dimensions')}: ${(cargoData.length*100).toFixed(0)}×${(cargoData.width*100).toFixed(0)}×${(cargoData.height*100).toFixed(0)} cm<br>
+            ${i18n.t('weight')}: ${cargoData.weight} kg<br>
             ${orientationInfo}
-            Stacking: ${cargoData.maxStack || 0} pcs<br>
-            Loading: ${this.formatMethods(cargoData.loadingMethods)}<br>
-            Unloading: ${this.formatMethods(cargoData.unloadingMethods)}
+            ${i18n.t('stacking')}: ${cargoData.maxStack || 0} ${i18n.t('pcs')}<br>
+            ${i18n.t('loading')}: ${this.formatMethods(cargoData.loadingMethods)}<br>
+            ${i18n.t('unloading')}: ${this.formatMethods(cargoData.unloadingMethods)}
         `;
         menu.appendChild(detailsSection);
         
@@ -1891,28 +1891,28 @@ class Scene3D {
                     if (!cargoData.isVerticalRoll) {
                         // Horizontal roll - can rotate 90/-90
                         menuItems.push(
-                            { text: '↻ Rotate right (90°)', action: () => this.rotateUnit(mesh, 90) },
-                            { text: '↺ Rotate left (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                            { text: `↻ ${i18n.t('rotateRight')}`, action: () => this.rotateUnit(mesh, 90) },
+                            { text: `↺ ${i18n.t('rotateLeft')}`, action: () => this.rotateUnit(mesh, -90) },
                             { separator: true }
                         );
                     }
                     // Always show orientation toggle for rolls
                     menuItems.push(
-                        { text: cargoData.isVerticalRoll ? '➡ Zmień na poziomo' : '⬆ Zmień na pionowo', 
+                        { text: cargoData.isVerticalRoll ? `➡ ${i18n.t('changeToHorizontal')}` : `⬆ ${i18n.t('changeToVertical')}`,
                           action: () => this.toggleRollOrientation(mesh) },
                         { separator: true }
                     );
                 } else {
                     // Regular units - can rotate 90/-90
                     menuItems.push(
-                        { text: '↻ Rotate right (90°)', action: () => this.rotateUnit(mesh, 90) },
-                        { text: '↺ Rotate left (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                        { text: `↻ ${i18n.t('rotateRight')}`, action: () => this.rotateUnit(mesh, 90) },
+                        { text: `↺ ${i18n.t('rotateLeft')}`, action: () => this.rotateUnit(mesh, -90) },
                         { separator: true }
                     );
                 }
             }
             menuItems.push(
-                { text: '🗑️ Remove unit', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
+                { text: `🗑️ ${i18n.t('removeUnit')}`, action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
             );
         } else if (isGroupSelected) {
             // Group operations - only for units inside container
@@ -1923,8 +1923,8 @@ class Scene3D {
                     if (!cargoData.isVerticalRoll) {
                         // Horizontal roll group - can rotate 90/-90
                         menuItems.push(
-                            { text: '↻ Rotate group right (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
-                            { text: '↺ Rotate group left (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
+                            { text: `↻ ${i18n.t('rotateGroupRight')}`, action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
+                            { text: `↺ ${i18n.t('rotateGroupLeft')}`, action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
                             { separator: true }
                         );
                     }
@@ -1932,28 +1932,28 @@ class Scene3D {
                 } else {
                     // Regular unit groups - can rotate 90/-90
                     menuItems.push(
-                        { text: '↻ Rotate group right (90°)', action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
-                        { text: '↺ Rotate group left (-90°)', action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
+                        { text: `↻ ${i18n.t('rotateGroupRight')}`, action: () => this.rotateGroup(cargoData.groupId, 90), style: 'font-weight: bold; color: #10b981;' },
+                        { text: `↺ ${i18n.t('rotateGroupLeft')}`, action: () => this.rotateGroup(cargoData.groupId, -90), style: 'font-weight: bold; color: #10b981;' },
                         { separator: true }
                     );
                 }
             }
             menuItems.push(
-                { text: '📦 Move group outside space', action: () => this.moveGroupOutsideContainer(cargoData.groupId), style: 'font-weight: bold; color: #10b981;' },
-                { text: '🗑️ Delete entire group', action: () => this.removeGroup(cargoData.groupId), style: 'font-weight: bold; color: #dc3545;' },
+                { text: `📦 ${i18n.t('moveGroupOutsideSpace')}`, action: () => this.moveGroupOutsideContainer(cargoData.groupId), style: 'font-weight: bold; color: #10b981;' },
+                { text: `🗑️ ${i18n.t('deleteEntireGroup')}`, action: () => this.removeGroup(cargoData.groupId), style: 'font-weight: bold; color: #dc3545;' },
                 { separator: true },
-                { text: '❌ Deselect group', action: () => this.onGroupDeselectionRequested && this.onGroupDeselectionRequested() }
+                { text: `❌ ${i18n.t('deselectGroup')}`, action: () => this.onGroupDeselectionRequested && this.onGroupDeselectionRequested() }
             );
         } else {
             // Individual unit operations for units inside container
             // Only show "Select group" if group has more than 1 unit inside container
             if (groupUnitsInside > 1) {
                 menuItems.push(
-                    { text: '🎯 Select group', action: () => this.onGroupSelectionRequested && this.onGroupSelectionRequested(cargoData.groupId), style: 'font-weight: bold; color: #3b82f6;' },
+                    { text: `🎯 ${i18n.t('selectGroup')}`, action: () => this.onGroupSelectionRequested && this.onGroupSelectionRequested(cargoData.groupId), style: 'font-weight: bold; color: #3b82f6;' },
                     { separator: true }
                 );
             }
-            
+
             // Steel Coils cannot be rotated
             if (!isSteelCoil) {
                 // For Roll units, check orientation for rotation options
@@ -1961,29 +1961,29 @@ class Scene3D {
                     if (!cargoData.isVerticalRoll) {
                         // Horizontal roll - can rotate 90/-90
                         menuItems.push(
-                            { text: '↻ Rotate right (90°)', action: () => this.rotateUnit(mesh, 90) },
-                            { text: '↺ Rotate left (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                            { text: `↻ ${i18n.t('rotateRight')}`, action: () => this.rotateUnit(mesh, 90) },
+                            { text: `↺ ${i18n.t('rotateLeft')}`, action: () => this.rotateUnit(mesh, -90) },
                             { separator: true }
                         );
                     }
                     // Always show orientation toggle for rolls
                     menuItems.push(
-                        { text: cargoData.isVerticalRoll ? '➡ Zmień na poziomo' : '⬆ Zmień na pionowo', 
+                        { text: cargoData.isVerticalRoll ? `➡ ${i18n.t('changeToHorizontal')}` : `⬆ ${i18n.t('changeToVertical')}`,
                           action: () => this.toggleRollOrientation(mesh) },
                         { separator: true }
                     );
                 } else {
                     // Regular units - can rotate 90/-90
                     menuItems.push(
-                        { text: '↻ Rotate right (90°)', action: () => this.rotateUnit(mesh, 90) },
-                        { text: '↺ Rotate left (-90°)', action: () => this.rotateUnit(mesh, -90) },
+                        { text: `↻ ${i18n.t('rotateRight')}`, action: () => this.rotateUnit(mesh, 90) },
+                        { text: `↺ ${i18n.t('rotateLeft')}`, action: () => this.rotateUnit(mesh, -90) },
                         { separator: true }
                     );
                 }
             }
             menuItems.push(
-                { text: '📦 Move outside space', action: () => this.moveOutsideContainer(mesh) },
-                { text: '🗑️ Remove unit', action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
+                { text: `📦 ${i18n.t('moveOutsideSpace')}`, action: () => this.moveOutsideContainer(mesh) },
+                { text: `🗑️ ${i18n.t('removeUnit')}`, action: () => this.removeUnit(mesh), style: 'color: #dc3545;' }
             );
         }
         
@@ -3128,28 +3128,82 @@ class Scene3D {
     
     clampToGrooveBounds(position) {
         if (!this.containerBounds || !this.draggedObjects[0]) return position;
-        
-        const coilRadius = this.draggedObjects[0].userData.height / 2;
-        const coilLength = this.draggedObjects[0].userData.length;
-        
+
+        // Get reference values from first coil
+        const firstCoil = this.draggedObjects[0];
+        const coilRadius = firstCoil.userData.height / 2;
+        const coilLength = firstCoil.userData.length;
+
         const clamped = position.clone();
-        
+
         // Calculate groove position in container coordinates
         const containerHalfLength = this.containerBounds.containerLength / 2;
         const grooveStartX = -containerHalfLength + this.containerBounds.grooveStartX;
         const grooveEndX = grooveStartX + this.containerBounds.grooveLength;
-        
-        // Restrict X movement within groove bounds
-        const minX = grooveStartX + coilLength / 2;
-        const maxX = grooveEndX - coilLength / 2;
-        clamped.x = Math.max(minX, Math.min(maxX, position.x));
-        
+
+        // Find all Steel Coils in dragged objects
+        const steelCoils = this.draggedObjects.filter(obj =>
+            obj.userData && obj.userData.fixedDiameter
+        );
+
+        if (steelCoils.length > 1) {
+            // Multiple Steel Coils - calculate safe delta for entire group
+            // Calculate what delta X would be for the first coil
+            const originalFirstX = firstCoil.position.x;
+            const basicMinX = grooveStartX + coilLength / 2;
+            const basicMaxX = grooveEndX - coilLength / 2;
+            const desiredFirstX = Math.max(basicMinX, Math.min(basicMaxX, position.x));
+            const deltaX = desiredFirstX - originalFirstX;
+
+            // Check if this delta would keep all coils within bounds
+            let maxAllowedDelta = deltaX;
+            for (let coil of steelCoils) {
+                const coilLen = coil.userData.length;
+                const newCoilX = coil.position.x + deltaX;
+                const coilMinX = grooveStartX + coilLen / 2;
+                const coilMaxX = grooveEndX - coilLen / 2;
+
+                // If this coil would go out of bounds with current delta, restrict delta
+                if (newCoilX < coilMinX) {
+                    // Coil would go too far left - limit delta
+                    const necessaryDelta = coilMinX - coil.position.x;
+                    // Choose the delta that moves less (closer to 0 in the direction of movement)
+                    if (deltaX < 0) {
+                        // Moving left - choose larger (less negative) delta
+                        maxAllowedDelta = Math.max(maxAllowedDelta, necessaryDelta);
+                    } else {
+                        // Not moving left but coil would be out - something is wrong, restrict to 0
+                        maxAllowedDelta = 0;
+                    }
+                } else if (newCoilX > coilMaxX) {
+                    // Coil would go too far right - limit delta
+                    const necessaryDelta = coilMaxX - coil.position.x;
+                    // Choose the delta that moves less (closer to 0 in the direction of movement)
+                    if (deltaX > 0) {
+                        // Moving right - choose smaller (less positive) delta
+                        maxAllowedDelta = Math.min(maxAllowedDelta, necessaryDelta);
+                    } else {
+                        // Not moving right but coil would be out - something is wrong, restrict to 0
+                        maxAllowedDelta = 0;
+                    }
+                }
+            }
+
+            // Apply the most restrictive delta
+            clamped.x = originalFirstX + maxAllowedDelta;
+        } else {
+            // Single Steel Coil or no Steel Coils - use original logic
+            const minX = grooveStartX + coilLength / 2;
+            const maxX = grooveEndX - coilLength / 2;
+            clamped.x = Math.max(minX, Math.min(maxX, position.x));
+        }
+
         // Force Z position to center of groove (coil can only move along X axis)
         clamped.z = 0;
-        
+
         // Force Y position to groove depth
         clamped.y = -this.containerBounds.grooveDepth / 2 + coilRadius;
-        
+
         return clamped;
     }
     
@@ -4007,11 +4061,11 @@ class Scene3D {
     }
     
     formatMethods(methods) {
-        if (!methods || methods.length === 0) return 'None';
+        if (!methods || methods.length === 0) return i18n.t('back');
         const methodNames = {
-            'rear': 'Back',
-            'side': 'Side',
-            'top': 'Top'
+            'rear': i18n.t('back'),
+            'side': i18n.t('side'),
+            'top': i18n.t('top')
         };
         return methods.map(m => methodNames[m] || m).join(', ');
     }
@@ -4664,10 +4718,27 @@ class Scene3D {
         
         // Create new group for labels
         this.dimensionLabelsGroup = new THREE.Group();
-        
+
+        // Get dimensions from userData (these reflect the logical dimensions after rotation)
         const halfLength = mesh.userData.length / 2;
         const halfWidth = mesh.userData.width / 2;
         const halfHeight = mesh.userData.height / 2;
+
+        // For local space calculations (vertices), we need the actual geometry dimensions
+        // which don't change when mesh is rotated - only mesh.rotation changes
+        // Check if mesh is rotated 90 or -90 degrees
+        const rotation = mesh.rotation.y;
+        const isRotated90 = Math.abs(Math.abs(rotation) - Math.PI/2) < 0.1;
+
+        // For local vertices, use geometry dimensions (swap if rotated)
+        let localHalfLength = halfLength;
+        let localHalfWidth = halfWidth;
+
+        if (isRotated90) {
+            // Geometry still has original dimensions, so swap back for local calculations
+            localHalfLength = halfWidth;
+            localHalfWidth = halfLength;
+        }
         
         // Check if it's a cylindrical unit (Roll or Steel Coil)
         const isRoll = mesh.userData.isRoll;
@@ -4714,61 +4785,62 @@ class Scene3D {
         
         // Map vertex index to which edges are visible
         // Each vertex connects three edges
+        // Use LOCAL dimensions (from geometry, not userData) for vertex positions
         const edgeMap = {
             0: { // back-bottom-left
                 edges: [
-                    { dimension: 'length', start: [-halfLength, -halfHeight, -halfWidth], end: [halfLength, -halfHeight, -halfWidth] },
-                    { dimension: 'width', start: [-halfLength, -halfHeight, -halfWidth], end: [-halfLength, -halfHeight, halfWidth] },
-                    { dimension: 'height', start: [-halfLength, -halfHeight, -halfWidth], end: [-halfLength, halfHeight, -halfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, -halfHeight, -localHalfWidth] },
+                    { dimension: 'width', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [-localHalfLength, -halfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [-localHalfLength, halfHeight, -localHalfWidth] }
                 ]
             },
             1: { // back-bottom-right
                 edges: [
-                    { dimension: 'length', start: [-halfLength, -halfHeight, -halfWidth], end: [halfLength, -halfHeight, -halfWidth] },
-                    { dimension: 'width', start: [halfLength, -halfHeight, -halfWidth], end: [halfLength, -halfHeight, halfWidth] },
-                    { dimension: 'height', start: [halfLength, -halfHeight, -halfWidth], end: [halfLength, halfHeight, -halfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, -halfHeight, -localHalfWidth] },
+                    { dimension: 'width', start: [localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, -halfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, -localHalfWidth] }
                 ]
             },
             2: { // front-bottom-right
                 edges: [
-                    { dimension: 'length', start: [-halfLength, -halfHeight, halfWidth], end: [halfLength, -halfHeight, halfWidth] },
-                    { dimension: 'width', start: [halfLength, -halfHeight, -halfWidth], end: [halfLength, -halfHeight, halfWidth] },
-                    { dimension: 'height', start: [halfLength, -halfHeight, halfWidth], end: [halfLength, halfHeight, halfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, -halfHeight, localHalfWidth], end: [localHalfLength, -halfHeight, localHalfWidth] },
+                    { dimension: 'width', start: [localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, -halfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [localHalfLength, -halfHeight, localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] }
                 ]
             },
             3: { // front-bottom-left
                 edges: [
-                    { dimension: 'length', start: [-halfLength, -halfHeight, halfWidth], end: [halfLength, -halfHeight, halfWidth] },
-                    { dimension: 'width', start: [-halfLength, -halfHeight, -halfWidth], end: [-halfLength, -halfHeight, halfWidth] },
-                    { dimension: 'height', start: [-halfLength, -halfHeight, halfWidth], end: [-halfLength, halfHeight, halfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, -halfHeight, localHalfWidth], end: [localHalfLength, -halfHeight, localHalfWidth] },
+                    { dimension: 'width', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [-localHalfLength, -halfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [-localHalfLength, -halfHeight, localHalfWidth], end: [-localHalfLength, halfHeight, localHalfWidth] }
                 ]
             },
             4: { // back-top-left
                 edges: [
-                    { dimension: 'length', start: [-halfLength, halfHeight, -halfWidth], end: [halfLength, halfHeight, -halfWidth] },
-                    { dimension: 'width', start: [-halfLength, halfHeight, -halfWidth], end: [-halfLength, halfHeight, halfWidth] },
-                    { dimension: 'height', start: [-halfLength, -halfHeight, -halfWidth], end: [-halfLength, halfHeight, -halfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, -localHalfWidth] },
+                    { dimension: 'width', start: [-localHalfLength, halfHeight, -localHalfWidth], end: [-localHalfLength, halfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [-localHalfLength, halfHeight, -localHalfWidth] }
                 ]
             },
             5: { // back-top-right
                 edges: [
-                    { dimension: 'length', start: [-halfLength, halfHeight, -halfWidth], end: [halfLength, halfHeight, -halfWidth] },
-                    { dimension: 'width', start: [halfLength, halfHeight, -halfWidth], end: [halfLength, halfHeight, halfWidth] },
-                    { dimension: 'height', start: [halfLength, -halfHeight, -halfWidth], end: [halfLength, halfHeight, -halfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, -localHalfWidth] },
+                    { dimension: 'width', start: [localHalfLength, halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, -localHalfWidth] }
                 ]
             },
             6: { // front-top-right
                 edges: [
-                    { dimension: 'length', start: [-halfLength, halfHeight, halfWidth], end: [halfLength, halfHeight, halfWidth] },
-                    { dimension: 'width', start: [halfLength, halfHeight, -halfWidth], end: [halfLength, halfHeight, halfWidth] },
-                    { dimension: 'height', start: [halfLength, -halfHeight, halfWidth], end: [halfLength, halfHeight, halfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, halfHeight, localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] },
+                    { dimension: 'width', start: [localHalfLength, halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [localHalfLength, -halfHeight, localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] }
                 ]
             },
             7: { // front-top-left
                 edges: [
-                    { dimension: 'length', start: [-halfLength, halfHeight, halfWidth], end: [halfLength, halfHeight, halfWidth] },
-                    { dimension: 'width', start: [-halfLength, halfHeight, -halfWidth], end: [-halfLength, halfHeight, halfWidth] },
-                    { dimension: 'height', start: [-halfLength, -halfHeight, halfWidth], end: [-halfLength, halfHeight, halfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, halfHeight, localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] },
+                    { dimension: 'width', start: [-localHalfLength, halfHeight, -localHalfWidth], end: [-localHalfLength, halfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [-localHalfLength, -halfHeight, localHalfWidth], end: [-localHalfLength, halfHeight, localHalfWidth] }
                 ]
             }
         };
@@ -4856,30 +4928,38 @@ class Scene3D {
                             // Radius label - position at center of circular face
                             if (isSteelCoil) {
                                 // Horizontal cylinder along X axis - choose front or back face based on camera
-                                const xOffset = cameraRelative.x > 0 ? halfLength : -halfLength;
-                                labelPosition = new THREE.Vector3(xOffset, 0, 0).add(meshWorldPos);
+                                const xOffset = cameraRelative.x > 0 ? localHalfLength : -localHalfLength;
+                                const localLabelPos = new THREE.Vector3(xOffset, 0, 0);
+                                localLabelPos.applyQuaternion(mesh.quaternion);
+                                labelPosition = localLabelPos.add(meshWorldPos);
                                 radiusStart = new THREE.Vector3(xOffset, 0, 0);
                                 radiusEnd = new THREE.Vector3(xOffset, halfHeight, 0);
                             } else if (isRoll && isVerticalRoll) {
                                 // Vertical cylinder - choose top or bottom face based on camera
                                 const yOffset = cameraRelative.y > 0 ? halfHeight : -halfHeight;
-                                labelPosition = new THREE.Vector3(0, yOffset, 0).add(meshWorldPos);
+                                const localLabelPos = new THREE.Vector3(0, yOffset, 0);
+                                localLabelPos.applyQuaternion(mesh.quaternion);
+                                labelPosition = localLabelPos.add(meshWorldPos);
                                 radiusStart = new THREE.Vector3(0, yOffset, 0);
-                                radiusEnd = new THREE.Vector3(halfWidth, yOffset, 0);
+                                radiusEnd = new THREE.Vector3(localHalfWidth, yOffset, 0);
                             } else if (isRoll && !isVerticalRoll) {
                                 // Horizontal cylinder along X axis - choose front or back face based on camera
-                                const xOffset = cameraRelative.x > 0 ? halfLength : -halfLength;
-                                labelPosition = new THREE.Vector3(xOffset, 0, 0).add(meshWorldPos);
+                                const xOffset = cameraRelative.x > 0 ? localHalfLength : -localHalfLength;
+                                const localLabelPos = new THREE.Vector3(xOffset, 0, 0);
+                                localLabelPos.applyQuaternion(mesh.quaternion);
+                                labelPosition = localLabelPos.add(meshWorldPos);
                                 radiusStart = new THREE.Vector3(xOffset, 0, 0);
-                                radiusEnd = new THREE.Vector3(xOffset, halfWidth, 0);
+                                radiusEnd = new THREE.Vector3(xOffset, localHalfWidth, 0);
                             }
                         } else if (isHeight || isLength) {
                             // Height/Length label - position at center of cylinder LENGTH FACE (not cylinder center)
                             if (isHeight) {
                                 // Vertical Roll - position on the side surface of cylinder
                                 // Choose front or back based on camera position
-                                const zOffset = cameraRelative.z > 0 ? halfWidth : -halfWidth;
-                                labelPosition = new THREE.Vector3(0, 0, zOffset).add(meshWorldPos);
+                                const zOffset = cameraRelative.z > 0 ? localHalfWidth : -localHalfWidth;
+                                const localLabelPos = new THREE.Vector3(0, 0, zOffset);
+                                localLabelPos.applyQuaternion(mesh.quaternion);
+                                labelPosition = localLabelPos.add(meshWorldPos);
                                 // Vertical line for height
                                 radiusStart = new THREE.Vector3(0, -halfHeight, zOffset);
                                 radiusEnd = new THREE.Vector3(0, halfHeight, zOffset);
@@ -4888,22 +4968,28 @@ class Scene3D {
                                 // Calculate the optimal position on the cylinder's circumference
                                 // Project camera direction onto the YZ plane (perpendicular to cylinder axis)
                                 const cameraDir = cameraRelative.clone().normalize();
-                                
+
                                 // For horizontal cylinder (along X axis), we need angle in YZ plane
                                 const angleToCamera = Math.atan2(cameraDir.z, cameraDir.y);
-                                
+
                                 // Position label on the surface facing the camera
                                 const yOffset = Math.cos(angleToCamera) * halfHeight;
-                                const zOffset = Math.sin(angleToCamera) * halfWidth;
-                                
-                                labelPosition = new THREE.Vector3(0, yOffset, zOffset).add(meshWorldPos);
+                                const zOffset = Math.sin(angleToCamera) * localHalfWidth;
+
+                                const localLabelPos = new THREE.Vector3(0, yOffset, zOffset);
+                                localLabelPos.applyQuaternion(mesh.quaternion);
+                                labelPosition = localLabelPos.add(meshWorldPos);
                                 // Horizontal line for length at the same position
-                                radiusStart = new THREE.Vector3(-halfLength, yOffset, zOffset);
-                                radiusEnd = new THREE.Vector3(halfLength, yOffset, zOffset);
+                                radiusStart = new THREE.Vector3(-localHalfLength, yOffset, zOffset);
+                                radiusEnd = new THREE.Vector3(localHalfLength, yOffset, zOffset);
                             }
                         }
                         
                         // Transform dummy line to world space for orientation
+                        // Apply mesh rotation (important for rotated horizontal rolls)
+                        radiusStart.applyQuaternion(mesh.quaternion);
+                        radiusEnd.applyQuaternion(mesh.quaternion);
+
                         const radiusStartWorld = radiusStart.clone().add(meshWorldPos);
                         const radiusEndWorld = radiusEnd.clone().add(meshWorldPos);
                         
@@ -4956,41 +5042,39 @@ class Scene3D {
             edges.forEach(edge => {
                 const dimensionValue = dimensions[edge.dimension];
                 const dimensionText = `${dimensionValue} cm`;
-                
-                // Calculate edge center position in world space
-                const edgeCenter = new THREE.Vector3(
-                    (edge.start[0] + edge.end[0]) / 2,
-                    (edge.start[1] + edge.end[1]) / 2,
-                    (edge.start[2] + edge.end[2]) / 2
-                );
-                edgeCenter.add(vertexData.meshWorldPos);
-                
-                // Calculate edge direction vector for rotation
-                const edgeDirection = new THREE.Vector3(
-                    edge.end[0] - edge.start[0],
-                    edge.end[1] - edge.start[1],
-                    edge.end[2] - edge.start[2]
-                );
-                
-                // Calculate edge start and end in world space for label
-                const edgeStartWorld = new THREE.Vector3(
+
+                // Create edge start and end in local space
+                const edgeStartLocal = new THREE.Vector3(
                     edge.start[0],
                     edge.start[1],
                     edge.start[2]
-                ).add(vertexData.meshWorldPos);
-                
-                const edgeEndWorld = new THREE.Vector3(
+                );
+
+                const edgeEndLocal = new THREE.Vector3(
                     edge.end[0],
                     edge.end[1],
                     edge.end[2]
-                ).add(vertexData.meshWorldPos);
-                
+                );
+
+                // Transform local coordinates through mesh rotation (for rotated units)
+                edgeStartLocal.applyQuaternion(mesh.quaternion);
+                edgeEndLocal.applyQuaternion(mesh.quaternion);
+
+                // Add mesh world position to get world coordinates
+                const edgeStartWorld = edgeStartLocal.clone().add(vertexData.meshWorldPos);
+                const edgeEndWorld = edgeEndLocal.clone().add(vertexData.meshWorldPos);
+
+                // Calculate edge center in world space
+                const edgeCenter = new THREE.Vector3()
+                    .addVectors(edgeStartWorld, edgeEndWorld)
+                    .multiplyScalar(0.5);
+
                 // Position label directly on the edge center (text will be on the edge line)
                 const labelPosition = edgeCenter.clone();
-                
+
                 // Calculate the actual dimension value for this edge
                 const edgeDimensionValue = mesh.userData[edge.dimension];
-                
+
                 // Create the label with dimension info and edge endpoints for rotation
                 this.createDimensionLabel(labelPosition, dimensionText, edgeStartWorld, edgeEndWorld, edgeDimensionValue, mesh);
             });
