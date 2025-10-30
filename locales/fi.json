@@ -155,6 +155,7 @@
   "Height": "Korkeus",
   "Dimension": "Mitta",
   "dimensions": "Mitat",
+  "diameter": "Halkaisija",
   "orientation": "Suuntaus",
   "vertical": "Pystysuora",
   "horizontal": "Vaakasuora",

@@ -1,5 +1,8 @@
 class BinPacking3D {
     constructor(containerWidth, containerDepth, containerHeight, containerData = {}) {
+        // Epsilon tolerance for floating point precision errors (1mm)
+        this.EPSILON = 0.001;
+
         this.container = {
             width: containerWidth,
             depth: containerDepth,
@@ -409,13 +412,15 @@ class BinPacking3D {
             console.error('Item missing required dimensions:', item);
             return false;
         }
-        
-        return !(space.x + space.width <= position.x ||
-                position.x + item.width <= space.x ||
-                space.y + space.height <= position.y ||
-                position.y + item.height <= space.y ||
-                space.z + space.depth <= position.z ||
-                position.z + item.depth <= space.z);
+
+        // Use epsilon tolerance to handle floating point precision errors
+        const eps = this.EPSILON;
+        return !(space.x + space.width <= position.x + eps ||
+                position.x + item.width <= space.x + eps ||
+                space.y + space.height <= position.y + eps ||
+                position.y + item.height <= space.y + eps ||
+                space.z + space.depth <= position.z + eps ||
+                position.z + item.depth <= space.z + eps);
     }
     
     splitSpace(space, position, item, maxStack) {
@@ -678,13 +683,15 @@ class BinPacking3D {
     
     canPlaceItem(x, y, z, width, depth, height) {
         // Sprawdź czy pozycja nie koliduje z żadną użytą przestrzenią
+        // Use epsilon tolerance to handle floating point precision errors from coordinate conversions
+        const eps = this.EPSILON;
         for (const used of this.usedSpace) {
-            if (!(x + width <= used.x || 
-                  x >= used.x + used.width ||
-                  y + height <= used.y || 
-                  y >= used.y + used.height ||
-                  z + depth <= used.z || 
-                  z >= used.z + used.depth)) {
+            if (!(x + width <= used.x + eps ||
+                  x >= used.x + used.width - eps ||
+                  y + height <= used.y + eps ||
+                  y >= used.y + used.height - eps ||
+                  z + depth <= used.z + eps ||
+                  z >= used.z + used.depth - eps)) {
                 return false;
             }
         }

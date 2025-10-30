@@ -898,6 +898,11 @@ class UI {
         // Store current vehicle config for modal
         this.currentVehicleConfig = customVehicle;
 
+        // Auto arrange cargo if there are items
+        if (this.cargoManager.cargoItems.length > 0) {
+            this.autoArrangeCargo();
+        }
+
         this.updateStatistics();
     }
 
@@ -1551,7 +1556,18 @@ class UI {
             orientationKey = `_${params.isVerticalRoll ? 'vertical' : 'horizontal'}`;
         }
         const groupKey = `${unitType}_${params.name}_${params.weight}_${params.maxStack}_${params.maxStackWeight}_${params.loadingMethods.join(',')}_${params.unloadingMethods.join(',')}${dimensionKey}${orientationKey}`;
-        
+
+        // Check if group with this groupKey already exists (might have been rotated)
+        const existingGroupItem = this.cargoManager.cargoItems.find(item => item.groupKey === groupKey);
+        if (existingGroupItem) {
+            // Use dimensions from existing group (they may be rotated)
+            params.dimensions = {
+                length: existingGroupItem.length,
+                width: existingGroupItem.width,
+                height: existingGroupItem.height
+            };
+        }
+
         // Pass all parameters including name to the cargo manager
         const cargo = this.cargoManager.addCargoUnit(unitType, {
             ...params,
@@ -2341,11 +2357,11 @@ class UI {
                     e.stopPropagation();
                     const method = methodText.dataset.method;
                     const type = methodText.dataset.type;
-                    const groupId = methodText.dataset.groupId;
-                    
+                    const groupId = parseInt(methodText.dataset.groupId); // Parse to number!
+
                     // Toggle the active state
                     methodText.classList.toggle('active');
-                    
+
                     // Get current methods for this type
                     const groupedItems = {};
                     this.cargoManager.cargoItems.forEach(item => {
@@ -2359,11 +2375,12 @@ class UI {
                         }
                         groupedItems[key].items.push(item);
                     });
-                    const group = Object.values(groupedItems).find(g => g.groupId === parseInt(groupId));
+                    const group = Object.values(groupedItems).find(g => g.groupId === groupId);
                     if (group) {
                         const methodsKey = type === 'loading' ? 'loadingMethods' : 'unloadingMethods';
-                        let currentMethods = group.sample[methodsKey] || [];
-                        
+                        // Create a NEW array to avoid modifying shared references
+                        let currentMethods = [...(group.sample[methodsKey] || [])];
+
                         if (methodText.classList.contains('active')) {
                             // Add method if not present
                             if (!currentMethods.includes(method)) {
@@ -2373,8 +2390,8 @@ class UI {
                             // Remove method
                             currentMethods = currentMethods.filter(m => m !== method);
                         }
-                        
-                        // Update the group
+
+                        // Update the group with new array
                         this.updateGroupParameter(groupId, methodsKey, currentMethods);
                     }
                 });
@@ -2509,45 +2526,72 @@ class UI {
     }
     
     updateGroupParameter(groupId, parameter, value) {
+        // Parse groupId to number if it's a string (from dataset)
+        const numericGroupId = typeof groupId === 'string' ? parseInt(groupId) : groupId;
+
         // Store old weights to calculate difference
         let weightDifference = 0;
         let needsStackingCheck = false;
-        
+
         // Update all items in the group
         this.cargoManager.cargoItems.forEach(item => {
-            if (item.groupId === groupId) {
+            if (item.groupId === numericGroupId) {
                 // Calculate weight difference if weight is being changed
                 if (parameter === 'weight') {
                     weightDifference += value - item.weight;
                     needsStackingCheck = true; // Weight change might affect stacking
                 }
-                
+
                 // Check if we need stacking validation
                 if (parameter === 'maxStack' || parameter === 'maxStackWeight') {
                     needsStackingCheck = true;
                 }
-                
+
                 item[parameter] = value;
-                
+
+                // Update groupKey when any parameter that affects it is changed
+                // groupKey format: ${type}_${name}_${weight}_${maxStack}_${maxStackWeight}_${loadingMethods}_${unloadingMethods}_${dimensions}_${orientation}
+                if (parameter === 'weight' || parameter === 'name' || parameter === 'maxStack' ||
+                    parameter === 'maxStackWeight' || parameter === 'loadingMethods' || parameter === 'unloadingMethods') {
+
+                    const loadingStr = Array.isArray(item.loadingMethods) ? item.loadingMethods.join(',') : 'rear,side,top';
+                    const unloadingStr = Array.isArray(item.unloadingMethods) ? item.unloadingMethods.join(',') : 'rear,side,top';
+
+                    // Build groupKey based on item type
+                    let baseKey = `${item.type}_${item.name}_${item.weight}_${item.maxStack}_${item.maxStackWeight}_${loadingStr}_${unloadingStr}`;
+
+                    // Add dimensions if item has them
+                    if (item.length && item.width && item.height) {
+                        baseKey += `_${item.length}_${item.width}_${item.height}`;
+                    }
+
+                    // Add orientation for rolls
+                    if (item.type === 'roll' && item.isVerticalRoll !== undefined) {
+                        baseKey += `_${item.isVerticalRoll ? 'vertical' : 'horizontal'}`;
+                    }
+
+                    item.groupKey = baseKey;
+                }
+
                 // Update mesh userData if it exists
                 if (item.mesh) {
                     item.mesh.userData[parameter] = value;
                 }
             }
         });
-        
+
         // Update total weight if weight was changed
         if (parameter === 'weight') {
             this.cargoManager.totalWeight += weightDifference;
         }
-        
+
         // Check stacking limits and rearrange if needed
         if (needsStackingCheck) {
             // Clear all cargo meshes and re-arrange completely
             this.scene3d.clearAllCargo();
             this.cargoManager.autoArrange();
         }
-        
+
         // Update statistics and visualization
         this.updateStatistics();
         this.updateAxleIndicators();
@@ -2955,8 +2999,20 @@ class UI {
             this.cargoManager.autoArrange();
             this.updateLoadedUnitsList();
             this.updateStatistics();
+
+            // Update axle load indicators and 3D visualization
+            this.updateAxleIndicators();
+            if (this.scene3d.showAxleLoads) {
+                this.scene3d.updateAxleLoadVisualization();
+            }
         } else {
             this.updateLoadedUnitsList();
+
+            // Update axle load indicators even without auto-arrange
+            this.updateAxleIndicators();
+            if (this.scene3d.showAxleLoads) {
+                this.scene3d.updateAxleLoadVisualization();
+            }
         }
     }
     
