@@ -3436,7 +3436,7 @@ class UI {
             }
             
             // Save PDF
-            const filename = `load_plan_${new Date().toISOString().split('T')[0]}.pdf`;
+            const filename = `${planName.replace(/[^a-z0-9_\-]/gi, '_')}.pdf`;
             pdf.save(filename);
             
             this.showNotification(i18n.t('pdfGenerated'), 'success');
@@ -3790,13 +3790,13 @@ class UI {
         if (savedId) {
             let message;
             if (overwriteId && downloadFile) {
-                message = 'Configuration overwritten and downloaded';
+                message = i18n.t('configurationOverwrittenAndDownloaded');
             } else if (overwriteId) {
-                message = 'Configuration overwritten in browser memory';
+                message = i18n.t('configurationOverwrittenInBrowserMemory');
             } else if (downloadFile) {
-                message = 'Configuration saved to file and browser memory';
+                message = i18n.t('configurationSavedToFileAndMemory');
             } else {
-                message = 'Configuration saved in browser memory';
+                message = i18n.t('configSavedInMemory').replace('{message}', i18n.t('configurationSaved'));
             }
             this.showNotification(message, 'success');
         } else {
@@ -4786,7 +4786,7 @@ class UI {
             this.currentConfigName = finalName;
             nameInput.value = finalName;
             
-            const message = overwriteId ? 'Configuration overwritten' : 'Configuration saved';
+            const message = overwriteId ? i18n.t('configurationOverwritten') : i18n.t('configurationSaved');
             this.showNotification(i18n.t('configSavedInMemory').replace('{message}', message), 'success');
             this.checkConfigNameExists(finalName);
         } else {
@@ -4848,7 +4848,7 @@ class UI {
             
             URL.revokeObjectURL(url);
             
-            const message = overwriteId ? 'Configuration overwritten and downloaded' : 'Configuration saved and downloaded';
+            const message = overwriteId ? i18n.t('configurationOverwrittenAndDownloaded') : i18n.t('configurationSavedAndDownloaded');
             this.showNotification(message, 'success');
             this.checkConfigNameExists(finalName);
         } else {
