@@ -136,8 +136,8 @@ class CargoManager {
             weight: customParams.weight || unitConfig.defaultWeight || 100,
             maxStack: customParams.maxStack !== undefined ? customParams.maxStack : (unitConfig.maxStack ?? 3),
             maxStackWeight: customParams.maxStackWeight !== undefined ? customParams.maxStackWeight : (unitConfig.maxStackWeight ?? 2000),
-            loadingMethods: Array.isArray(customParams.loadingMethods) ? customParams.loadingMethods : (unitConfig.loadingMethods || ['rear', 'side', 'top']),
-            unloadingMethods: Array.isArray(customParams.unloadingMethods) ? customParams.unloadingMethods : (unitConfig.unloadingMethods || ['rear', 'side', 'top']),
+            loadingMethods: customParams.loadingMethods || unitConfig.loadingMethods || ['rear', 'side', 'top'],
+            unloadingMethods: customParams.unloadingMethods || unitConfig.unloadingMethods || ['rear', 'side', 'top'],
             orderIndex: this.cargoItems.length,  // Kolejność dodania
             groupId: isSameGroup ? lastItem.groupId : Date.now(), // Group ID for continuous additions
             groupKey: groupKey, // Store groupKey for future comparisons
@@ -203,23 +203,22 @@ class CargoManager {
             return false;
         }
         
-        // Separate existing positioned items from new items in this group FIRST
-        const existingGroupItems = groupItems.filter(item => item.mesh && item.position);
-        const newGroupItems = groupItems.filter(item => !item.position);
-
-        // Calculate current weight of items already in container (including existing items from this group)
+        // Calculate current weight of items already in container (not outside)
         let currentWeight = 0;
         this.cargoItems.forEach(item => {
-            if (!item.isOutside && item.mesh && item.position) {
+            if (item.groupId !== groupId && !item.isOutside) {
                 currentWeight += item.weight;
             }
         });
-
-        // Check if NEW items would exceed weight limit
-        const itemsWithinLimit = [...existingGroupItems]; // Existing items always included
+        
+        // Check if new group would exceed weight limit
+        const groupWeight = groupItems.reduce((sum, item) => sum + item.weight, 0);
+        
+        // Separate items that fit within weight limit
+        const itemsWithinLimit = [];
         const itemsExceedingLimit = [];
-
-        newGroupItems.forEach(item => {
+        
+        groupItems.forEach(item => {
             if (currentWeight + item.weight <= this.maxLoad) {
                 itemsWithinLimit.push(item);
                 currentWeight += item.weight;
@@ -227,31 +226,21 @@ class CargoManager {
                 itemsExceedingLimit.push(item);
             }
         });
-
-        // Get ALL items that should stay in place (other groups + existing items from this group)
-        const itemsToKeep = this.cargoItems.filter(item => {
-            // Items from other groups with positions
-            if (item.groupId !== groupId && item.mesh && item.position) {
-                return true;
-            }
-            // Existing positioned items from THIS group (keep them in place)
-            if (item.groupId === groupId && item.mesh && item.position) {
-                return true;
-            }
-            return false;
-        });
-
-        // Clear ONLY new items from the scene (don't touch existing positioned items)
-        newGroupItems.forEach(item => {
+        
+        // Get items from other groups that are already placed
+        const otherGroupItems = this.cargoItems.filter(item => item.groupId !== groupId && item.mesh && item.position);
+        
+        // Clear only the group items from the scene
+        groupItems.forEach(item => {
             if (item.mesh) {
                 this.scene3d.removeCargo(item.mesh);
                 item.mesh = null;
+                item.position = null;
             }
-            item.position = null;
         });
         
-        // Create occupied spaces from ALL items that should stay in place
-        const occupiedSpaces = itemsToKeep.map(item => {
+        // Create occupied spaces from other group items
+        const occupiedSpaces = otherGroupItems.map(item => {
             // Some items might have been rotated, need to get actual dimensions from mesh or use original
             const itemLength = item.mesh && item.mesh.userData.length ? item.mesh.userData.length : item.length;
             const itemWidth = item.mesh && item.mesh.userData.width ? item.mesh.userData.width : item.width;
@@ -294,11 +283,10 @@ class CargoManager {
             }
         });
         
-        // Arrange ONLY new items (existing items stay in place as occupied spaces)
+        // Arrange only items within weight limit
         let result = { success: true, unpackedCount: 0 };
-        const newItemsWithinLimit = newGroupItems.filter(item => itemsWithinLimit.includes(item));
-        if (newItemsWithinLimit.length > 0) {
-            result = this._arrangeGroupItems(newItemsWithinLimit, occupiedSpaces);
+        if (itemsWithinLimit.length > 0) {
+            result = this._arrangeGroupItems(itemsWithinLimit, occupiedSpaces);
         }
         
         // Place items exceeding weight limit outside
@@ -1154,12 +1142,9 @@ class CargoManager {
                 position: item.position,
                 maxStack: item.maxStack,
                 maxStackWeight: item.maxStackWeight,
-                loadingMethods: Array.isArray(item.loadingMethods) ? item.loadingMethods : ['rear', 'side', 'top'], // Ensure array is always saved
-                unloadingMethods: Array.isArray(item.unloadingMethods) ? item.unloadingMethods : ['rear', 'side', 'top'], // Ensure array is always saved
+                loadingMethods: item.loadingMethods,
+                unloadingMethods: item.unloadingMethods,
                 groupId: item.groupId,
-                groupKey: item.groupKey,
-                color: item.color, // Save color to preserve visual consistency
-                orderIndex: item.orderIndex, // Save order for proper group sorting
                 isOutside: item.isOutside,
                 rotation: item.rotation,
                 isRoll: item.isRoll,
@@ -1202,14 +1187,14 @@ class CargoManager {
                     loadingMethods: item.loadingMethods,
                     unloadingMethods: item.unloadingMethods,
                     name: item.name,
-                    groupKey: item.groupKey || `import_${item.groupId}`, // Use saved groupKey or generate
+                    groupKey: `import_${item.groupId}`, // Preserve group during import
                     rotation: item.rotation,
                     isRoll: item.isRoll,
                     diameter: item.diameter,
                     isVerticalRoll: item.isVerticalRoll,
                     fixedDiameter: item.fixedDiameter
                 };
-
+                
                 // If dimensions are provided, add them
                 if (item.dimensions) {
                     customParams.dimensions = {
@@ -1218,20 +1203,14 @@ class CargoManager {
                         height: item.dimensions.height
                     };
                 }
-
+                
                 const cargoItem = this.addCargoUnit(item.type, customParams);
-
-                // Restore the original groupId, color, and orderIndex
-                if (item.groupId !== undefined) {
+                
+                // Restore the original groupId
+                if (item.groupId) {
                     cargoItem.groupId = item.groupId;
                 }
-                if (item.color !== undefined) {
-                    cargoItem.color = item.color;
-                }
-                if (item.orderIndex !== undefined) {
-                    cargoItem.orderIndex = item.orderIndex;
-                }
-
+                
                 // Set position and isOutside flag
                 if (item.position) {
                     cargoItem.position = item.position;
@@ -1250,20 +1229,15 @@ class CargoManager {
                         y: item.position.y,
                         z: item.position.z
                     };
-
+                    
                     item.mesh = this.scene3d.addCargo(meshData);
-
+                    
                     // If item was outside, move it outside
                     if (item.isOutside) {
                         this.scene3d.moveOutsideContainer(item.mesh);
                     }
                 }
             });
-
-            // Update colorIndex to avoid color collisions with new groups
-            // Set to number of unique groups to continue golden ratio sequence
-            const uniqueGroups = new Set(this.cargoItems.map(item => item.groupId));
-            this.colorIndex = uniqueGroups.size;
         }
 
         // Return the vehicle type so UI can update
