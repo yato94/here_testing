@@ -71,6 +71,40 @@ const i18n = {
     },
 
     /**
+     * Get date locale string for the current language
+     * @returns {string} Locale string (e.g., 'en-US', 'pl-PL', 'de-DE')
+     */
+    getDateLocale() {
+        const localeMap = {
+            'en': 'en-US',
+            'pl': 'pl-PL',
+            'bg': 'bg-BG',
+            'cs': 'cs-CZ',
+            'da': 'da-DK',
+            'de': 'de-DE',
+            'es': 'es-ES',
+            'et': 'et-EE',
+            'fi': 'fi-FI',
+            'fr': 'fr-FR',
+            'hr': 'hr-HR',
+            'hu': 'hu-HU',
+            'it': 'it-IT',
+            'lt': 'lt-LT',
+            'lv': 'lv-LV',
+            'nl': 'nl-NL',
+            'no': 'no-NO',
+            'ro': 'ro-RO',
+            'pt': 'pt-PT',
+            'sk': 'sk-SK',
+            'sq': 'sq-AL',
+            'sr': 'sr-RS',
+            'sv': 'sv-SE'
+        };
+
+        return localeMap[this.currentLanguage] || 'en-US';
+    },
+
+    /**
      * Update all page elements with data-i18n attributes
      */
     updatePageLanguage() {

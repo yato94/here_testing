@@ -142,10 +142,13 @@ class CargoManager {
             groupId: isSameGroup ? lastItem.groupId : Date.now(), // Group ID for continuous additions
             groupKey: groupKey, // Store groupKey for future comparisons
             color: itemColor, // Use grayscale for steel coils, group color for others
+            rotationAngle: customParams.rotationAngle !== undefined ? customParams.rotationAngle : 0, // Rotation angle in radians
+            wasRotatedIndividually: false, // Flag to track individual rotation for group operations
             isRoll: isRoll, // Add isRoll property
             isVerticalRoll: customParams.isVerticalRoll !== undefined ? customParams.isVerticalRoll : (unitConfig.isVerticalRoll || false), // Add vertical roll flag
             isHorizontalRoll: customParams.isHorizontalRoll || false, // Add horizontal roll flag
             diameter: isRoll ? dimensions.width : undefined, // Add diameter for rolls (same as width)
+            cylinderLength: isRoll ? (customParams.cylinderLength !== undefined ? customParams.cylinderLength : ((customParams.isVerticalRoll !== undefined ? customParams.isVerticalRoll : (unitConfig.isVerticalRoll || false)) ? dimensions.height : dimensions.length)) : undefined, // Store original cylinder length
             fixedDiameter: unitConfig.fixedDiameter || false, // Add fixed diameter flag for steel coils
             position: null,
             mesh: null
@@ -241,10 +244,11 @@ class CargoManager {
         
         // Create occupied spaces from other group items
         const occupiedSpaces = otherGroupItems.map(item => {
-            // Some items might have been rotated, need to get actual dimensions from mesh or use original
-            const itemLength = item.mesh && item.mesh.userData.length ? item.mesh.userData.length : item.length;
-            const itemWidth = item.mesh && item.mesh.userData.width ? item.mesh.userData.width : item.width;
-            const itemHeight = item.mesh && item.mesh.userData.height ? item.mesh.userData.height : item.height;
+            // Always use dimensions from cargoItems array (source of truth), not from mesh.userData
+            // mesh.userData can become desynchronized after multiple rotations
+            const itemLength = item.length;
+            const itemWidth = item.width;
+            const itemHeight = item.height;
             
             // For JUMBO, keep scene coordinates - they will be converted in _arrangeGroupItems
             // For standard containers, convert to bin packing coordinates
@@ -326,9 +330,20 @@ class CargoManager {
         if (!this.containerDimensions || this.cargoItems.length === 0) {
             return false;
         }
-        
+
+        // Reset individual rotations before bin packing
+        this.cargoItems.forEach(item => {
+            // If item was rotated 90° or -90°, unswap dimensions back to original
+            if (item.rotationAngle && Math.abs(Math.abs(item.rotationAngle) - Math.PI / 2) < 0.01) {
+                const tempLength = item.length;
+                item.length = item.width;
+                item.width = tempLength;
+            }
+            item.rotationAngle = 0;
+        });
+
         this.scene3d.clearAllCargo();
-        
+
         // Get trailer height
         const trailerHeight = this.containerDimensions.trailerHeight || 1.1;
         
@@ -493,13 +508,19 @@ class CargoManager {
                         // Adjust position based on rotation
                         const itemLength = packedItem.rotated ? stack.sample.width : stack.sample.length;
                         const itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
-                        
+
+                        // If bin packing rotated this item, save swapped dimensions
+                        if (packedItem.rotated && item.type !== 'roll' && item.type !== 'steel-coil') {
+                            item.length = itemLength;
+                            item.width = itemWidth;
+                        }
+
                         item.position = {
                             x: baseX + (itemLength / 2),
                             y: trailerHeight + baseY + (index * stack.sample.height) + (stack.sample.height / 2),
                             z: baseZ + (itemWidth / 2)
                         };
-                        
+
                         // Mark item as inside the container
                         item.isOutside = false;
                         
@@ -508,8 +529,8 @@ class CargoManager {
                             x: item.position.x,
                             y: item.position.y,
                             z: item.position.z,
-                            // Only override dimensions for non-roll items
-                            ...(item.type !== 'roll' && item.type !== 'steel-coil' ? {
+                            // Override dimensions to match what bin packing used (except steel coils)
+                            ...(item.type !== 'steel-coil' ? {
                                 length: itemLength,
                                 width: itemWidth,
                                 height: stack.sample.height
@@ -611,13 +632,20 @@ class CargoManager {
                     // Adjust position based on rotation
                     const itemLength = packedItem.rotated ? stack.sample.width : stack.sample.length;
                     const itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
-                    
+
+                    // If bin packing rotated this item, save swapped dimensions
+                    // Horizontal rolls have allowRotate=false, so they won't be rotated by bin packing
+                    if (packedItem.rotated && item.type !== 'steel-coil') {
+                        item.length = itemLength;
+                        item.width = itemWidth;
+                    }
+
                     item.position = {
                         x: baseX + (itemLength / 2),
                         y: trailerHeight + baseY + (index * stack.sample.height) + (stack.sample.height / 2),
                         z: baseZ + ((stack.sample.isRoll && stack.sample.fixedDiameter) ? 0 : itemWidth / 2)
                     };
-                    
+
                     // Mark item as inside the container
                     item.isOutside = false;
                     
@@ -626,8 +654,8 @@ class CargoManager {
                         x: item.position.x,
                         y: item.position.y,
                         z: item.position.z,
-                        // Only override dimensions for non-roll items
-                        ...(item.type !== 'roll' && item.type !== 'steel-coil' ? {
+                        // Override dimensions to match what bin packing used (except steel coils)
+                        ...(item.type !== 'steel-coil' ? {
                             length: itemLength,
                             width: itemWidth,
                             height: stack.sample.height
@@ -734,7 +762,7 @@ class CargoManager {
         if (groupItems.length === 0) {
             return false;
         }
-        
+
         const trailerHeight = this.containerDimensions.trailerHeight || 1.1;
         
         // Create stack from group items
@@ -760,7 +788,7 @@ class CargoManager {
             groupItems.forEach(item => {
                 stacks.push({
                     items: [item],
-                    sample: firstItem,
+                    sample: item,  // Use actual item, not firstItem
                     stackHeight: 1
                 });
             });
@@ -785,7 +813,7 @@ class CargoManager {
                     if (currentStack.length > 0) {
                         stacks.push({
                             items: currentStack,
-                            sample: firstItem,
+                            sample: currentStack[0],  // Use first item of this stack, not firstItem
                             stackHeight: currentStack.length
                         });
                     }
@@ -793,11 +821,11 @@ class CargoManager {
                     weightAboveBottom = 0;
                 }
             });
-            
+
             if (currentStack.length > 0) {
                 stacks.push({
                     items: currentStack,
-                    sample: firstItem,
+                    sample: currentStack[0],  // Use first item of this stack, not firstItem
                     stackHeight: currentStack.length
                 });
             }
@@ -924,13 +952,19 @@ class CargoManager {
                         stack.items.forEach((item, index) => {
                             // Adjust position based on rotation
                             const itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
-                            
+
+                            // If bin packing rotated this item, save swapped dimensions
+                            if (packedItem.rotated && item.type !== 'roll' && item.type !== 'steel-coil') {
+                                item.length = itemLength;
+                                item.width = itemWidth;
+                            }
+
                             item.position = {
                                 x: baseX + (itemLength / 2),
                                 y: trailerHeight + baseY + (index * stack.sample.height) + (stack.sample.height / 2),
                                 z: baseZ + (itemWidth / 2)
                             };
-                            
+
                             // Mark item as inside the container
                             item.isOutside = false;
                             
@@ -1008,13 +1042,20 @@ class CargoManager {
                     // Use actual item dimensions (which may have been rotated) instead of stack.sample
                     const itemLength = packedItem.rotated ? item.width : item.length;
                     const itemWidth = packedItem.rotated ? item.length : item.width;
-                    
+
+                    // If bin packing rotated this item, save swapped dimensions
+                    // Horizontal rolls have allowRotate=false, so they won't be rotated by bin packing
+                    if (packedItem.rotated && item.type !== 'steel-coil') {
+                        item.length = itemLength;
+                        item.width = itemWidth;
+                    }
+
                     item.position = {
                         x: baseX + (itemLength / 2),
                         y: trailerHeight + baseY + (index * item.height) + (item.height / 2),
                         z: baseZ + ((item.isRoll && item.fixedDiameter) ? 0 : itemWidth / 2)
                     };
-                    
+
                     // Mark item as inside the container
                     item.isOutside = false;
                     
@@ -1145,10 +1186,16 @@ class CargoManager {
                 loadingMethods: item.loadingMethods,
                 unloadingMethods: item.unloadingMethods,
                 groupId: item.groupId,
+                groupColor: item.color,
                 isOutside: item.isOutside,
-                rotation: item.rotation,
+                rotationAngle: item.rotationAngle,
+                rotation: item.rotation,  // For horizontal rolls group rotation tracking
+                // Save originalLength/originalWidth only if they exist (not undefined)
+                ...(item.originalLength !== undefined && { originalLength: item.originalLength }),
+                ...(item.originalWidth !== undefined && { originalWidth: item.originalWidth }),
                 isRoll: item.isRoll,
                 diameter: item.diameter,
+                cylinderLength: item.cylinderLength,
                 isVerticalRoll: item.isVerticalRoll,
                 fixedDiameter: item.fixedDiameter
             })),
@@ -1161,65 +1208,95 @@ class CargoManager {
         this.cargoItems = [];
         this.totalWeight = 0;
         this.colorIndex = 0;
-        this.selectedGroupId = null;
+        this.deselectGroup();
         this.scene3d.clearAllCargo();
 
         // Store the vehicle type to return it
         const vehicleType = config.vehicleType || 'custom';
         this.currentVehicleType = vehicleType;
-        
+
         // Don't set container here - it should be set by UI before calling this method
         // Only set if container dimensions are different (for safety)
-        if (config.container && (!this.containerDimensions || 
+        if (config.container && (!this.containerDimensions ||
             this.containerDimensions.length !== config.container.length ||
             this.containerDimensions.width !== config.container.width ||
             this.containerDimensions.height !== config.container.height)) {
             this.setContainer(config.container, config.maxLoad);
         }
-        
+
         if (config.cargoItems) {
-            config.cargoItems.forEach(item => {
-                // Prepare custom parameters with all properties
-                const customParams = {
+            // Track max groupId to update colorIndex properly
+            let maxGroupId = 0;
+
+            config.cargoItems.forEach((item, index) => {
+                // Get unit config for defaults
+                const unitConfig = CONFIG.cargoUnits[item.type] || {};
+
+                // Use dimensions as they are saved in the file
+                // If unit was rotated, dimensions are already swapped in the file
+                // We don't need to swap them back or apply rotation to mesh
+                // The geometry will be created with these dimensions directly
+
+                // Check if item was individually rotated OR if it's a horizontal roll that was group-rotated
+                // For horizontal rolls with cumulative rotation, check if dimensions are currently swapped (odd rotations)
+                const wasRotatedIndividually = item.rotationAngle &&
+                    Math.abs(Math.abs(item.rotationAngle) - Math.PI / 2) < 0.01;
+
+                let wasRotatedAsGroup = false;
+                if (item.rotation) {
+                    const rotationSteps = Math.round(item.rotation / (Math.PI / 2));
+                    wasRotatedAsGroup = Math.abs(rotationSteps % 2) === 1;
+                }
+
+                const wasRotated = wasRotatedIndividually || wasRotatedAsGroup;
+
+                // Directly create cargo item with saved properties
+                const cargoItem = {
+                    id: Date.now() + Math.random() + index,
+                    type: item.type,
+                    name: item.name || unitConfig.name || 'Custom',
+                    length: item.dimensions.length,
+                    width: item.dimensions.width,
+                    height: item.dimensions.height,
                     weight: item.weight,
-                    maxStack: item.maxStack,
-                    maxStackWeight: item.maxStackWeight,
-                    loadingMethods: item.loadingMethods,
-                    unloadingMethods: item.unloadingMethods,
-                    name: item.name,
-                    groupKey: `import_${item.groupId}`, // Preserve group during import
-                    rotation: item.rotation,
-                    isRoll: item.isRoll,
+                    maxStack: item.maxStack !== undefined ? item.maxStack : (unitConfig.maxStack ?? 3),
+                    maxStackWeight: item.maxStackWeight !== undefined ? item.maxStackWeight : (unitConfig.maxStackWeight ?? 2000),
+                    loadingMethods: item.loadingMethods || unitConfig.loadingMethods || ['rear', 'side', 'top'],
+                    unloadingMethods: item.unloadingMethods || unitConfig.unloadingMethods || ['rear', 'side', 'top'],
+                    orderIndex: index,
+                    groupId: item.groupId,  // Use original groupId
+                    groupKey: `import_${item.groupId}`,  // Mark as imported
+                    color: item.groupColor || '#cccccc',  // Use original color
+                    rotationAngle: 0,  // Don't apply rotation - dimensions are already correct
+                    rotation: item.rotation || undefined,  // Preserve rotation for horizontal rolls
+                    originalLength: item.originalLength || undefined,  // Preserve original dimensions for horizontal rolls
+                    originalWidth: item.originalWidth || undefined,    // Preserve original dimensions for horizontal rolls
+                    wasRotatedIndividually: wasRotated,  // Flag to track if unit was rotated before save
+                    isRoll: item.isRoll || false,
+                    isVerticalRoll: item.isVerticalRoll || false,
+                    isHorizontalRoll: item.isHorizontalRoll || false,
                     diameter: item.diameter,
-                    isVerticalRoll: item.isVerticalRoll,
-                    fixedDiameter: item.fixedDiameter
+                    cylinderLength: item.cylinderLength !== undefined ? item.cylinderLength : (item.isRoll ? (item.isVerticalRoll ? item.dimensions.height : Math.max(item.dimensions.length, item.dimensions.width)) : undefined),
+                    fixedDiameter: item.fixedDiameter || false,
+                    position: item.position || null,
+                    isOutside: item.isOutside || false,
+                    mesh: null
                 };
-                
-                // If dimensions are provided, add them
-                if (item.dimensions) {
-                    customParams.dimensions = {
-                        length: item.dimensions.length,
-                        width: item.dimensions.width,
-                        height: item.dimensions.height
-                    };
-                }
-                
-                const cargoItem = this.addCargoUnit(item.type, customParams);
-                
-                // Restore the original groupId
-                if (item.groupId) {
-                    cargoItem.groupId = item.groupId;
-                }
-                
-                // Set position and isOutside flag
-                if (item.position) {
-                    cargoItem.position = item.position;
-                }
-                if (item.isOutside !== undefined) {
-                    cargoItem.isOutside = item.isOutside;
+
+                this.cargoItems.push(cargoItem);
+                this.totalWeight += cargoItem.weight;
+
+                // Track max groupId for colorIndex
+                if (item.groupId > maxGroupId) {
+                    maxGroupId = item.groupId;
                 }
             });
-            
+
+            // Update colorIndex to ensure new groups don't conflict with imported ones
+            // Count unique groups to set colorIndex properly
+            const uniqueGroups = new Set(config.cargoItems.map(item => item.groupId));
+            this.colorIndex = uniqueGroups.size;
+
             // After all items are added, create meshes with proper positions
             this.cargoItems.forEach(item => {
                 if (item.position) {
@@ -1229,9 +1306,9 @@ class CargoManager {
                         y: item.position.y,
                         z: item.position.z
                     };
-                    
+
                     item.mesh = this.scene3d.addCargo(meshData);
-                    
+
                     // If item was outside, move it outside
                     if (item.isOutside) {
                         this.scene3d.moveOutsideContainer(item.mesh);
@@ -1245,7 +1322,7 @@ class CargoManager {
     }
     
     updateCargoPositions(movedCargo) {
-        // Update positions and isOutside flag of moved cargo items
+        // Update positions, dimensions, rotation and isOutside flag of moved cargo items
         movedCargo.forEach(cargoData => {
             const item = this.cargoItems.find(c => c.id === cargoData.id);
             if (item) {
@@ -1255,6 +1332,55 @@ class CargoManager {
                 // Update isOutside flag if it exists in cargoData
                 if (cargoData.isOutside !== undefined) {
                     item.isOutside = cargoData.isOutside;
+                }
+                // Update dimensions if they changed (e.g., after rotation)
+                if (cargoData.length !== undefined) {
+                    item.length = cargoData.length;
+                }
+                if (cargoData.width !== undefined) {
+                    item.width = cargoData.width;
+                }
+                if (cargoData.height !== undefined) {
+                    item.height = cargoData.height;
+                }
+                // Update rotation angle if it exists
+                if (cargoData.rotationAngle !== undefined) {
+                    item.rotationAngle = cargoData.rotationAngle;
+
+                    // Set flag if unit was individually rotated (≈90° or -90°)
+                    if (Math.abs(Math.abs(cargoData.rotationAngle) - Math.PI / 2) < 0.01) {
+                        item.wasRotatedIndividually = true;
+                    }
+
+                    // If rotation was reset to 0, clear original dimensions
+                    if (cargoData.rotationAngle === 0) {
+                        delete item.originalLength;
+                        delete item.originalWidth;
+                    }
+                }
+                // Update rotation property for horizontal rolls
+                if (cargoData.rotation !== undefined) {
+                    item.rotation = cargoData.rotation;
+
+                    // Set flag if horizontal roll was individually rotated (odd multiples of π/2)
+                    const rotationSteps = Math.round(cargoData.rotation / (Math.PI / 2));
+                    if (Math.abs(rotationSteps % 2) === 1) {
+                        item.wasRotatedIndividually = true;
+                    }
+
+                    // If rotation was reset to 0, clear original dimensions
+                    if (cargoData.rotation === 0) {
+                        delete item.originalLength;
+                        delete item.originalWidth;
+                    }
+                }
+                // Update originalLength/originalWidth for horizontal rolls (only if not being cleared above)
+                // Always sync these properties to ensure they're preserved through save/load
+                if (cargoData.hasOwnProperty('originalLength')) {
+                    item.originalLength = cargoData.originalLength;
+                }
+                if (cargoData.hasOwnProperty('originalWidth')) {
+                    item.originalWidth = cargoData.originalWidth;
                 }
             }
         });
@@ -1341,48 +1467,138 @@ class CargoManager {
     }
     
     rotateGroup(groupId, angle) {
-        // Get all items in the group that are inside the container
-        const groupItems = this.cargoItems.filter(item => 
-            item.groupId === groupId && !item.isOutside
-        );
-        if (groupItems.length === 0) return;
-        
+        // Get ALL items in the group (including outside units)
+        const allGroupItems = this.cargoItems.filter(item => item.groupId === groupId);
+        if (allGroupItems.length === 0) return;
+
         // Check if this is a Steel Coil group - they cannot be rotated
-        if (groupItems[0].type === 'steel-coil' || groupItems[0].fixedDiameter) {
+        if (allGroupItems[0].type === 'steel-coil' || allGroupItems[0].fixedDiameter) {
             console.warn('Steel Coil groups cannot be rotated');
             return;
         }
-        
+
         // Check if this is a vertical Roll group - they cannot be rotated
-        if (groupItems[0].isRoll && groupItems[0].isVerticalRoll) {
+        if (allGroupItems[0].isRoll && allGroupItems[0].isVerticalRoll) {
             console.warn('Vertical Roll groups cannot be rotated');
             return;
         }
-        
+
         // Remember if this group is selected for highlighting restoration
         const wasSelected = this.selectedGroupId === groupId;
-        
-        // Update dimensions for each item if rotating 90 or -90 degrees
-        if (Math.abs(angle) === 90) {
-            groupItems.forEach(item => {
-                // For horizontal rolls, preserve the diameter info
-                if (item.type === 'roll' && !item.isVerticalRoll) {
-                    // Store diameter if not already stored
-                    if (!item.diameter) {
-                        item.diameter = item.width; // width is diameter for horizontal roll
-                    }
-                    
-                    // Track rotation ONLY for horizontal rolls
-                    if (!item.rotation) {
-                        item.rotation = 0;
-                    }
-                    item.rotation += (angle * Math.PI) / 180;
+
+        // Initialize rotation property for horizontal rolls BEFORE checking (must happen first!)
+        allGroupItems.forEach(item => {
+            if (item.type === 'roll' && !item.isVerticalRoll) {
+                if (item.rotation === undefined) {
+                    item.rotation = 0;
                 }
-                
-                // Swap dimensions for ALL items
-                const tempLength = item.length;
-                item.length = item.width;
-                item.width = tempLength;
+                // Store diameter if not already stored
+                if (!item.diameter) {
+                    item.diameter = item.width; // width is diameter for horizontal roll
+                }
+            }
+        });
+
+        // For horizontal rolls: find minimum rotation (this is the group's base rotation)
+        // Items with higher rotation were rotated individually and need to be reset to group rotation
+        const horizontalRolls = allGroupItems.filter(item => item.type === 'roll' && !item.isVerticalRoll);
+        const groupBaseRotation = horizontalRolls.length > 0
+            ? Math.min(...horizontalRolls.map(item => item.rotation || 0))
+            : 0;
+
+        // Reset individual rotations before group rotation for ALL items (inside + outside)
+        allGroupItems.forEach(item => {
+            if (item.type === 'roll' && !item.isVerticalRoll) {
+                // For horizontal rolls, store original dimensions if not already stored
+                if (!item.originalLength) {
+                    // Determine original dimensions based on current rotation state
+                    if (item.rotation) {
+                        const rotationSteps = Math.round(item.rotation / (Math.PI / 2));
+                        const isCurrentlySwapped = Math.abs(rotationSteps % 2) === 1;
+                        if (isCurrentlySwapped) {
+                            item.originalLength = item.width;
+                            item.originalWidth = item.length;
+                        } else {
+                            item.originalLength = item.length;
+                            item.originalWidth = item.width;
+                        }
+                    } else {
+                        item.originalLength = item.length;
+                        item.originalWidth = item.width;
+                    }
+                }
+
+                // Reset individually rotated items to group base rotation
+                if (item.rotation !== groupBaseRotation) {
+                    const currentRotationSteps = Math.round(item.rotation / (Math.PI / 2));
+                    const targetRotationSteps = Math.round(groupBaseRotation / (Math.PI / 2));
+
+                    const currentSwapped = Math.abs(currentRotationSteps % 2) === 1;
+                    const targetSwapped = Math.abs(targetRotationSteps % 2) === 1;
+
+                    // If swap state is different, adjust dimensions
+                    if (currentSwapped !== targetSwapped) {
+                        const temp = item.length;
+                        item.length = item.width;
+                        item.width = temp;
+
+                        // DON'T swap originalLength/originalWidth!
+                        // They should ALWAYS represent dimensions at rotation=0
+                    }
+
+                    item.rotation = groupBaseRotation;
+                }
+            } else {
+                // For regular units, unswap if needed
+                // Check ONLY rotationAngle to determine current dimension state
+                // wasRotatedIndividually flag should NOT be used here as it's historical info
+                const isCurrentlySwapped = item.rotationAngle && Math.abs(Math.abs(item.rotationAngle) - Math.PI / 2) < 0.01;
+
+                if (isCurrentlySwapped) {
+                    const tempLength = item.length;
+                    item.length = item.width;
+                    item.width = tempLength;
+                }
+            }
+
+            // Reset rotationAngle and flag for all units
+            item.rotationAngle = 0;
+            item.wasRotatedIndividually = false;
+        });
+
+        // Update dimensions for each item if rotating 90 or -90 degrees (ALL items)
+        if (Math.abs(angle) === 90) {
+            allGroupItems.forEach(item => {
+                // For horizontal rolls, handle rotation differently
+                if (item.type === 'roll' && !item.isVerticalRoll) {
+                    // Store original dimensions if not already stored
+                    if (!item.originalLength) {
+                        item.originalLength = item.length;
+                        item.originalWidth = item.width;
+                    }
+
+                    // Increment rotation tracking
+                    item.rotation += (angle * Math.PI) / 180;
+
+                    // Determine if dimensions should be swapped based on FINAL rotation
+                    // Swap only for odd multiples of π/2 (π/2, 3π/2, 5π/2...)
+                    const rotationSteps = Math.round(item.rotation / (Math.PI / 2));
+                    const shouldBeSwapped = Math.abs(rotationSteps % 2) === 1;
+
+                    // Set dimensions based on final rotation state
+                    if (shouldBeSwapped) {
+                        item.length = item.originalWidth;
+                        item.width = item.originalLength;
+                    } else {
+                        item.length = item.originalLength;
+                        item.width = item.originalWidth;
+                    }
+                } else {
+                    // Regular units: swap dimensions
+                    const tempLength = item.length;
+                    item.length = item.width;
+                    item.width = tempLength;
+                }
             });
         }
         

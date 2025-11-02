@@ -898,6 +898,11 @@ class UI {
         // Store current vehicle config for modal
         this.currentVehicleConfig = customVehicle;
 
+        // Auto arrange cargo if there are items
+        if (this.cargoManager.cargoItems.length > 0) {
+            this.autoArrangeCargo();
+        }
+
         this.updateStatistics();
     }
 
@@ -1286,10 +1291,10 @@ class UI {
                             // Some items didn't fit or exceeded weight limit
                             const messages = [];
                             if (result.unpackedCount > 0) {
-                                messages.push(`${result.unpackedCount} units did not fit in the space`);
+                                messages.push(i18n.t('unitsDidNotFit').replace('{count}', result.unpackedCount));
                             }
                             if (result.exceedingWeightCount > 0) {
-                                messages.push(`${result.exceedingWeightCount} units exceeded weight limit`);
+                                messages.push(i18n.t('unitsExceededWeightLimit').replace('{count}', result.exceedingWeightCount));
                             }
                             if (messages.length > 0) {
                                 this.showNotification(`${messages.join(` ${i18n.t('and')} `)} - ${i18n.t('placedOutside')}`, 'warning');
@@ -1358,10 +1363,10 @@ class UI {
                             // Some items didn't fit or exceeded weight limit
                             const messages = [];
                             if (result.unpackedCount > 0) {
-                                messages.push(`${result.unpackedCount} units did not fit in the space`);
+                                messages.push(i18n.t('unitsDidNotFit').replace('{count}', result.unpackedCount));
                             }
                             if (result.exceedingWeightCount > 0) {
-                                messages.push(`${result.exceedingWeightCount} units exceeded weight limit`);
+                                messages.push(i18n.t('unitsExceededWeightLimit').replace('{count}', result.exceedingWeightCount));
                             }
                             if (messages.length > 0) {
                                 this.showNotification(`${messages.join(` ${i18n.t('and')} `)} - ${i18n.t('placedOutside')}`, 'warning');
@@ -1551,7 +1556,18 @@ class UI {
             orientationKey = `_${params.isVerticalRoll ? 'vertical' : 'horizontal'}`;
         }
         const groupKey = `${unitType}_${params.name}_${params.weight}_${params.maxStack}_${params.maxStackWeight}_${params.loadingMethods.join(',')}_${params.unloadingMethods.join(',')}${dimensionKey}${orientationKey}`;
-        
+
+        // Check if group with this groupKey already exists (might have been rotated)
+        const existingGroupItem = this.cargoManager.cargoItems.find(item => item.groupKey === groupKey);
+        if (existingGroupItem) {
+            // Use dimensions from existing group (they may be rotated)
+            params.dimensions = {
+                length: existingGroupItem.length,
+                width: existingGroupItem.width,
+                height: existingGroupItem.height
+            };
+        }
+
         // Pass all parameters including name to the cargo manager
         const cargo = this.cargoManager.addCargoUnit(unitType, {
             ...params,
@@ -1798,10 +1814,10 @@ class UI {
         } else {
             const messages = [];
             if (result.unpackedCount > 0) {
-                messages.push(`${result.unpackedCount} units did not fit`);
+                messages.push(i18n.t('unitsDidNotFit').replace('{count}', result.unpackedCount));
             }
             if (result.exceedingWeightCount > 0) {
-                messages.push(`${result.exceedingWeightCount} units exceeded weight limit`);
+                messages.push(i18n.t('unitsExceededWeightLimit').replace('{count}', result.exceedingWeightCount));
             }
             if (messages.length > 0) {
                 this.showNotification(i18n.t('warningPlacedOutside').replace('{items}', messages.join(` ${i18n.t('and')} `)), 'warning');
@@ -1980,49 +1996,50 @@ class UI {
             const groundItems = group.items.filter(item => {
                 // Skip items outside container
                 if (item.isOutside) return false;
-                
+
                 // Check if item has position and is on ground level (trailer floor or coil well)
                 // Item is on ground if its bottom is at trailer height
                 // Steel Coils in coil well are 0.3m lower due to the groove
                 let expectedGroundY = trailerHeight + item.height/2;
-                
+
                 // Steel Coils in Coilmulde are placed in the groove which is 0.3m deep
                 if (item.type === 'steel-coil' && this.cargoManager.containerDimensions?.hasGroove) {
                     expectedGroundY = trailerHeight - 0.3 + item.height/2;
                 }
-                
-                return item.position && Math.abs(item.position.y - expectedGroundY) < 0.1;
+
+                // Increased tolerance to 0.15m to handle floating point precision errors
+                return item.position && Math.abs(item.position.y - expectedGroundY) < 0.15;
             });
             // Calculate floor area - handle both regular items and cylinders (Steel Coil, Roll)
-            let floorArea;
-            
-            if (group.sample.type === 'steel-coil' || (group.sample.type === 'roll' && !group.sample.isHorizontal)) {
-                // For cylinders use circular area
-                // Steel Coil stores diameter as width, Roll has diameter property
-                const diameter = group.sample.diameter || group.sample.width || 1.8;
-                const radius = diameter / 2;
-                floorArea = groundItems.length * Math.PI * radius * radius;
-            } else if (group.sample.type === 'roll' && group.sample.isHorizontal) {
-                // Horizontal roll uses rectangular footprint
-                floorArea = groundItems.length * (group.sample.diameter || 0.8) * (group.sample.rollHeight || 1.2);
-            } else {
-                // Regular rectangular items
-                floorArea = groundItems.length * group.sample.length * group.sample.width;
-            }
+            // Sum individual items to account for potential rotation dimension swaps
+            const floorArea = groundItems.reduce((sum, item) => {
+                if (item.type === 'steel-coil' || (item.type === 'roll' && !item.isHorizontalRoll)) {
+                    // For vertical cylinders use circular area
+                    const diameter = item.diameter || item.width || 1.8;
+                    const radius = diameter / 2;
+                    return sum + (Math.PI * radius * radius);
+                } else if (item.type === 'roll' && item.isHorizontalRoll) {
+                    // Horizontal roll uses rectangular footprint (diameter × cylinder length)
+                    return sum + ((item.diameter || 0.8) * (item.length || 1.2));
+                } else {
+                    // Regular rectangular items
+                    return sum + (item.length * item.width);
+                }
+            }, 0);
             
             // Calculate LDM - Loading Meter
             const containerWidth = this.cargoManager.containerDimensions ? 
                 Math.floor(this.cargoManager.containerDimensions.width * 10) / 10 : 2.4; // Default 2.4m if no container
             const ldm = groundItems.reduce((sum, item) => {
-                if (item.type === 'steel-coil' || (item.type === 'roll' && !item.isHorizontal)) {
+                if (item.type === 'steel-coil' || (item.type === 'roll' && !item.isHorizontalRoll)) {
                     // For cylinders, use circular area (π × r²) divided by container width
                     // Steel Coil stores diameter as width, Roll has diameter property
                     const diameter = item.diameter || item.width || 1.8;
                     const radius = diameter / 2;
                     return sum + (Math.PI * radius * radius) / containerWidth;
-                } else if (item.type === 'roll' && item.isHorizontal) {
-                    // Horizontal roll
-                    return sum + ((item.diameter || 0.8) * (item.rollHeight || 1.2)) / containerWidth;
+                } else if (item.type === 'roll' && item.isHorizontalRoll) {
+                    // Horizontal roll: rectangular footprint (diameter × cylinder length)
+                    return sum + ((item.diameter || 0.8) * (item.length || 1.2)) / containerWidth;
                 } else {
                     // Regular items
                     return sum + (item.length * item.width) / containerWidth;
@@ -2374,8 +2391,8 @@ class UI {
                             currentMethods = currentMethods.filter(m => m !== method);
                         }
                         
-                        // Update the group
-                        this.updateGroupParameter(groupId, methodsKey, currentMethods);
+                        // Update the group (convert groupId to int)
+                        this.updateGroupParameter(parseInt(groupId), methodsKey, currentMethods);
                     }
                 });
             });
@@ -2497,10 +2514,10 @@ class UI {
         if (result && !result.success) {
             const messages = [];
             if (result.unpackedCount > 0) {
-                messages.push(`${result.unpackedCount} units did not fit in the space`);
+                messages.push(i18n.t('unitsDidNotFit').replace('{count}', result.unpackedCount));
             }
             if (result.exceedingWeightCount > 0) {
-                messages.push(`${result.exceedingWeightCount} units exceed weight limit`);
+                messages.push(i18n.t('unitsExceededWeightLimit').replace('{count}', result.exceedingWeightCount));
             }
             this.showNotification(messages.join(', '), 'warning');
         } else {
@@ -2512,7 +2529,7 @@ class UI {
         // Store old weights to calculate difference
         let weightDifference = 0;
         let needsStackingCheck = false;
-        
+
         // Update all items in the group
         this.cargoManager.cargoItems.forEach(item => {
             if (item.groupId === groupId) {
@@ -2521,37 +2538,53 @@ class UI {
                     weightDifference += value - item.weight;
                     needsStackingCheck = true; // Weight change might affect stacking
                 }
-                
+
                 // Check if we need stacking validation
                 if (parameter === 'maxStack' || parameter === 'maxStackWeight') {
                     needsStackingCheck = true;
                 }
-                
+
                 item[parameter] = value;
-                
+
+                // Regenerate groupKey if loading/unloading methods changed
+                if (parameter === 'loadingMethods' || parameter === 'unloadingMethods') {
+                    const loadingStr = item.loadingMethods ? item.loadingMethods.join(',') : 'rear,side,top';
+                    const unloadingStr = item.unloadingMethods ? item.unloadingMethods.join(',') : 'rear,side,top';
+                    const dimensionKey = `_${item.length}_${item.width}_${item.height}`;
+                    let orientationKey = '';
+                    if (item.type === 'roll' && item.isVerticalRoll !== undefined) {
+                        orientationKey = `_${item.isVerticalRoll ? 'vertical' : 'horizontal'}`;
+                    }
+                    item.groupKey = `${item.type}_${item.name}_${item.weight}_${item.maxStack}_${item.maxStackWeight}_${loadingStr}_${unloadingStr}${dimensionKey}${orientationKey}`;
+                }
+
                 // Update mesh userData if it exists
                 if (item.mesh) {
                     item.mesh.userData[parameter] = value;
                 }
             }
         });
-        
+
         // Update total weight if weight was changed
         if (parameter === 'weight') {
             this.cargoManager.totalWeight += weightDifference;
         }
-        
+
         // Check stacking limits and rearrange if needed
         if (needsStackingCheck) {
             // Clear all cargo meshes and re-arrange completely
             this.scene3d.clearAllCargo();
             this.cargoManager.autoArrange();
         }
-        
+
         // Update statistics and visualization
         this.updateStatistics();
         this.updateAxleIndicators();
-        // Don't call updateLoadedUnitsList to avoid infinite loop
+
+        // Refresh UI if loading/unloading methods changed (safe - no infinite loop)
+        if (parameter === 'loadingMethods' || parameter === 'unloadingMethods') {
+            this.updateLoadedUnitsList();
+        }
     }
 
     addItemToGroup(groupId) {
@@ -2666,26 +2699,50 @@ class UI {
                 const wasVertical = item.isVerticalRoll;
                 item.isVerticalRoll = !wasVertical;
                 item.isHorizontalRoll = wasVertical;
-                
-                // Swap dimensions based on new orientation
+
+                // STEP 1: Read correct dimensions BEFORE resetting rotation flags
+                let trueDiameter, trueLength;
+
+                if (wasVertical) {
+                    // Vertical roll: diameter = width (always), length = height (always)
+                    trueDiameter = item.width;
+                    trueLength = item.height;
+                } else {
+                    // Horizontal roll: use stored diameter (always correct)
+                    trueDiameter = item.diameter || item.height; // fallback to height if diameter not set
+
+                    // Use stored cylinderLength if available (fixes equal dimensions issue)
+                    if (item.cylinderLength !== undefined) {
+                        trueLength = item.cylinderLength;
+                    } else {
+                        // Fallback: cylinder length is the larger of length/width
+                        trueLength = Math.max(item.length, item.width);
+                    }
+                }
+
+                // STEP 2: Reset all rotation flags
+                // This prevents visual glitches when changing orientation of previously rotated groups
+                item.rotation = 0;
+                item.rotationAngle = 0;
+                item.wasRotatedIndividually = false;
+                delete item.originalLength;
+                delete item.originalWidth;
+
+                // STEP 3: Set new dimensions based on new orientation
                 if (wasVertical) {
                     // Going from vertical to horizontal
-                    const originalDiameter = item.width;
-                    const originalHeight = item.height;
-                    
-                    item.length = originalHeight;
-                    item.width = originalDiameter;
-                    item.height = originalDiameter;
+                    item.length = trueLength;
+                    item.width = trueDiameter;
+                    item.height = trueDiameter;
+                    item.diameter = trueDiameter; // Store diameter for horizontal rolls
                 } else {
                     // Going from horizontal to vertical
-                    const originalLength = item.length;
-                    const originalDiameter = item.width;
-                    
-                    item.length = originalDiameter;
-                    item.width = originalDiameter;
-                    item.height = originalLength;
+                    item.length = trueDiameter;
+                    item.width = trueDiameter;
+                    item.height = trueLength;
+                    // Note: diameter is not used for vertical rolls, but keep it for potential future orientation change
                 }
-                
+
                 // Update groupKey
                 const loadingStr = (item.loadingMethods || ['rear', 'side', 'top']).join(',');
                 const unloadingStr = (item.unloadingMethods || ['rear', 'side', 'top']).join(',');
@@ -2955,8 +3012,16 @@ class UI {
             this.cargoManager.autoArrange();
             this.updateLoadedUnitsList();
             this.updateStatistics();
+            this.updateAxleIndicators();
+            if (this.scene3d.showAxleLoads) {
+                this.scene3d.updateAxleLoadVisualization();
+            }
         } else {
             this.updateLoadedUnitsList();
+            this.updateAxleIndicators();
+            if (this.scene3d.showAxleLoads) {
+                this.scene3d.updateAxleLoadVisualization();
+            }
         }
     }
     
@@ -3138,8 +3203,8 @@ class UI {
             // Add view title below plan name
             pdf.setFontSize(12);
             pdf.setFont(undefined, 'normal');
-            pdf.text('Load Plan - Perspective View', pageWidth / 2, 14, { align: 'center' });
-            
+            pdf.text(i18n.t('loadPlanPerspectiveView'), pageWidth / 2, 14, { align: 'center' });
+
             // Add logo on the left
             if (logoDataURL) {
                 const logoWidth = 25; // mm
@@ -3151,20 +3216,18 @@ class UI {
             pdf.setFontSize(9);
             pdf.setFont(undefined, 'italic');
             pdf.setTextColor(100, 100, 100);
-            pdf.text('Planned and generated on', 32, 7, { align: 'left' });
-            pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
+            pdf.text(i18n.t('plannedAndGeneratedOn'), 32, 7, { align: 'left' });
+            pdf.text(i18n.t('transportNomadSite'), 32, 11, { align: 'left' });
 
             // Add date
             pdf.setFontSize(10);
             pdf.setFont(undefined, 'normal');
             pdf.setTextColor(0, 0, 0);
             const now = new Date();
-            const day = String(now.getDate()).padStart(2, '0');
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const year = now.getFullYear();
-            const time = now.toLocaleTimeString('en-US');
-            const date = `${day}/${month}/${year} ${time}`;
-            pdf.text(`Date: ${date}`, pageWidth - 5, 8, { align: 'right' });
+            const dateStr = now.toLocaleDateString(i18n.getDateLocale());
+            const timeStr = now.toLocaleTimeString(i18n.getDateLocale());
+            const date = `${dateStr} ${timeStr}`;
+            pdf.text(`${i18n.t('dateLabel')}: ${date}`, pageWidth - 5, 8, { align: 'right' });
             
             // Calculate full page image dimensions with minimal margins
             const sideMargin = 3; // Minimal side margin
@@ -3204,8 +3267,8 @@ class UI {
             // Add view title below plan name
             pdf.setFontSize(12);
             pdf.setFont(undefined, 'normal');
-            pdf.text('Load Plan - Top View', pageWidth / 2, 14, { align: 'center' });
-            
+            pdf.text(i18n.t('loadPlanTopView'), pageWidth / 2, 14, { align: 'center' });
+
             // Add logo on the left
             if (logoDataURL) {
                 const logoWidth = 25; // mm
@@ -3217,8 +3280,8 @@ class UI {
             pdf.setFontSize(9);
             pdf.setFont(undefined, 'italic');
             pdf.setTextColor(100, 100, 100);
-            pdf.text('Planned and generated on', 32, 7, { align: 'left' });
-            pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
+            pdf.text(i18n.t('plannedAndGeneratedOn'), 32, 7, { align: 'left' });
+            pdf.text(i18n.t('transportNomadSite'), 32, 11, { align: 'left' });
 
             pdf.setFont(undefined, 'normal');
             pdf.setTextColor(0, 0, 0);
@@ -3260,8 +3323,8 @@ class UI {
                 pdf.setFontSize(9);
                 pdf.setFont(undefined, 'italic');
                 pdf.setTextColor(100, 100, 100);
-                pdf.text('Planned and generated on', 32, 7, { align: 'left' });
-                pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
+                pdf.text(i18n.t('plannedAndGeneratedOn'), 32, 7, { align: 'left' });
+                pdf.text(i18n.t('transportNomadSite'), 32, 11, { align: 'left' });
 
                 pdf.setFont(undefined, 'normal');
                 pdf.setTextColor(0, 0, 0);
@@ -3344,8 +3407,8 @@ class UI {
                     pdf.setFontSize(9);
                     pdf.setFont(undefined, 'italic');
                     pdf.setTextColor(100, 100, 100);
-                    pdf.text('Planned and generated on', 32, 7, { align: 'left' });
-                    pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
+                    pdf.text(i18n.t('plannedAndGeneratedOn'), 32, 7, { align: 'left' });
+                    pdf.text(i18n.t('transportNomadSite'), 32, 11, { align: 'left' });
 
                     pdf.setFont(undefined, 'normal');
                     pdf.setTextColor(0, 0, 0);
@@ -3380,7 +3443,8 @@ class UI {
             }
             
             // Save PDF
-            const filename = `load_plan_${new Date().toISOString().split('T')[0]}.pdf`;
+            const configName = this.currentConfigName || this.generateDefaultName();
+            const filename = `${configName.replace(/[^a-z0-9_\-]/gi, '_')}.pdf`;
             pdf.save(filename);
             
             this.showNotification(i18n.t('pdfGenerated'), 'success');
@@ -3642,14 +3706,14 @@ class UI {
         
         // Generate preview
         const stats = this.cargoManager.getStatistics();
-        const vehicleName = CONFIG.vehicles[this.currentVehicle]?.name || 'Custom Dimensions';
-        
+        const vehicleName = CONFIG.vehicles[this.currentVehicle]?.name || i18n.t('customFallback');
+
         preview.innerHTML = `
-            <div><strong>Cargo Space:</strong> ${vehicleName}</div>
-            <div><strong>Number of Units:</strong> ${stats.totalItems} ${stats.outsideItems > 0 ? `(+${stats.outsideItems} outside)` : ''}</div>
-            <div><strong>Total Weight:</strong> ${stats.totalWeight} kg</div>
-            <div><strong>Space Usage:</strong> ${stats.volumeUsage.toFixed(1)}%</div>
-            <div><strong>Load Capacity Usage:</strong> ${stats.weightUsage.toFixed(1)}%</div>
+            <div><strong>${i18n.t('cargoSpaceLabel')}:</strong> ${vehicleName}</div>
+            <div><strong>${i18n.t('numberOfUnits')}:</strong> ${stats.totalItems} ${stats.outsideItems > 0 ? i18n.t('outsideParentheses').replace('{count}', stats.outsideItems) : ''}</div>
+            <div><strong>${i18n.t('totalWeightLabel')}:</strong> ${stats.totalWeight} ${i18n.t('kg')}</div>
+            <div><strong>${i18n.t('spaceUsageLabel')}:</strong> ${stats.volumeUsage.toFixed(1)}%</div>
+            <div><strong>${i18n.t('loadCapacityUsageLabel')}:</strong> ${stats.weightUsage.toFixed(1)}%</div>
         `;
         
         // Load existing configurations for selection
@@ -3660,19 +3724,19 @@ class UI {
             
             existingList.innerHTML = configs.map(config => {
                 const date = new Date(config.date);
-                const dateStr = date.toLocaleDateString('pl-PL');
-                const timeStr = date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+                const dateStr = date.toLocaleDateString(i18n.getDateLocale());
+                const timeStr = date.toLocaleTimeString(i18n.getDateLocale(), { hour: '2-digit', minute: '2-digit' });
                 const isCurrentConfig = config.id === this.currentConfigId;
                 
                 return `
                     <div class="existing-config-item ${isCurrentConfig ? 'current-config' : ''}" data-config-id="${config.id}" data-config-name="${config.name}">
                         <div class="config-main-info">
-                            <div class="config-name">${config.name} ${isCurrentConfig ? '<span class="current-badge">(Aktualny)</span>' : ''}</div>
+                            <div class="config-name">${config.name} ${isCurrentConfig ? `<span class="current-badge">${i18n.t('currentConfig')}</span>` : ''}</div>
                             <div class="config-meta">${dateStr} ${timeStr}</div>
                         </div>
                         <div class="config-details">
                             ${config.vehicleType ? `<span class="config-vehicle">${CONFIG.vehicles[config.vehicleType]?.name || config.vehicleType}</span>` : ''}
-                            ${config.stats?.insideWeight ? `<span class="config-weight">${config.stats.insideWeight} kg</span>` : ''}
+                            ${config.stats?.insideWeight ? `<span class="config-weight">${config.stats.insideWeight} ${i18n.t('kg')}</span>` : ''}
                         </div>
                     </div>
                 `;
@@ -3685,8 +3749,6 @@ class UI {
         // Reset selected config
         this.selectedConfigToOverwrite = null;
         this.selectedConfigOriginalName = null;
-        document.getElementById('saveConfigText').textContent = 'Save as new';
-        document.getElementById('saveDownloadConfigText').textContent = 'Save and download';
         const saveButtonsGroup = document.querySelector('.save-buttons-group');
         const overwriteButtonsGroup = document.querySelector('.overwrite-buttons-group');
         if (saveButtonsGroup && overwriteButtonsGroup) {
@@ -3734,13 +3796,13 @@ class UI {
         if (savedId) {
             let message;
             if (overwriteId && downloadFile) {
-                message = 'Configuration overwritten and downloaded';
+                message = i18n.t('configOverwrittenAndDownloaded');
             } else if (overwriteId) {
-                message = 'Configuration overwritten in browser memory';
+                message = i18n.t('configOverwrittenInMemory');
             } else if (downloadFile) {
-                message = 'Configuration saved to file and browser memory';
+                message = i18n.t('configSavedToFileAndMemory');
             } else {
-                message = 'Configuration saved in browser memory';
+                message = i18n.t('configSavedInMemoryOnly');
             }
             this.showNotification(message, 'success');
         } else {
@@ -3775,21 +3837,21 @@ class UI {
         // Build HTML for configs
         listContainer.innerHTML = configs.map(config => {
             const date = new Date(config.date);
-            const dateStr = date.toLocaleDateString('pl-PL');
-            const timeStr = date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
-            const vehicleName = CONFIG.vehicles[config.vehicleType]?.name || 'Custom';
-            
+            const dateStr = date.toLocaleDateString(i18n.getDateLocale());
+            const timeStr = date.toLocaleTimeString(i18n.getDateLocale(), { hour: '2-digit', minute: '2-digit' });
+            const vehicleName = CONFIG.vehicles[config.vehicleType]?.name || i18n.t('customFallback');
+
             // Show groups summary or use stats
-            const groupsInfo = config.groupsSummary || 
-                (config.stats.totalItems > 0 ? `${config.stats.totalItems} units` : 'No cargo');
-            
+            const groupsInfo = config.groupsSummary ||
+                (config.stats.totalItems > 0 ? `${config.stats.totalItems} ${i18n.t('units')}` : i18n.t('noCargo'));
+
             return `
                 <div class="config-item" data-config-id="${config.id}">
                     <div class="config-item-info" onclick="window.uiInstance.loadStoredConfiguration('${config.id}')">
                         <div class="config-item-name">${config.name}</div>
                         <div class="config-item-details">
                             <span class="config-item-detail" style="font-weight: 500;">${vehicleName}</span>
-                            <span class="config-item-detail">${config.stats.totalWeight} kg</span>
+                            <span class="config-item-detail">${config.stats.totalWeight} ${i18n.t('kg')}</span>
                             <span class="config-item-detail">${dateStr} ${timeStr}</span>
                         </div>
                         <div class="config-item-groups" style="font-size: 11px; color: #6b7280; margin-top: 4px;">
@@ -4436,10 +4498,8 @@ class UI {
                 // Update input with selected config name - add suffix for new save
                 const originalName = item.dataset.configName;
                 nameInput.value = this.generateUniqueConfigName(originalName);
-                
+
                 // Show/hide appropriate buttons
-                document.getElementById('saveConfigText').textContent = 'Save as new';
-                document.getElementById('saveDownloadConfigText').textContent = 'Save as new and download';
                 if (saveButtonsGroup && overwriteButtonsGroup) {
                     saveButtonsGroup.style.display = 'none';
                     overwriteButtonsGroup.style.display = 'flex';
@@ -4468,8 +4528,6 @@ class UI {
             });
             this.selectedConfigToOverwrite = null;
             this.selectedConfigOriginalName = null;
-            document.getElementById('saveConfigText').textContent = 'Save as new';
-            document.getElementById('saveDownloadConfigText').textContent = 'Save and download';
             if (saveButtonsGroup && overwriteButtonsGroup) {
                 saveButtonsGroup.style.display = 'flex';
                 overwriteButtonsGroup.style.display = 'none';
@@ -4729,8 +4787,8 @@ class UI {
             this.currentConfigId = savedId;
             this.currentConfigName = finalName;
             nameInput.value = finalName;
-            
-            const message = overwriteId ? 'Configuration overwritten' : 'Configuration saved';
+
+            const message = overwriteId ? i18n.t('configurationOverwritten') : i18n.t('configurationSavedNew');
             this.showNotification(i18n.t('configSavedInMemory').replace('{message}', message), 'success');
             this.checkConfigNameExists(finalName);
         } else {
@@ -4791,8 +4849,8 @@ class UI {
             a.click();
             
             URL.revokeObjectURL(url);
-            
-            const message = overwriteId ? 'Configuration overwritten and downloaded' : 'Configuration saved and downloaded';
+
+            const message = overwriteId ? i18n.t('configOverwrittenAndDownloaded') : i18n.t('configSavedAndDownloaded');
             this.showNotification(message, 'success');
             this.checkConfigNameExists(finalName);
         } else {
@@ -4871,21 +4929,21 @@ class UI {
             // Orange color for overwrite
             saveBtn.classList.add('btn-overwrite');
             saveDownloadBtn.classList.add('btn-overwrite');
-            saveBtn.title = 'Overwrite in memory';
-            saveDownloadBtn.title = 'Overwrite and download';
+            saveBtn.title = i18n.t('overwriteInMemory');
+            saveDownloadBtn.title = i18n.t('overwriteAndDownload');
         } else {
             // Normal colors
             saveBtn.classList.remove('btn-overwrite');
             saveDownloadBtn.classList.remove('btn-overwrite');
-            saveBtn.title = 'Save to memory';
-            saveDownloadBtn.title = 'Save and download';
+            saveBtn.title = i18n.t('saveToMemory');
+            saveDownloadBtn.title = i18n.t('saveAndDownloadTooltip');
         }
         
         return exists;
     }
     
     generateDefaultName() {
-        const vehicleName = CONFIG.vehicles[this.currentVehicle]?.name || 'Custom';
+        const vehicleName = CONFIG.vehicles[this.currentVehicle]?.name || i18n.t('customFallback');
         const stats = this.cargoManager.getStatistics();
         
         // Get all cargo groups with counts

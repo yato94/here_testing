@@ -338,7 +338,7 @@ class BinPacking3D {
                 height: item.height,
                 weight: item.weight
             };
-            
+
             if (this.itemFits(rotatedItem, space) && this.canPlaceItem(space.x, space.y, space.z, rotatedItem.width, rotatedItem.depth, rotatedItem.height)) {
                 const waste = this.calculateWaste(rotatedItem, space);
                 const position = {
@@ -678,14 +678,20 @@ class BinPacking3D {
     
     canPlaceItem(x, y, z, width, depth, height) {
         // Sprawdź czy pozycja nie koliduje z żadną użytą przestrzenią
+        // Używamy tej samej tolerancji co w itemFits() (5mm) dla spójności
+        const tolerance = 0.005;
+
         for (const used of this.usedSpace) {
-            if (!(x + width <= used.x || 
-                  x >= used.x + used.width ||
-                  y + height <= used.y || 
-                  y >= used.y + used.height ||
-                  z + depth <= used.z || 
-                  z >= used.z + used.depth)) {
-                return false;
+            // Sprawdź nakładanie się z tolerancją dla błędów zmiennoprzecinkowych
+            const overlapsX = !(x + width <= used.x + tolerance ||
+                               x >= used.x + used.width - tolerance);
+            const overlapsY = !(y + height <= used.y + tolerance ||
+                               y >= used.y + used.height - tolerance);
+            const overlapsZ = !(z + depth <= used.z + tolerance ||
+                               z >= used.z + used.depth - tolerance);
+
+            if (overlapsX && overlapsY && overlapsZ) {
+                return false; // Kolizja wykryta
             }
         }
         return true;

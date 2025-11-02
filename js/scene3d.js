@@ -1007,8 +1007,9 @@ class Scene3D {
         }
         
         // Create geometry key for caching
-        const geoKey = cargoData.isRoll ? 
-            `roll_${cargoData.length}_${cargoData.height}_${cargoData.width}` :
+        // For rolls with equal dimensions, orientation must be part of cache key
+        const geoKey = cargoData.isRoll ?
+            `roll_${cargoData.isVerticalRoll ? 'v' : 'h'}_${cargoData.length}_${cargoData.height}_${cargoData.width}` :
             `${cargoData.length}_${cargoData.height}_${cargoData.width}`;
         
         // Use cached geometry if available
@@ -1072,12 +1073,19 @@ class Scene3D {
                     // Otherwise use width as diameter
                     const diameter = cargoData.diameter || cargoData.width;
                     const radius = diameter / 2;
-                    
-                    // Cylinder length is the larger of length/width (for rotated items)
-                    const cylinderLength = cargoData.diameter ? 
-                        Math.max(cargoData.length, cargoData.width) : 
-                        cargoData.length;
-                    
+
+                    // Use stored cylinderLength if available (fixes equal dimensions issue)
+                    // Fallback to old logic for backward compatibility
+                    let cylinderLength;
+                    if (cargoData.cylinderLength !== undefined) {
+                        cylinderLength = cargoData.cylinderLength;
+                    } else {
+                        // Fallback: cylinder length is the larger of length/width (for rotated items)
+                        cylinderLength = cargoData.diameter ?
+                            Math.max(cargoData.length, cargoData.width) :
+                            cargoData.length;
+                    }
+
                     geometry = new THREE.CylinderGeometry(
                         radius,    // top radius
                         radius,    // bottom radius
@@ -1086,7 +1094,7 @@ class Scene3D {
                         1,         // height segments
                         false      // open ended
                     );
-                    
+
                     // Rotate to lie horizontally along X axis
                     geometry.rotateZ(Math.PI / 2);
                 }
@@ -1127,12 +1135,23 @@ class Scene3D {
         );
         
         // Apply rotation if it exists (for rotated items)
-        if (cargoData.rotation) {
-            mesh.rotation.y = cargoData.rotation;
+        // Horizontal rolls use 'rotation', regular units use 'rotationAngle'
+        const rotationValue = cargoData.rotation || cargoData.rotationAngle;
+        if (rotationValue) {
+            mesh.rotation.y = rotationValue;
         }
         
         mesh.userData = cargoData;
-        
+
+        // Store original dimensions (before any rotation) for dimension label edge calculations
+        // Only set if not present in cargoData at all (preserve values from rotated units after save/load)
+        if (!('originalLength' in cargoData) && !('originalWidth' in cargoData)) {
+            mesh.userData.originalLength = cargoData.length;
+            mesh.userData.originalWidth = cargoData.width;
+        }
+        // originalHeight is always safe to set (never swapped)
+        mesh.userData.originalHeight = cargoData.height;
+
         // Add wireframe only if less than 1000 items (performance)
         // For steel coils, don't add wireframe as it looks better without edge lines
         if (this.cargoMeshes.length < 1000 && cargoData.type !== 'steel-coil') {
@@ -1163,9 +1182,17 @@ class Scene3D {
                     // Horizontal cylinder - add circles at the ends
                     const diameter = cargoData.diameter || cargoData.width;
                     const radius = diameter / 2;
-                    const cylinderLength = cargoData.diameter ? 
-                        Math.max(cargoData.length, cargoData.width) : 
-                        cargoData.length;
+
+                    // Use stored cylinderLength if available (fixes equal dimensions issue)
+                    let cylinderLength;
+                    if (cargoData.cylinderLength !== undefined) {
+                        cylinderLength = cargoData.cylinderLength;
+                    } else {
+                        // Fallback for old saves
+                        cylinderLength = cargoData.diameter ?
+                            Math.max(cargoData.length, cargoData.width) :
+                            cargoData.length;
+                    }
                     
                     // Create circle curve
                     const circle = new THREE.EllipseCurve(0, 0, radius, radius, 0, 2 * Math.PI, false);
@@ -2027,9 +2054,11 @@ class Scene3D {
         }
         document.removeEventListener('click', this.hideContextMenuHandler);
         document.removeEventListener('contextmenu', this.hideContextMenuHandler);
-        
+
         // Hide ruler when closing context menu
         this.hideRuler();
+        // Hide dimension labels when closing context menu
+        this.hideDimensionLabels();
     }
     
     hideContextMenuHandler = (e) => {
@@ -2055,17 +2084,36 @@ class Scene3D {
         // Check if already outside container
         const isAlreadyOutside = this.isPositionOutsideContainer(mesh.position);
         
+        // Sort stack from bottom to top (lower Y = bottom) for proper cumulative Y adjustment
+        entireStack.sort((a, b) => a.position.y - b.position.y);
+
+        // Track cumulative height change for units above
+        let cumulativeHeightChange = 0;
+
         // Toggle orientation for all Roll units in the stack
-        entireStack.forEach(unit => {
+        entireStack.forEach((unit, index) => {
             if (unit.userData.isRoll && !unit.userData.fixedDiameter) {
                 // Store original values before change
                 const oldHeight = unit.userData.height;
                 const currentDiameter = unit.userData.diameter;
-                const currentCylinderLength = unit.userData.isVerticalRoll ? unit.userData.height : unit.userData.length;
-                
+                // Read current cylinder length - use stored value if available (fixes equal dimensions issue)
+                let currentCylinderLength;
+                if (unit.userData.cylinderLength !== undefined) {
+                    // Use stored cylinderLength (always available for new rolls)
+                    currentCylinderLength = unit.userData.cylinderLength;
+                } else {
+                    // Fallback for old saves without cylinderLength property
+                    if (unit.userData.isVerticalRoll) {
+                        currentCylinderLength = unit.userData.height;
+                    } else {
+                        // Horizontal roll: cylinder length is the larger of length/width
+                        currentCylinderLength = Math.max(unit.userData.length, unit.userData.width);
+                    }
+                }
+
                 // Toggle the orientation
                 unit.userData.isVerticalRoll = !unit.userData.isVerticalRoll;
-                
+
                 if (unit.userData.isVerticalRoll) {
                     // Changing from horizontal to vertical
                     // diameter stays same, cylinder length becomes height
@@ -2081,19 +2129,29 @@ class Scene3D {
                     unit.userData.length = currentCylinderLength; // cylinder length
                     unit.userData.width = currentDiameter; // width is diameter
                 }
-                
-                // Calculate new Y position to keep bottom at same level
+
+                // Calculate new Y position with cumulative adjustment for stacked units
                 const heightDifference = unit.userData.height - oldHeight;
-                unit.position.y += heightDifference / 2;
+
+                if (index === 0) {
+                    // Bottom unit: adjust to keep bottom face at same level
+                    unit.position.y += heightDifference / 2;
+                } else {
+                    // Units above: move by cumulative height change of units below + half of own height change
+                    unit.position.y += cumulativeHeightChange + (heightDifference / 2);
+                }
+
+                // Accumulate height change for next unit above
+                cumulativeHeightChange += heightDifference;
                 
                 // Update the mesh geometry
                 const geometry = new THREE.CylinderGeometry(
                     unit.userData.diameter / 2,
                     unit.userData.diameter / 2,
-                    unit.userData.isVerticalRoll ? unit.userData.height : unit.userData.length,
+                    unit.userData.isVerticalRoll ? unit.userData.height : unit.userData.cylinderLength,
                     32
                 );
-                
+
                 // Apply rotation for horizontal orientation
                 if (!unit.userData.isVerticalRoll) {
                     geometry.rotateZ(Math.PI / 2);
@@ -2102,9 +2160,21 @@ class Scene3D {
                 // Update mesh
                 unit.geometry.dispose();
                 unit.geometry = geometry;
-                
+
+                // Update bounding box for proper collision/raycast detection
+                unit.geometry.computeBoundingBox();
+                unit.geometry.computeBoundingSphere();
+
                 // Reset rotation since we're changing orientation
                 unit.rotation.y = 0;
+
+                // Clear all rotation tracking properties in userData
+                unit.userData.rotationAngle = 0;
+                unit.userData.rotation = 0;  // Reset to 0 for new orientation (not undefined, for consistency)
+                unit.userData.wasRotatedIndividually = false;
+                // Clear original dimensions to prevent stale values from different orientation
+                delete unit.userData.originalLength;
+                delete unit.userData.originalWidth;
                 
                 // Remove old outline (LineLoop children)
                 const lineLoops = [];
@@ -2146,9 +2216,17 @@ class Scene3D {
                         // Horizontal cylinder - add circles at the ends
                         const diameter = unit.userData.diameter || unit.userData.width;
                         const radius = diameter / 2;
-                        const cylinderLength = unit.userData.diameter ? 
-                            Math.max(unit.userData.length, unit.userData.width) : 
-                            unit.userData.length;
+
+                        // Use stored cylinderLength if available (fixes equal dimensions issue)
+                        let cylinderLength;
+                        if (unit.userData.cylinderLength !== undefined) {
+                            cylinderLength = unit.userData.cylinderLength;
+                        } else {
+                            // Fallback for old saves
+                            cylinderLength = unit.userData.diameter ?
+                                Math.max(unit.userData.length, unit.userData.width) :
+                                unit.userData.length;
+                        }
                         
                         // Create circle curve
                         const circle = new THREE.EllipseCurve(0, 0, radius, radius, 0, 2 * Math.PI, false);
@@ -2177,7 +2255,20 @@ class Scene3D {
                 };
             }
         });
-        
+
+        // Check if any unit exceeds container height after orientation change
+        if (!isAlreadyOutside && this.containerBounds && this.containerBounds.max.y) {
+            for (let unit of entireStack) {
+                const unitTop = unit.position.y + (unit.userData.height / 2);
+                if (unitTop > this.containerBounds.max.y) {
+                    // Stack exceeds container height - move outside
+                    this.moveOutsideContainer(bottomUnit);
+                    console.warn('Stack height exceeds container after orientation change - moved outside');
+                    return;
+                }
+            }
+        }
+
         // If outside container, just update and return
         if (isAlreadyOutside) {
             // Notify about changes
@@ -2278,10 +2369,48 @@ class Scene3D {
                 newZ = bottomUnit.position.z + newRelativeZ;
             }
             
-            // Swap dimensions if rotating 90 or -90 degrees
+            // Calculate dimensions after rotation
             if (Math.abs(angle) === 90) {
-                newLength = unit.userData.width;
-                newWidth = unit.userData.length;
+                const isHorizontalRoll = unit.userData.isRoll && !unit.userData.isVerticalRoll;
+                if (isHorizontalRoll) {
+                    // For horizontal rolls, use originalLength/originalWidth system
+                    // Store original dimensions if not already stored
+                    if (!unit.userData.originalLength) {
+                        // Determine original dimensions based on current rotation state
+                        // (unit might have been rotated by group before, so current dimensions might be swapped)
+                        if (unit.userData.rotation) {
+                            const rotationSteps = Math.round(unit.userData.rotation / (Math.PI / 2));
+                            const isCurrentlySwapped = Math.abs(rotationSteps % 2) === 1;
+                            if (isCurrentlySwapped) {
+                                unit.userData.originalLength = unit.userData.width;
+                                unit.userData.originalWidth = unit.userData.length;
+                            } else {
+                                unit.userData.originalLength = unit.userData.length;
+                                unit.userData.originalWidth = unit.userData.width;
+                            }
+                        } else {
+                            unit.userData.originalLength = unit.userData.length;
+                            unit.userData.originalWidth = unit.userData.width;
+                        }
+                    }
+                    // Calculate what rotation will be AFTER this rotation
+                    const currentRotation = unit.userData.rotation || 0;
+                    const futureRotation = currentRotation + radians;
+                    // Calculate dimensions based on future rotation
+                    const rotationSteps = Math.round(futureRotation / (Math.PI / 2));
+                    const shouldBeSwapped = Math.abs(rotationSteps % 2) === 1;
+                    if (shouldBeSwapped) {
+                        newLength = unit.userData.originalWidth;
+                        newWidth = unit.userData.originalLength;
+                    } else {
+                        newLength = unit.userData.originalLength;
+                        newWidth = unit.userData.originalWidth;
+                    }
+                } else {
+                    // Regular units: simple swap
+                    newLength = unit.userData.width;
+                    newWidth = unit.userData.length;
+                }
             }
             
             testPositions.push({
@@ -2300,14 +2429,63 @@ class Scene3D {
             entireStack.forEach(unit => {
                 // Update rotation
                 unit.rotation.y += radians;
-                
+
+                // Update rotation tracking in userData
+                // Horizontal rolls use 'rotation' property, regular units use 'rotationAngle'
+                const isHorizontalRoll = unit.userData.isRoll && !unit.userData.isVerticalRoll;
+                if (isHorizontalRoll) {
+                    if (!unit.userData.rotation) {
+                        unit.userData.rotation = 0;
+                    }
+                    unit.userData.rotation += radians;
+                } else {
+                    if (!unit.userData.rotationAngle) {
+                        unit.userData.rotationAngle = 0;
+                    }
+                    unit.userData.rotationAngle += radians;
+                }
+
                 // Update dimensions in userData
                 if (Math.abs(angle) === 90) {
-                    const tempLength = unit.userData.length;
-                    unit.userData.length = unit.userData.width;
-                    unit.userData.width = tempLength;
+                    const isHorizontalRoll = unit.userData.isRoll && !unit.userData.isVerticalRoll;
+                    if (isHorizontalRoll) {
+                        // For horizontal rolls, use originalLength/originalWidth system
+                        if (!unit.userData.originalLength) {
+                            // Determine original dimensions based on CURRENT rotation state (before increment)
+                            const currentRotation = unit.userData.rotation - radians; // Before this rotation
+                            if (currentRotation) {
+                                const rotationSteps = Math.round(currentRotation / (Math.PI / 2));
+                                const isCurrentlySwapped = Math.abs(rotationSteps % 2) === 1;
+                                if (isCurrentlySwapped) {
+                                    unit.userData.originalLength = unit.userData.width;
+                                    unit.userData.originalWidth = unit.userData.length;
+                                } else {
+                                    unit.userData.originalLength = unit.userData.length;
+                                    unit.userData.originalWidth = unit.userData.width;
+                                }
+                            } else {
+                                unit.userData.originalLength = unit.userData.length;
+                                unit.userData.originalWidth = unit.userData.width;
+                            }
+                        }
+                        // Set dimensions based on final rotation (after increment above)
+                        const rotationSteps = Math.round(unit.userData.rotation / (Math.PI / 2));
+                        const shouldBeSwapped = Math.abs(rotationSteps % 2) === 1;
+                        if (shouldBeSwapped) {
+                            unit.userData.length = unit.userData.originalWidth;
+                            unit.userData.width = unit.userData.originalLength;
+                        } else {
+                            unit.userData.length = unit.userData.originalLength;
+                            unit.userData.width = unit.userData.originalWidth;
+                        }
+                    } else {
+                        // Regular units: swap dimensions
+                        const tempLength = unit.userData.length;
+                        unit.userData.length = unit.userData.width;
+                        unit.userData.width = tempLength;
+                    }
                 }
-                
+
                 // Update userData position (stays the same, just dimensions change)
                 unit.userData.position = {
                     x: unit.position.x,
@@ -2315,14 +2493,21 @@ class Scene3D {
                     z: unit.position.z
                 };
             });
-            
+
             // Notify about changes
             if (this.onCargoMoved) {
                 this.onCargoMoved(entireStack.map(m => m.userData));
             }
+
+            // Clear dimension labels so they get recreated on next hover with correct positions
+            this.hideDimensionLabels();
+
+            // Force hover re-detection to prevent immediate label recreation with old geometry
+            this.hoveredObject = null;
+
             return;
         }
-        
+
         // Find a valid position for the rotated stack (only for units inside container)
         const result = this.findValidPositionForRotatedStack(testPositions, entireStack);
         
@@ -2332,19 +2517,68 @@ class Scene3D {
             entireStack.forEach((unit, index) => {
                 // Update rotation
                 unit.rotation.y += radians;
-                
+
+                // Update rotation tracking in userData
+                // Horizontal rolls use 'rotation' property, regular units use 'rotationAngle'
+                const isHorizontalRoll = unit.userData.isRoll && !unit.userData.isVerticalRoll;
+                if (isHorizontalRoll) {
+                    if (!unit.userData.rotation) {
+                        unit.userData.rotation = 0;
+                    }
+                    unit.userData.rotation += radians;
+                } else {
+                    if (!unit.userData.rotationAngle) {
+                        unit.userData.rotationAngle = 0;
+                    }
+                    unit.userData.rotationAngle += radians;
+                }
+
                 // Update dimensions in userData
                 if (Math.abs(angle) === 90) {
-                    const tempLength = unit.userData.length;
-                    unit.userData.length = unit.userData.width;
-                    unit.userData.width = tempLength;
+                    const isHorizontalRoll = unit.userData.isRoll && !unit.userData.isVerticalRoll;
+                    if (isHorizontalRoll) {
+                        // For horizontal rolls, use originalLength/originalWidth system
+                        if (!unit.userData.originalLength) {
+                            // Determine original dimensions based on CURRENT rotation state (before increment)
+                            const currentRotation = unit.userData.rotation - radians; // Before this rotation
+                            if (currentRotation) {
+                                const rotationSteps = Math.round(currentRotation / (Math.PI / 2));
+                                const isCurrentlySwapped = Math.abs(rotationSteps % 2) === 1;
+                                if (isCurrentlySwapped) {
+                                    unit.userData.originalLength = unit.userData.width;
+                                    unit.userData.originalWidth = unit.userData.length;
+                                } else {
+                                    unit.userData.originalLength = unit.userData.length;
+                                    unit.userData.originalWidth = unit.userData.width;
+                                }
+                            } else {
+                                unit.userData.originalLength = unit.userData.length;
+                                unit.userData.originalWidth = unit.userData.width;
+                            }
+                        }
+                        // Set dimensions based on final rotation (after increment above)
+                        const rotationSteps = Math.round(unit.userData.rotation / (Math.PI / 2));
+                        const shouldBeSwapped = Math.abs(rotationSteps % 2) === 1;
+                        if (shouldBeSwapped) {
+                            unit.userData.length = unit.userData.originalWidth;
+                            unit.userData.width = unit.userData.originalLength;
+                        } else {
+                            unit.userData.length = unit.userData.originalLength;
+                            unit.userData.width = unit.userData.originalWidth;
+                        }
+                    } else {
+                        // Regular units: swap dimensions
+                        const tempLength = unit.userData.length;
+                        unit.userData.length = unit.userData.width;
+                        unit.userData.width = tempLength;
+                    }
                 }
             });
-            
+
             // Then move the entire stack outside the container
             // Use the bottom unit as the reference for moving outside
             this.moveOutsideContainer(bottomUnit);
-            
+
             console.warn('No valid position found for rotation - units moved outside container');
             return;
         }
@@ -2354,21 +2588,70 @@ class Scene3D {
         // Apply the rotation and adjusted positions
         adjustedPositions.forEach(test => {
             const unit = test.unit;
-            
+
             // Update position
             unit.position.x = test.newX;
             unit.position.z = test.newZ;
-            
+
             // Update rotation
             unit.rotation.y += radians;
-            
+
+            // Update rotation tracking in userData
+            // Horizontal rolls use 'rotation' property, regular units use 'rotationAngle'
+            const isHorizontalRoll = unit.userData.isRoll && !unit.userData.isVerticalRoll;
+            if (isHorizontalRoll) {
+                if (!unit.userData.rotation) {
+                    unit.userData.rotation = 0;
+                }
+                unit.userData.rotation += radians;
+            } else {
+                if (!unit.userData.rotationAngle) {
+                    unit.userData.rotationAngle = 0;
+                }
+                unit.userData.rotationAngle += radians;
+            }
+
             // Update dimensions in userData
             if (Math.abs(angle) === 90) {
-                const tempLength = unit.userData.length;
-                unit.userData.length = unit.userData.width;
-                unit.userData.width = tempLength;
+                const isHorizontalRoll = unit.userData.isRoll && !unit.userData.isVerticalRoll;
+                if (isHorizontalRoll) {
+                    // For horizontal rolls, use originalLength/originalWidth system
+                    if (!unit.userData.originalLength) {
+                        // Determine original dimensions based on CURRENT rotation state (before increment)
+                        const currentRotation = unit.userData.rotation - radians; // Before this rotation
+                        if (currentRotation) {
+                            const rotationSteps = Math.round(currentRotation / (Math.PI / 2));
+                            const isCurrentlySwapped = Math.abs(rotationSteps % 2) === 1;
+                            if (isCurrentlySwapped) {
+                                unit.userData.originalLength = unit.userData.width;
+                                unit.userData.originalWidth = unit.userData.length;
+                            } else {
+                                unit.userData.originalLength = unit.userData.length;
+                                unit.userData.originalWidth = unit.userData.width;
+                            }
+                        } else {
+                            unit.userData.originalLength = unit.userData.length;
+                            unit.userData.originalWidth = unit.userData.width;
+                        }
+                    }
+                    // Set dimensions based on final rotation (after increment above)
+                    const rotationSteps = Math.round(unit.userData.rotation / (Math.PI / 2));
+                    const shouldBeSwapped = Math.abs(rotationSteps % 2) === 1;
+                    if (shouldBeSwapped) {
+                        unit.userData.length = unit.userData.originalWidth;
+                        unit.userData.width = unit.userData.originalLength;
+                    } else {
+                        unit.userData.length = unit.userData.originalLength;
+                        unit.userData.width = unit.userData.originalWidth;
+                    }
+                } else {
+                    // Regular units: swap dimensions
+                    const tempLength = unit.userData.length;
+                    unit.userData.length = unit.userData.width;
+                    unit.userData.width = tempLength;
+                }
             }
-            
+
             // Update userData position
             unit.userData.position = {
                 x: unit.position.x,
@@ -2376,13 +2659,19 @@ class Scene3D {
                 z: unit.position.z
             };
         });
-        
+
         // Notify about changes
         if (this.onCargoMoved) {
             this.onCargoMoved(entireStack.map(m => m.userData));
         }
+
+        // Clear dimension labels so they get recreated on next hover with correct positions
+        this.hideDimensionLabels();
+
+        // Force hover re-detection to prevent immediate label recreation with old geometry
+        this.hoveredObject = null;
     }
-    
+
     findValidPositionForRotatedStack(testPositions, entireStack) {
         // Check if current position is valid
         if (this.isValidStackPosition(testPositions, entireStack)) {
@@ -4724,21 +5013,14 @@ class Scene3D {
         const halfWidth = mesh.userData.width / 2;
         const halfHeight = mesh.userData.height / 2;
 
-        // For local space calculations (vertices), we need the actual geometry dimensions
-        // which don't change when mesh is rotated - only mesh.rotation changes
-        // Check if mesh is rotated 90 or -90 degrees
-        const rotation = mesh.rotation.y;
-        const isRotated90 = Math.abs(Math.abs(rotation) - Math.PI/2) < 0.1;
+        // For edge position calculations in local space, use ORIGINAL geometry dimensions
+        // (not swapped userData dimensions, as the mesh rotation will handle the transformation)
+        const originalHalfLength = (mesh.userData.originalLength || mesh.userData.length) / 2;
+        const originalHalfWidth = (mesh.userData.originalWidth || mesh.userData.width) / 2;
+        const originalHalfHeight = (mesh.userData.originalHeight || mesh.userData.height) / 2;
 
-        // For local vertices, use geometry dimensions (swap if rotated)
-        let localHalfLength = halfLength;
-        let localHalfWidth = halfWidth;
-
-        if (isRotated90) {
-            // Geometry still has original dimensions, so swap back for local calculations
-            localHalfLength = halfWidth;
-            localHalfWidth = halfLength;
-        }
+        const localHalfLength = originalHalfLength;
+        const localHalfWidth = originalHalfWidth;
         
         // Check if it's a cylindrical unit (Roll or Steel Coil)
         const isRoll = mesh.userData.isRoll;
@@ -4785,62 +5067,62 @@ class Scene3D {
         
         // Map vertex index to which edges are visible
         // Each vertex connects three edges
-        // Use LOCAL dimensions (from geometry, not userData) for vertex positions
+        // Use ORIGINAL geometry dimensions for vertex positions (before rotation)
         const edgeMap = {
             0: { // back-bottom-left
                 edges: [
-                    { dimension: 'length', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, -halfHeight, -localHalfWidth] },
-                    { dimension: 'width', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [-localHalfLength, -halfHeight, localHalfWidth] },
-                    { dimension: 'height', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [-localHalfLength, halfHeight, -localHalfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, -originalHalfHeight, -localHalfWidth], end: [localHalfLength, -originalHalfHeight, -localHalfWidth] },
+                    { dimension: 'width', start: [-localHalfLength, -originalHalfHeight, -localHalfWidth], end: [-localHalfLength, -originalHalfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [-localHalfLength, -originalHalfHeight, -localHalfWidth], end: [-localHalfLength, originalHalfHeight, -localHalfWidth] }
                 ]
             },
             1: { // back-bottom-right
                 edges: [
-                    { dimension: 'length', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, -halfHeight, -localHalfWidth] },
-                    { dimension: 'width', start: [localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, -halfHeight, localHalfWidth] },
-                    { dimension: 'height', start: [localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, -localHalfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, -originalHalfHeight, -localHalfWidth], end: [localHalfLength, -originalHalfHeight, -localHalfWidth] },
+                    { dimension: 'width', start: [localHalfLength, -originalHalfHeight, -localHalfWidth], end: [localHalfLength, -originalHalfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [localHalfLength, -originalHalfHeight, -localHalfWidth], end: [localHalfLength, originalHalfHeight, -localHalfWidth] }
                 ]
             },
             2: { // front-bottom-right
                 edges: [
-                    { dimension: 'length', start: [-localHalfLength, -halfHeight, localHalfWidth], end: [localHalfLength, -halfHeight, localHalfWidth] },
-                    { dimension: 'width', start: [localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, -halfHeight, localHalfWidth] },
-                    { dimension: 'height', start: [localHalfLength, -halfHeight, localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, -originalHalfHeight, localHalfWidth], end: [localHalfLength, -originalHalfHeight, localHalfWidth] },
+                    { dimension: 'width', start: [localHalfLength, -originalHalfHeight, -localHalfWidth], end: [localHalfLength, -originalHalfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [localHalfLength, -originalHalfHeight, localHalfWidth], end: [localHalfLength, originalHalfHeight, localHalfWidth] }
                 ]
             },
             3: { // front-bottom-left
                 edges: [
-                    { dimension: 'length', start: [-localHalfLength, -halfHeight, localHalfWidth], end: [localHalfLength, -halfHeight, localHalfWidth] },
-                    { dimension: 'width', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [-localHalfLength, -halfHeight, localHalfWidth] },
-                    { dimension: 'height', start: [-localHalfLength, -halfHeight, localHalfWidth], end: [-localHalfLength, halfHeight, localHalfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, -originalHalfHeight, localHalfWidth], end: [localHalfLength, -originalHalfHeight, localHalfWidth] },
+                    { dimension: 'width', start: [-localHalfLength, -originalHalfHeight, -localHalfWidth], end: [-localHalfLength, -originalHalfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [-localHalfLength, -originalHalfHeight, localHalfWidth], end: [-localHalfLength, originalHalfHeight, localHalfWidth] }
                 ]
             },
             4: { // back-top-left
                 edges: [
-                    { dimension: 'length', start: [-localHalfLength, halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, -localHalfWidth] },
-                    { dimension: 'width', start: [-localHalfLength, halfHeight, -localHalfWidth], end: [-localHalfLength, halfHeight, localHalfWidth] },
-                    { dimension: 'height', start: [-localHalfLength, -halfHeight, -localHalfWidth], end: [-localHalfLength, halfHeight, -localHalfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, originalHalfHeight, -localHalfWidth], end: [localHalfLength, originalHalfHeight, -localHalfWidth] },
+                    { dimension: 'width', start: [-localHalfLength, originalHalfHeight, -localHalfWidth], end: [-localHalfLength, originalHalfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [-localHalfLength, -originalHalfHeight, -localHalfWidth], end: [-localHalfLength, originalHalfHeight, -localHalfWidth] }
                 ]
             },
             5: { // back-top-right
                 edges: [
-                    { dimension: 'length', start: [-localHalfLength, halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, -localHalfWidth] },
-                    { dimension: 'width', start: [localHalfLength, halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] },
-                    { dimension: 'height', start: [localHalfLength, -halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, -localHalfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, originalHalfHeight, -localHalfWidth], end: [localHalfLength, originalHalfHeight, -localHalfWidth] },
+                    { dimension: 'width', start: [localHalfLength, originalHalfHeight, -localHalfWidth], end: [localHalfLength, originalHalfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [localHalfLength, -originalHalfHeight, -localHalfWidth], end: [localHalfLength, originalHalfHeight, -localHalfWidth] }
                 ]
             },
             6: { // front-top-right
                 edges: [
-                    { dimension: 'length', start: [-localHalfLength, halfHeight, localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] },
-                    { dimension: 'width', start: [localHalfLength, halfHeight, -localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] },
-                    { dimension: 'height', start: [localHalfLength, -halfHeight, localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, originalHalfHeight, localHalfWidth], end: [localHalfLength, originalHalfHeight, localHalfWidth] },
+                    { dimension: 'width', start: [localHalfLength, originalHalfHeight, -localHalfWidth], end: [localHalfLength, originalHalfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [localHalfLength, -originalHalfHeight, localHalfWidth], end: [localHalfLength, originalHalfHeight, localHalfWidth] }
                 ]
             },
             7: { // front-top-left
                 edges: [
-                    { dimension: 'length', start: [-localHalfLength, halfHeight, localHalfWidth], end: [localHalfLength, halfHeight, localHalfWidth] },
-                    { dimension: 'width', start: [-localHalfLength, halfHeight, -localHalfWidth], end: [-localHalfLength, halfHeight, localHalfWidth] },
-                    { dimension: 'height', start: [-localHalfLength, -halfHeight, localHalfWidth], end: [-localHalfLength, halfHeight, localHalfWidth] }
+                    { dimension: 'length', start: [-localHalfLength, originalHalfHeight, localHalfWidth], end: [localHalfLength, originalHalfHeight, localHalfWidth] },
+                    { dimension: 'width', start: [-localHalfLength, originalHalfHeight, -localHalfWidth], end: [-localHalfLength, originalHalfHeight, localHalfWidth] },
+                    { dimension: 'height', start: [-localHalfLength, -originalHalfHeight, localHalfWidth], end: [-localHalfLength, originalHalfHeight, localHalfWidth] }
                 ]
             }
         };
@@ -5040,7 +5322,24 @@ class Scene3D {
             const edges = edgeMap[vertexIndex].edges;
             
             edges.forEach(edge => {
-                const dimensionValue = dimensions[edge.dimension];
+                // Check if mesh is rotated 90 degrees
+                const isRotated90 = Math.abs(Math.abs(mesh.rotation.y) - Math.PI/2) < 0.1;
+
+                // For rotated meshes, swap dimension assignment
+                // (edge.dimension refers to LOCAL space, but userData was swapped by rotateUnit)
+                let dimensionValue;
+                if (isRotated90) {
+                    if (edge.dimension === 'length') {
+                        dimensionValue = dimensions.width; // local X edge shows width value
+                    } else if (edge.dimension === 'width') {
+                        dimensionValue = dimensions.length; // local Z edge shows length value
+                    } else {
+                        dimensionValue = dimensions.height; // height unchanged
+                    }
+                } else {
+                    dimensionValue = dimensions[edge.dimension];
+                }
+
                 const dimensionText = `${dimensionValue} cm`;
 
                 // Create edge start and end in local space
@@ -5073,7 +5372,19 @@ class Scene3D {
                 const labelPosition = edgeCenter.clone();
 
                 // Calculate the actual dimension value for this edge
-                const edgeDimensionValue = mesh.userData[edge.dimension];
+                // For rotated meshes, swap dimension assignment (same logic as above)
+                let edgeDimensionValue;
+                if (isRotated90) {
+                    if (edge.dimension === 'length') {
+                        edgeDimensionValue = mesh.userData.width;
+                    } else if (edge.dimension === 'width') {
+                        edgeDimensionValue = mesh.userData.length;
+                    } else {
+                        edgeDimensionValue = mesh.userData.height;
+                    }
+                } else {
+                    edgeDimensionValue = mesh.userData[edge.dimension];
+                }
 
                 // Create the label with dimension info and edge endpoints for rotation
                 this.createDimensionLabel(labelPosition, dimensionText, edgeStartWorld, edgeEndWorld, edgeDimensionValue, mesh);
@@ -6037,21 +6348,39 @@ class Scene3D {
         const totalWeight = group.totalWeight.toFixed(0);
         const unitVolume = sampleItem.length * sampleItem.width * sampleItem.height;
         const totalVolume = (unitVolume * group.count).toFixed(2);
-        const area = (sampleItem.length * sampleItem.width * group.count).toFixed(2);
+
+        // Calculate area based on unit type
+        // Sum individual items to account for potential rotation dimension swaps
+        let areaSum = 0;
+        group.items.forEach(item => {
+            if (item.type === 'steel-coil' || (item.isRoll && !item.isHorizontalRoll)) {
+                // Vertical roll or steel coil: circular area
+                const diameter = item.diameter || item.width || 1.8;
+                const radius = diameter / 2;
+                areaSum += Math.PI * radius * radius;
+            } else if (item.isRoll && item.isHorizontalRoll) {
+                // Horizontal roll: rectangular footprint (diameter × cylinder length)
+                areaSum += (item.diameter || 0.8) * (item.length || 1.2);
+            } else {
+                // Regular rectangular items
+                areaSum += item.length * item.width;
+            }
+        });
+        const area = areaSum.toFixed(2);
         
         // Calculate LDM properly - area divided by container width
         const containerWidth = this.containerDimensions ? this.containerDimensions.width : 2.4;
         let ldm = 0;
         group.items.forEach(item => {
-            if (item.type === 'steel-coil' || (item.isRoll && !item.isVerticalRoll)) {
-                // For cylinders, use circular area (π × r²) divided by container width
+            if (item.type === 'steel-coil' || (item.isRoll && item.isVerticalRoll)) {
+                // For vertical cylinders, use circular area (π × r²) divided by container width
                 const diameter = item.diameter || item.width || 1.8;
                 const radius = diameter / 2;
                 ldm += (Math.PI * radius * radius) / containerWidth;
-            } else if (item.isRoll && item.isVerticalRoll) {
-                // Vertical roll - use diameter × height
+            } else if (item.isRoll && item.isHorizontalRoll) {
+                // Horizontal roll: rectangular footprint (diameter × cylinder length)
                 const diameter = item.diameter || 0.8;
-                ldm += (diameter * item.height) / containerWidth;
+                ldm += ((diameter * (item.length || 1.2)) / containerWidth);
             } else {
                 // Regular items - length × width
                 ldm += (item.length * item.width) / containerWidth;
