@@ -1,9 +1,9 @@
 {
   "cargoSpace": "Rakodótér",
   "customDimensions": "Egyéni méretek",
-  "length": "Hosszúság",
-  "width": "Szélesség",
-  "height": "Magasság",
+  "length": "h",
+  "width": "sz",
+  "height": "m",
   "dimensions": "Méretek",
   "volume": "Térfogat",
   "maxLoadCapacity": "Max. teherbírás",

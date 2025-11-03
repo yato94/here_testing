@@ -1,9 +1,9 @@
 {
   "cargoSpace": "Spațiu de marfă",
   "customDimensions": "Dimensiuni personalizate",
-  "length": "Lungime",
-  "width": "Lățime",
-  "height": "Înălțime",
+  "length": "lung.",
+  "width": "lăț.",
+  "height": "înăl.",
   "dimensions": "Dimensiuni",
   "volume": "Volum",
   "maxLoadCapacity": "Capacitate max. de încărcare",

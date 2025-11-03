@@ -1,9 +1,9 @@
 {
   "cargoSpace": "Espaço de carga",
   "customDimensions": "Dimensões personalizadas",
-  "length": "Comprimento",
-  "width": "Largura",
-  "height": "Altura",
+  "length": "Compr.",
+  "width": "Larg.",
+  "height": "Alt.",
   "dimensions": "Dimensões",
   "volume": "Volume",
   "maxLoadCapacity": "Capacidade máx. de carga",

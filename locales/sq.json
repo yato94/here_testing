@@ -1,9 +1,9 @@
 {
   "cargoSpace": "Hapësira e ngarkesës",
   "customDimensions": "Dimensione të personalizuara",
-  "length": "Gjatësi",
-  "width": "Gjerësi",
-  "height": "Lartësi",
+  "length": "gjat.",
+  "width": "gjer.",
+  "height": "lart.",
   "dimensions": "Dimensione",
   "volume": "Vëllim",
   "maxLoadCapacity": "Kapaciteti maks. i ngarkesës",

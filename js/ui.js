@@ -583,7 +583,7 @@ class UI {
         
         // Remove all Steel Coils if switching to non-Coilmulde
         if (switchingFromCoilmulde) {
-            const steelCoils = this.cargoManager.cargoItems.filter(item => item.isRoll);
+            const steelCoils = this.cargoManager.cargoItems.filter(item => item.type === 'steel-coil');
             if (steelCoils.length > 0) {
                 console.log(`Removing ${steelCoils.length} Steel Coils - not compatible with ${vehicle.name}`);
                 steelCoils.forEach(coil => {
@@ -1869,20 +1869,25 @@ class UI {
                            maxlength="4"
                            title="Length (cm)" />×180×180 <span class="dimension-unit-small">cm</span>`;
         } else if (sample.type === 'roll' && !sample.fixedDiameter) {
-            // Roll: diameter and height are editable
-            return `<input type="number" class="dimension-input-compact edit-dimension-diameter" 
-                           value="${Math.round((sample.diameter || sample.width) * 100)}" 
-                           data-group-id="${groupId}" 
+            // Roll: diameter and cylinderLength/height are editable
+            const isVertical = sample.isVerticalRoll;
+            const secondDimension = isVertical ? 'height' : 'cylinderLength';
+            const secondValue = isVertical ? sample.height : (sample.cylinderLength || sample.length);
+            const secondTooltip = i18n.t('tooltipCylinderLength');
+
+            return `<input type="number" class="dimension-input-compact edit-dimension-diameter"
+                           value="${Math.round((sample.diameter || sample.width) * 100)}"
+                           data-group-id="${groupId}"
                            data-dimension="diameter"
                            min="10" max="1360" step="1"
                            maxlength="4"
-                           title="Średnica (cm)" />×<input type="number" class="dimension-input-compact edit-dimension-height" 
-                           value="${Math.round(sample.height * 100)}" 
-                           data-group-id="${groupId}" 
-                           data-dimension="height"
-                           min="10" max="300" step="1"
-                           maxlength="3"
-                           title="Height (cm)" /> <span class="dimension-unit-small">cm</span>`;
+                           title="${i18n.t('tooltipDiameter')}" />×<input type="number" class="dimension-input-compact edit-dimension-${secondDimension}"
+                           value="${Math.round(secondValue * 100)}"
+                           data-group-id="${groupId}"
+                           data-dimension="${secondDimension}"
+                           min="10" max="1360" step="1"
+                           maxlength="4"
+                           title="${secondTooltip}" /> <span class="dimension-unit-small">cm</span>`;
         } else {
             // Regular units: all dimensions editable - keep original display format
             return `<input type="number" class="dimension-input-compact edit-dimension-length" 
@@ -2075,7 +2080,7 @@ class UI {
                                 </div>
                                 <div class="unit-item-sublabel">
                                     ${group.sample.type === 'roll' && !group.sample.fixedDiameter ?
-                                        `<button class="orientation-toggle-btn" data-group-id="${group.groupId}" style="background: none; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 11px;">
+                                        `(${i18n.t('diameter')} / ${i18n.t('length')})<br><button class="orientation-toggle-btn" data-group-id="${group.groupId}" style="background: none; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 11px; margin-top: 2px;">
                                             ${group.sample.isVerticalRoll ? `⬆ ${i18n.t('vertical')}` : `➡ ${i18n.t('horizontal')}`}
                                         </button>` :
                                         (group.sample.type === 'steel-coil' ? `(${i18n.t('length')} × ${i18n.t('height')} × ${i18n.t('height')})` : `(${i18n.t('length')} / ${i18n.t('width')} / ${i18n.t('height')})`)}
@@ -2146,7 +2151,7 @@ class UI {
             const deleteAllBtn = element.querySelector('.unit-btn-delete-all');
             
             // Add dimension input listeners
-            const dimensionInputs = element.querySelectorAll('.edit-dimension-length, .edit-dimension-width, .edit-dimension-height, .edit-dimension-diameter');
+            const dimensionInputs = element.querySelectorAll('.edit-dimension-length, .edit-dimension-width, .edit-dimension-height, .edit-dimension-diameter, .edit-dimension-cylinderLength');
             
             // Disable remove button if only one item in group
             if (group.items.length <= 1) {
@@ -2225,14 +2230,17 @@ class UI {
                     const valueInM = valueInCm / 100;
                     
                     // Validate input based on dimension type
-                    let maxValue = 1360; // Default for length/width/diameter
+                    let maxValue = 1360; // Default for length/width/diameter/cylinderLength
                     if (dimension === 'height') {
                         maxValue = 300;
                     }
-                    
+
                     if (valueInCm < 1 || valueInCm > maxValue) {
                         const maxText = dimension === 'height' ? '300cm' : '1360cm';
-                        this.showNotification(i18n.t('dimensionMustBeBetween').replace('{dimension}', dimension === 'height' ? i18n.t('Height') : i18n.t('Dimension')).replace('{max}', maxText), 'error');
+                        const dimensionName = dimension === 'height' ? i18n.t('Height') :
+                                             dimension === 'cylinderLength' ? i18n.t('cylinderLength') :
+                                             i18n.t('Dimension');
+                        this.showNotification(i18n.t('dimensionMustBeBetween').replace('{dimension}', dimensionName).replace('{max}', maxText), 'error');
                         return;
                     }
                     
@@ -2464,6 +2472,21 @@ class UI {
                 // Update diameter property
                 groupItems.forEach(item => {
                     item.diameter = newValue;
+                });
+            }
+        } else if (dimension === 'cylinderLength') {
+            // For rolls, cylinderLength is the length of the cylinder
+            if (firstItem.type === 'roll') {
+                if (firstItem.isVerticalRoll) {
+                    // Vertical roll: cylinderLength is height
+                    newDimensions.height = newValue;
+                } else {
+                    // Horizontal roll: cylinderLength is length
+                    newDimensions.length = newValue;
+                }
+                // Update cylinderLength property
+                groupItems.forEach(item => {
+                    item.cylinderLength = newValue;
                 });
             }
         }
@@ -2735,11 +2758,13 @@ class UI {
                     item.width = trueDiameter;
                     item.height = trueDiameter;
                     item.diameter = trueDiameter; // Store diameter for horizontal rolls
+                    item.cylinderLength = trueLength; // Store cylinder length for horizontal rolls
                 } else {
                     // Going from horizontal to vertical
                     item.length = trueDiameter;
                     item.width = trueDiameter;
                     item.height = trueLength;
+                    item.cylinderLength = trueLength; // Store cylinder length for vertical rolls
                     // Note: diameter is not used for vertical rolls, but keep it for potential future orientation change
                 }
 

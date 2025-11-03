@@ -7455,7 +7455,7 @@ class Scene3D {
         } else if (isJumbo) {
             // JUMBO vehicle
             const section1Start = containerFront;
-            const section1Length = this.containerDimensions?.section1Length || 7.7;
+            const section1Length = this.containerDimensions?.sections?.[0]?.length || 7.7;
             const section2Start = section1Start + section1Length + 0.5; // 0.5m gap
             
             // Truck axles
