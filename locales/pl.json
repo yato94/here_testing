@@ -204,7 +204,7 @@
   "loadPlanPerspectiveView": "Plan załadunku - Widok perspektywiczny",
   "loadPlanTopView": "Plan załadunku - Widok z góry",
   "loadPlanGroupView": "Plan załadunku - Widok grupy",
-  "plannedAndGeneratedOn": "Zaplanowano i wygenerowano na",
+  "plannedAndGeneratedOn": "Planned and generated on",
   "dateLabel": "Data",
   "outsideParentheses": "(+{count} poza)",
   "transportNomadSite": "Transport-Nomad.com"

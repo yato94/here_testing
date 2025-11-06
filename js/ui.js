@@ -2103,7 +2103,7 @@ class UI {
                                 <div class="stacking-inputs-container">
                                     <input type="text" class="stacking-input-small edit-stack" value="${group.sample.maxStack}" data-group-id="${group.groupId}" title="${i18n.t('units')}" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
                                     <span class="stacking-separator">/</span>
-                                    <input type="text" class="stacking-input-small edit-max-weight auto-resize-input" value="${(group.sample.maxStackWeight || 0).toString().replace(/[^\d.]/g, '')}kg" data-group-id="${group.groupId}" maxlength="6" title="${i18n.t('weight')}" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
+                                    <input type="text" class="stacking-input-small edit-max-weight auto-resize-input" value="${(group.sample.maxStackWeight || 0).toFixed(2).replace(/[^\d.]/g, '')}kg" data-group-id="${group.groupId}" maxlength="6" title="${i18n.t('weight')}" ${group.sample.type === 'steel-coil' ? 'disabled readonly style="background-color: #f3f4f6; cursor: not-allowed;"' : ''} />
                                 </div>
                             </div>
                             <div class="unit-item">
@@ -2122,7 +2122,7 @@ class UI {
                     </div>
                     <div class="unit-box-footer">
                         <div class="unit-footer-item">
-                            <div class="unit-footer-value">${totalWeight} kg</div>
+                            <div class="unit-footer-value">${totalWeight.toFixed(2)} kg</div>
                             <div class="unit-footer-label">${i18n.t('totalWeight')}</div>
                         </div>
                         <div class="unit-footer-item">
@@ -2294,7 +2294,7 @@ class UI {
                 e.target.value = newWeight + ' kg';
                 // Update footer total weight
                 const totalWeight = group.items.length * newWeight;
-                element.querySelector('.unit-box-footer .unit-footer-value').textContent = totalWeight + ' kg';
+                element.querySelector('.unit-box-footer .unit-footer-value').textContent = totalWeight.toFixed(2) + ' kg';
                 
                 // Auto-update max stack weight when unit weight changes
                 const stackCount = parseInt(stackInput.value) || 0;
@@ -3068,7 +3068,7 @@ class UI {
             statItems[0].textContent = `${stats.volumeUsage.toFixed(1)}%`;
             statItems[1].textContent = `${stats.weightUsage.toFixed(1)}%`;
             // Show weight in format: loaded / max capacity
-            statItems[2].textContent = `${stats.insideWeight} / ${stats.maxLoad} kg`;
+            statItems[2].textContent = `${stats.insideWeight.toFixed(2)} / ${stats.maxLoad.toFixed(2)} kg`;
             // Show units count
             if (stats.outsideItems > 0) {
                 statItems[3].textContent = `${stats.placedItems} (+${stats.outsideItems} poza)`;
@@ -3761,7 +3761,7 @@ class UI {
                         </div>
                         <div class="config-details">
                             ${config.vehicleType ? `<span class="config-vehicle">${CONFIG.vehicles[config.vehicleType]?.name || config.vehicleType}</span>` : ''}
-                            ${config.stats?.insideWeight ? `<span class="config-weight">${config.stats.insideWeight} ${i18n.t('kg')}</span>` : ''}
+                            ${config.stats?.insideWeight ? `<span class="config-weight">${config.stats.insideWeight.toFixed(2)} ${i18n.t('kg')}</span>` : ''}
                         </div>
                     </div>
                 `;

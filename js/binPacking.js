@@ -422,21 +422,22 @@ class BinPacking3D {
         const subspaces = [];
         const canStackOnTop = maxStack === undefined || maxStack !== 0;
         
-        // Przestrzeń po prawej - cała wysokość od poziomu przestrzeni
+        // Przestrzeń po prawej - pełna głębokość od pozycji jednostki
+        // Pozwala na umieszczenie jednostek różnych głębokości obok siebie
         if (position.x + item.width < space.x + space.width) {
             subspaces.push({
                 x: position.x + item.width,
                 y: space.y,
-                z: space.z,
+                z: position.z,
                 width: space.x + space.width - (position.x + item.width),
-                depth: space.depth,
+                depth: space.z + space.depth - position.z,
                 height: space.height
             });
         }
-        
-        // Przestrzeń z przodu - rozdzielona na części
+
+        // Przestrzeń z przodu - tylko do szerokości jednostki (bez nakładania z Right)
         if (position.z + item.depth < space.z + space.depth) {
-            // Przestrzeń bezpośrednio przed elementem
+            // Bezpośrednio przed jednostką
             subspaces.push({
                 x: position.x,
                 y: space.y,
@@ -445,26 +446,14 @@ class BinPacking3D {
                 depth: space.z + space.depth - (position.z + item.depth),
                 height: space.height
             });
-            
-            // Przestrzeń z przodu po lewej stronie elementu
+
+            // Po lewej przed jednostką (jeśli jest miejsce)
             if (space.x < position.x) {
                 subspaces.push({
                     x: space.x,
                     y: space.y,
                     z: position.z + item.depth,
                     width: position.x - space.x,
-                    depth: space.z + space.depth - (position.z + item.depth),
-                    height: space.height
-                });
-            }
-            
-            // Przestrzeń z przodu po prawej stronie elementu
-            if (position.x + item.width < space.x + space.width) {
-                subspaces.push({
-                    x: position.x + item.width,
-                    y: space.y,
-                    z: position.z + item.depth,
-                    width: space.x + space.width - (position.x + item.width),
                     depth: space.z + space.depth - (position.z + item.depth),
                     height: space.height
                 });
@@ -491,9 +480,9 @@ class BinPacking3D {
                 subspaces.push({
                     x: position.x + item.width,
                     y: position.y + item.height,
-                    z: space.z,
+                    z: position.z,
                     width: space.x + space.width - (position.x + item.width),
-                    depth: space.depth,
+                    depth: item.depth,
                     height: space.y + space.height - (position.y + item.height)
                 });
             }
@@ -501,24 +490,24 @@ class BinPacking3D {
             // Space in front of the item (at the stacking level)
             if (position.z + item.depth < space.z + space.depth) {
                 subspaces.push({
-                    x: space.x,
+                    x: position.x,
                     y: position.y + item.height,
                     z: position.z + item.depth,
-                    width: space.width,
+                    width: item.width,
                     depth: space.z + space.depth - (position.z + item.depth),
                     height: space.y + space.height - (position.y + item.height)
                 });
             }
         }
         
-        // Przestrzeń po lewej
+        // Przestrzeń po lewej - tylko na głębokość jednostki (reszta pokryta przez Front left)
         if (space.x < position.x) {
             subspaces.push({
                 x: space.x,
                 y: space.y,
-                z: space.z,
+                z: position.z,
                 width: position.x - space.x,
-                depth: space.depth,
+                depth: item.depth,
                 height: space.height
             });
         }

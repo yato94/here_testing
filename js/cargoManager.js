@@ -1158,8 +1158,8 @@ class CargoManager {
             totalItems: this.cargoItems.length,
             placedItems: placedItems.length,
             outsideItems: outsideItems.length,
-            totalWeight: this.totalWeight,
-            insideWeight: insideWeight,
+            totalWeight: Math.round(this.totalWeight * 100) / 100,
+            insideWeight: Math.round(insideWeight * 100) / 100,
             maxLoad: this.maxLoad,
             weightUsage: (insideWeight / this.maxLoad) * 100,
             volumeUsage: (usedVolume / containerVolume) * 100
