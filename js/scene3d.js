@@ -1143,6 +1143,39 @@ class Scene3D {
         
         mesh.userData = cargoData;
 
+        // Fix dimensions for rotated horizontal rolls
+        // After individual rotation, cargoData may have swapped length/width but cylinderLength stays constant
+        // We need to ensure userData dimensions match the actual cylinder geometry
+        if (cargoData.isRoll && !cargoData.isVerticalRoll && !cargoData.fixedDiameter) {
+            const diameter = cargoData.diameter || cargoData.width;
+            let cylinderLength;
+            if (cargoData.cylinderLength !== undefined) {
+                cylinderLength = cargoData.cylinderLength;
+            } else {
+                cylinderLength = cargoData.diameter ?
+                    Math.max(cargoData.length, cargoData.width) :
+                    cargoData.length;
+            }
+
+            // Check rotation state to determine correct dimensions
+            const rotationValue = cargoData.rotation || 0;
+            const rotationSteps = Math.round(rotationValue / (Math.PI / 2));
+            const isSwapped = Math.abs(rotationSteps % 2) === 1;
+
+            if (isSwapped) {
+                // After 90° rotation, cylinder runs along width axis
+                mesh.userData.length = diameter;
+                mesh.userData.width = cylinderLength;
+            } else {
+                // Normal orientation, cylinder runs along length axis
+                mesh.userData.length = cylinderLength;
+                mesh.userData.width = diameter;
+            }
+            mesh.userData.height = diameter;
+            mesh.userData.cylinderLength = cylinderLength;
+            mesh.userData.diameter = diameter;
+        }
+
         // Store original dimensions (before any rotation) for dimension label edge calculations
         // Only set if not present in cargoData at all (preserve values from rotated units after save/load)
         if (!('originalLength' in cargoData) && !('originalWidth' in cargoData)) {
@@ -2118,6 +2151,7 @@ class Scene3D {
                     // Changing from horizontal to vertical
                     // diameter stays same, cylinder length becomes height
                     unit.userData.diameter = currentDiameter;
+                    unit.userData.cylinderLength = currentCylinderLength; // preserve cylinder length
                     unit.userData.height = currentCylinderLength; // cylinder length becomes height
                     unit.userData.length = currentDiameter; // footprint
                     unit.userData.width = currentDiameter; // footprint
@@ -2125,6 +2159,7 @@ class Scene3D {
                     // Changing from vertical to horizontal
                     // diameter stays same, cylinder length becomes length
                     unit.userData.diameter = currentDiameter;
+                    unit.userData.cylinderLength = currentCylinderLength; // preserve cylinder length
                     unit.userData.height = currentDiameter; // height is now diameter
                     unit.userData.length = currentCylinderLength; // cylinder length
                     unit.userData.width = currentDiameter; // width is diameter

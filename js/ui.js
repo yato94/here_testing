@@ -3228,7 +3228,7 @@ class UI {
             // Add view title below plan name
             pdf.setFontSize(12);
             pdf.setFont(undefined, 'normal');
-            pdf.text(i18n.t('loadPlanPerspectiveView'), pageWidth / 2, 14, { align: 'center' });
+            pdf.text('Load Plan - Perspective View', pageWidth / 2, 14, { align: 'center' });
 
             // Add logo on the left
             if (logoDataURL) {
@@ -3241,8 +3241,8 @@ class UI {
             pdf.setFontSize(9);
             pdf.setFont(undefined, 'italic');
             pdf.setTextColor(100, 100, 100);
-            pdf.text(i18n.t('plannedAndGeneratedOn'), 32, 7, { align: 'left' });
-            pdf.text(i18n.t('transportNomadSite'), 32, 11, { align: 'left' });
+            pdf.text('Planned and generated on', 32, 7, { align: 'left' });
+            pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
 
             // Add date
             pdf.setFontSize(10);
@@ -3252,7 +3252,7 @@ class UI {
             const dateStr = now.toLocaleDateString(i18n.getDateLocale());
             const timeStr = now.toLocaleTimeString(i18n.getDateLocale());
             const date = `${dateStr} ${timeStr}`;
-            pdf.text(`${i18n.t('dateLabel')}: ${date}`, pageWidth - 5, 8, { align: 'right' });
+            pdf.text(`Date: ${date}`, pageWidth - 5, 8, { align: 'right' });
             
             // Calculate full page image dimensions with minimal margins
             const sideMargin = 3; // Minimal side margin
@@ -3292,7 +3292,7 @@ class UI {
             // Add view title below plan name
             pdf.setFontSize(12);
             pdf.setFont(undefined, 'normal');
-            pdf.text(i18n.t('loadPlanTopView'), pageWidth / 2, 14, { align: 'center' });
+            pdf.text('Load Plan - Top View', pageWidth / 2, 14, { align: 'center' });
 
             // Add logo on the left
             if (logoDataURL) {
@@ -3305,8 +3305,8 @@ class UI {
             pdf.setFontSize(9);
             pdf.setFont(undefined, 'italic');
             pdf.setTextColor(100, 100, 100);
-            pdf.text(i18n.t('plannedAndGeneratedOn'), 32, 7, { align: 'left' });
-            pdf.text(i18n.t('transportNomadSite'), 32, 11, { align: 'left' });
+            pdf.text('Planned and generated on', 32, 7, { align: 'left' });
+            pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
 
             pdf.setFont(undefined, 'normal');
             pdf.setTextColor(0, 0, 0);
@@ -3348,8 +3348,8 @@ class UI {
                 pdf.setFontSize(9);
                 pdf.setFont(undefined, 'italic');
                 pdf.setTextColor(100, 100, 100);
-                pdf.text(i18n.t('plannedAndGeneratedOn'), 32, 7, { align: 'left' });
-                pdf.text(i18n.t('transportNomadSite'), 32, 11, { align: 'left' });
+                pdf.text('Planned and generated on', 32, 7, { align: 'left' });
+                pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
 
                 pdf.setFont(undefined, 'normal');
                 pdf.setTextColor(0, 0, 0);
@@ -3432,8 +3432,8 @@ class UI {
                     pdf.setFontSize(9);
                     pdf.setFont(undefined, 'italic');
                     pdf.setTextColor(100, 100, 100);
-                    pdf.text(i18n.t('plannedAndGeneratedOn'), 32, 7, { align: 'left' });
-                    pdf.text(i18n.t('transportNomadSite'), 32, 11, { align: 'left' });
+                    pdf.text('Planned and generated on', 32, 7, { align: 'left' });
+                    pdf.text('Transport-Nomad.com', 32, 11, { align: 'left' });
 
                     pdf.setFont(undefined, 'normal');
                     pdf.setTextColor(0, 0, 0);

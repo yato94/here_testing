@@ -312,10 +312,18 @@ class CargoManager {
                 };
                 
                 item.mesh = this.scene3d.addCargo(meshData);
+
+                // For horizontal rolls, sync corrected dimensions back from mesh.userData
+                if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                    item.length = item.mesh.userData.length;
+                    item.width = item.mesh.userData.width;
+                    item.height = item.mesh.userData.height;
+                }
+
                 this.scene3d.moveOutsideContainer(item.mesh);
                 item.isOutside = true;
             });
-            
+
             result.exceedingWeightCount = itemsExceedingLimit.length;
             if (result.success && itemsExceedingLimit.length > 0) {
                 result.success = false;
@@ -380,25 +388,39 @@ class CargoManager {
         
         // Create stacks from groups
         const stacks = [];
+
+        // Helper to check if two horizontal rolls have the same rotation state
+        const hasSameRotationState = (item1, item2) => {
+            if (!item1.isRoll || !item1.isHorizontalRoll || item1.fixedDiameter) {
+                return true; // Not a horizontal roll, rotation doesn't matter
+            }
+            const rotation1 = item1.rotation || 0;
+            const rotation2 = item2.rotation || 0;
+            const steps1 = Math.round(rotation1 / (Math.PI / 2));
+            const steps2 = Math.round(rotation2 / (Math.PI / 2));
+            // Check if both are in the same orientation (both even or both odd steps)
+            return Math.abs(steps1 % 2) === Math.abs(steps2 % 2);
+        };
+
         sortedGroups.forEach(group => {
             const maxStack = group.sample.maxStack !== undefined ? group.sample.maxStack : 1;
             const maxStackWeight = group.sample.maxStackWeight !== undefined ? group.sample.maxStackWeight : Infinity;
-            
+
             // maxStack means how many units can be placed ON TOP of this unit
             // So total stack height = 1 (base) + maxStack (units on top)
             const maxTotalHeight = 1 + maxStack;
-            
+
             // Get container height to check if stack fits
             const containerHeight = this.containerDimensions.height;
             const unitHeight = group.sample.height;
             const unitWeight = group.sample.weight;
-            
+
             // If maxStack is 0, only single units (no stacking on top)
             if (maxStack === 0) {
                 group.items.forEach(item => {
                     stacks.push({
                         items: [item],
-                        sample: group.sample,
+                        sample: item,  // Use actual item, not group.sample
                         stackHeight: 1
                     });
                 });
@@ -406,16 +428,21 @@ class CargoManager {
                 // Normal stacking logic with height and weight check
                 let currentStack = [];
                 let weightAboveBottom = 0; // Weight on top of the bottom unit
-                
+
                 group.items.forEach(item => {
                     // Check maxStack limit, container height AND weight limit
                     const potentialStackHeight = (currentStack.length + 1) * unitHeight;
                     // Weight above bottom = all units except the first one
                     const potentialWeightAbove = currentStack.length > 0 ? weightAboveBottom + unitWeight : 0;
-                    const canAddToStack = currentStack.length < maxTotalHeight && 
+
+                    // For horizontal rolls, also check if rotation state matches
+                    const rotationMatches = currentStack.length === 0 || hasSameRotationState(currentStack[0], item);
+
+                    const canAddToStack = currentStack.length < maxTotalHeight &&
                                          potentialStackHeight <= containerHeight &&
-                                         potentialWeightAbove <= maxStackWeight;
-                    
+                                         potentialWeightAbove <= maxStackWeight &&
+                                         rotationMatches;
+
                     if (canAddToStack) {
                         currentStack.push(item);
                         if (currentStack.length > 1) {
@@ -426,7 +453,7 @@ class CargoManager {
                         if (currentStack.length > 0) {
                             stacks.push({
                                 items: currentStack,
-                                sample: group.sample,
+                                sample: currentStack[0],  // Use first item of this stack
                                 stackHeight: currentStack.length
                             });
                         }
@@ -434,12 +461,12 @@ class CargoManager {
                         weightAboveBottom = 0; // Reset weight for new stack
                     }
                 });
-                
+
                 // Add remaining items as last stack
                 if (currentStack.length > 0) {
                     stacks.push({
                         items: currentStack,
-                        sample: group.sample,
+                        sample: currentStack[0],  // Use first item of this stack
                         stackHeight: currentStack.length
                     });
                 }
@@ -463,26 +490,47 @@ class CargoManager {
         
         // Prepare items for packing (treating each stack as single unit)
         const itemsToPlace = itemsWithinLimit;
-        
+
+        // Helper function to get correct dimensions for rolls
+        const getItemDimensions = (item) => {
+            if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                const rotation = item.rotation || 0;
+                const rotationSteps = Math.round(rotation / (Math.PI / 2));
+                const isSwapped = Math.abs(rotationSteps % 2) === 1;
+                return {
+                    width: isSwapped ? item.diameter : item.cylinderLength,
+                    depth: isSwapped ? item.cylinderLength : item.diameter
+                };
+            }
+            return {
+                width: item.length,
+                depth: item.width
+            };
+        };
+
         // Handle JUMBO with sections
         if (this.packers && this.sections) {
             // Reset packers
             this.packers.forEach(packer => packer.reset());
-            
-            const itemsForPacking = itemsToPlace.map(stack => ({
-                width: stack.sample.length,
-                depth: stack.sample.width,
-                height: stack.sample.height * stack.stackHeight, // Stack height
-                weight: stack.sample.weight * stack.stackHeight, // Total weight
-                userData: stack,
-                maxStack: stack.sample.maxStack, // Pass maxStack info
-                maxStackWeight: stack.sample.maxStackWeight, // Pass maxStackWeight info
-                isRoll: stack.sample.isRoll, // Pass isRoll info for steel coils
-                isVerticalRoll: stack.sample.isVerticalRoll, // Pass isVerticalRoll info for rolls
-                isHorizontalRoll: stack.sample.isHorizontalRoll, // Pass isHorizontalRoll info for rolls
-                diameter: stack.sample.diameter, // Pass diameter for rolls
-                fixedDiameter: stack.sample.fixedDiameter // Pass fixedDiameter for steel coils
-            }));
+
+            const itemsForPacking = itemsToPlace.map(stack => {
+                const dims = getItemDimensions(stack.sample);
+                return {
+                    width: dims.width,
+                    depth: dims.depth,
+                    height: stack.sample.height * stack.stackHeight, // Stack height
+                    weight: stack.sample.weight * stack.stackHeight, // Total weight
+                    userData: stack,
+                    maxStack: stack.sample.maxStack, // Pass maxStack info
+                    maxStackWeight: stack.sample.maxStackWeight, // Pass maxStackWeight info
+                    isRoll: stack.sample.isRoll, // Pass isRoll info for steel coils
+                    isVerticalRoll: stack.sample.isVerticalRoll, // Pass isVerticalRoll info for rolls
+                    isHorizontalRoll: stack.sample.isHorizontalRoll, // Pass isHorizontalRoll info for rolls
+                    diameter: stack.sample.diameter, // Pass diameter for rolls
+                    cylinderLength: stack.sample.cylinderLength, // Pass cylinderLength for rolls
+                    fixedDiameter: stack.sample.fixedDiameter // Pass fixedDiameter for steel coils
+                };
+            });
             
             const gap = 0.5; // 50cm gap between sections
             let xOffset = -this.containerDimensions.length / 2;
@@ -506,8 +554,17 @@ class CargoManager {
                     // Place each item in the stack
                     stack.items.forEach((item, index) => {
                         // Adjust position based on rotation
-                        const itemLength = packedItem.rotated ? stack.sample.width : stack.sample.length;
-                        const itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
+                        let itemLength, itemWidth;
+                        if (stack.sample.isRoll && stack.sample.isHorizontalRoll && !stack.sample.fixedDiameter) {
+                            // For horizontal rolls, use cylinderLength and diameter
+                            const dims = getItemDimensions(stack.sample);
+                            itemLength = dims.width;  // width in bin packing corresponds to length in item
+                            itemWidth = dims.depth;    // depth in bin packing corresponds to width in item
+                        } else {
+                            // For other items, use rotation from bin packing
+                            itemLength = packedItem.rotated ? stack.sample.width : stack.sample.length;
+                            itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
+                        }
 
                         // If bin packing rotated this item, save swapped dimensions
                         if (packedItem.rotated && item.type !== 'roll' && item.type !== 'steel-coil') {
@@ -529,8 +586,8 @@ class CargoManager {
                             x: item.position.x,
                             y: item.position.y,
                             z: item.position.z,
-                            // Override dimensions to match what bin packing used (except steel coils)
-                            ...(item.type !== 'steel-coil' ? {
+                            // Override dimensions to match what bin packing used (except steel coils and rolls)
+                            ...(item.type !== 'steel-coil' && item.type !== 'roll' ? {
                                 length: itemLength,
                                 width: itemWidth,
                                 height: stack.sample.height
@@ -538,6 +595,13 @@ class CargoManager {
                         };
                         
                         item.mesh = this.scene3d.addCargo(meshData);
+
+                        // For horizontal rolls, sync corrected dimensions back from mesh.userData
+                        if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                            item.length = item.mesh.userData.length;
+                            item.width = item.mesh.userData.width;
+                            item.height = item.mesh.userData.height;
+                        }
                     });
                 });
                 
@@ -570,6 +634,13 @@ class CargoManager {
                         };
                         
                         item.mesh = this.scene3d.addCargo(meshData);
+
+                        // For horizontal rolls, sync corrected dimensions back from mesh.userData
+                        if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                            item.length = item.mesh.userData.length;
+                            item.width = item.mesh.userData.width;
+                            item.height = item.mesh.userData.height;
+                        }
                     });
                 });
                 
@@ -594,20 +665,24 @@ class CargoManager {
                 this.containerDimensions  // Pass full container data for groove info
             );
             
-            const itemsForPacking = itemsToPlace.map(stack => ({
-                width: stack.sample.length,
-                depth: stack.sample.width,
-                height: stack.sample.height * stack.stackHeight, // Stack height
-                weight: stack.sample.weight * stack.stackHeight, // Total weight
-                userData: stack,
-                maxStack: stack.sample.maxStack, // Pass maxStack info
-                maxStackWeight: stack.sample.maxStackWeight, // Pass maxStackWeight info
-                isRoll: stack.sample.isRoll, // Pass isRoll info for steel coils
-                isVerticalRoll: stack.sample.isVerticalRoll, // Pass isVerticalRoll info for rolls
-                isHorizontalRoll: stack.sample.isHorizontalRoll, // Pass isHorizontalRoll info for rolls
-                diameter: stack.sample.diameter, // Pass diameter for rolls
-                fixedDiameter: stack.sample.fixedDiameter // Pass fixedDiameter for steel coils
-            }));
+            const itemsForPacking = itemsToPlace.map(stack => {
+                const dims = getItemDimensions(stack.sample);
+                return {
+                    width: dims.width,
+                    depth: dims.depth,
+                    height: stack.sample.height * stack.stackHeight, // Stack height
+                    weight: stack.sample.weight * stack.stackHeight, // Total weight
+                    userData: stack,
+                    maxStack: stack.sample.maxStack, // Pass maxStack info
+                    maxStackWeight: stack.sample.maxStackWeight, // Pass maxStackWeight info
+                    isRoll: stack.sample.isRoll, // Pass isRoll info for steel coils
+                    isVerticalRoll: stack.sample.isVerticalRoll, // Pass isVerticalRoll info for rolls
+                    isHorizontalRoll: stack.sample.isHorizontalRoll, // Pass isHorizontalRoll info for rolls
+                    diameter: stack.sample.diameter, // Pass diameter for rolls
+                    cylinderLength: stack.sample.cylinderLength, // Pass cylinderLength for rolls
+                    fixedDiameter: stack.sample.fixedDiameter // Pass fixedDiameter for steel coils
+                };
+            });
             
             const result = this.packer.packItems(itemsForPacking);
             
@@ -630,12 +705,21 @@ class CargoManager {
                 // Place each item in the stack
                 stack.items.forEach((item, index) => {
                     // Adjust position based on rotation
-                    const itemLength = packedItem.rotated ? stack.sample.width : stack.sample.length;
-                    const itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
+                    let itemLength, itemWidth;
+                    if (stack.sample.isRoll && stack.sample.isHorizontalRoll && !stack.sample.fixedDiameter) {
+                        // For horizontal rolls, use cylinderLength and diameter
+                        const dims = getItemDimensions(stack.sample);
+                        itemLength = dims.width;  // width in bin packing corresponds to length in item
+                        itemWidth = dims.depth;    // depth in bin packing corresponds to width in item
+                    } else {
+                        // For other items, use rotation from bin packing
+                        itemLength = packedItem.rotated ? stack.sample.width : stack.sample.length;
+                        itemWidth = packedItem.rotated ? stack.sample.length : stack.sample.width;
+                    }
 
                     // If bin packing rotated this item, save swapped dimensions
                     // Horizontal rolls have allowRotate=false, so they won't be rotated by bin packing
-                    if (packedItem.rotated && item.type !== 'steel-coil') {
+                    if (packedItem.rotated && item.type !== 'steel-coil' && item.type !== 'roll') {
                         item.length = itemLength;
                         item.width = itemWidth;
                     }
@@ -654,8 +738,8 @@ class CargoManager {
                         x: item.position.x,
                         y: item.position.y,
                         z: item.position.z,
-                        // Override dimensions to match what bin packing used (except steel coils)
-                        ...(item.type !== 'steel-coil' ? {
+                        // Override dimensions to match what bin packing used (except steel coils and rolls)
+                        ...(item.type !== 'steel-coil' && item.type !== 'roll' ? {
                             length: itemLength,
                             width: itemWidth,
                             height: stack.sample.height
@@ -663,6 +747,13 @@ class CargoManager {
                     };
                     
                     item.mesh = this.scene3d.addCargo(meshData);
+
+                    // For horizontal rolls, sync corrected dimensions back from mesh.userData
+                    if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                        item.length = item.mesh.userData.length;
+                        item.width = item.mesh.userData.width;
+                        item.height = item.mesh.userData.height;
+                    }
                 });
             });
             
@@ -686,6 +777,13 @@ class CargoManager {
                         };
                         
                         item.mesh = this.scene3d.addCargo(meshData);
+
+                        // For horizontal rolls, sync corrected dimensions back from mesh.userData
+                        if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                            item.length = item.mesh.userData.length;
+                            item.width = item.mesh.userData.width;
+                            item.height = item.mesh.userData.height;
+                        }
                     });
                 });
                 
@@ -717,6 +815,14 @@ class CargoManager {
                         };
                         
                         item.mesh = this.scene3d.addCargo(meshData);
+
+                        // For horizontal rolls, sync corrected dimensions back from mesh.userData
+                        if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                            item.length = item.mesh.userData.length;
+                            item.width = item.mesh.userData.width;
+                            item.height = item.mesh.userData.height;
+                        }
+
                         this.scene3d.moveOutsideContainer(item.mesh);
                         item.isOutside = true;
                     });
@@ -745,6 +851,14 @@ class CargoManager {
                 };
                 
                 item.mesh = this.scene3d.addCargo(meshData);
+
+                // For horizontal rolls, sync corrected dimensions back from mesh.userData
+                if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                    item.length = item.mesh.userData.length;
+                    item.width = item.mesh.userData.width;
+                    item.height = item.mesh.userData.height;
+                }
+
                 this.scene3d.moveOutsideContainer(item.mesh);
                 item.isOutside = true;
             });
@@ -782,7 +896,20 @@ class CargoManager {
         const unitWeight = firstItem.weight;
         
         const stacks = [];
-        
+
+        // Helper to check if two horizontal rolls have the same rotation state
+        const hasSameRotationState = (item1, item2) => {
+            if (!item1.isRoll || !item1.isHorizontalRoll || item1.fixedDiameter) {
+                return true; // Not a horizontal roll, rotation doesn't matter
+            }
+            const rotation1 = item1.rotation || 0;
+            const rotation2 = item2.rotation || 0;
+            const steps1 = Math.round(rotation1 / (Math.PI / 2));
+            const steps2 = Math.round(rotation2 / (Math.PI / 2));
+            // Check if both are in the same orientation (both even or both odd steps)
+            return Math.abs(steps1 % 2) === Math.abs(steps2 % 2);
+        };
+
         // If maxStack is 0, only single units
         if (maxStack === 0) {
             groupItems.forEach(item => {
@@ -796,14 +923,19 @@ class CargoManager {
             // Normal stacking logic
             let currentStack = [];
             let weightAboveBottom = 0;
-            
+
             groupItems.forEach(item => {
                 const potentialStackHeight = (currentStack.length + 1) * unitHeight;
                 const potentialWeightAbove = currentStack.length > 0 ? weightAboveBottom + unitWeight : 0;
-                const canAddToStack = currentStack.length < maxTotalHeight && 
+
+                // For horizontal rolls, also check if rotation state matches
+                const rotationMatches = currentStack.length === 0 || hasSameRotationState(currentStack[0], item);
+
+                const canAddToStack = currentStack.length < maxTotalHeight &&
                                      potentialStackHeight <= containerHeight &&
-                                     potentialWeightAbove <= maxStackWeight;
-                
+                                     potentialWeightAbove <= maxStackWeight &&
+                                     rotationMatches;
+
                 if (canAddToStack) {
                     currentStack.push(item);
                     if (currentStack.length > 1) {
@@ -831,21 +963,42 @@ class CargoManager {
             }
         }
         
+        // Helper function to get correct dimensions for rolls
+        const getItemDimensions = (item) => {
+            if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                const rotation = item.rotation || 0;
+                const rotationSteps = Math.round(rotation / (Math.PI / 2));
+                const isSwapped = Math.abs(rotationSteps % 2) === 1;
+                return {
+                    width: isSwapped ? item.diameter : item.cylinderLength,
+                    depth: isSwapped ? item.cylinderLength : item.diameter
+                };
+            }
+            return {
+                width: item.length,
+                depth: item.width
+            };
+        };
+
         // Prepare items for packing
-        const itemsForPacking = stacks.map(stack => ({
-            width: stack.sample.length,
-            depth: stack.sample.width,
-            height: stack.sample.height * stack.stackHeight,
-            weight: stack.sample.weight * stack.stackHeight,
-            userData: stack,
-            maxStack: stack.sample.maxStack,
-            maxStackWeight: stack.sample.maxStackWeight,
-            isRoll: stack.sample.isRoll,
-            isVerticalRoll: stack.sample.isVerticalRoll,
-            isHorizontalRoll: stack.sample.isHorizontalRoll,
-            diameter: stack.sample.diameter,
-            fixedDiameter: stack.sample.fixedDiameter
-        }));
+        const itemsForPacking = stacks.map(stack => {
+            const dims = getItemDimensions(stack.sample);
+            return {
+                width: dims.width,
+                depth: dims.depth,
+                height: stack.sample.height * stack.stackHeight,
+                weight: stack.sample.weight * stack.stackHeight,
+                userData: stack,
+                maxStack: stack.sample.maxStack,
+                maxStackWeight: stack.sample.maxStackWeight,
+                isRoll: stack.sample.isRoll,
+                isVerticalRoll: stack.sample.isVerticalRoll,
+                isHorizontalRoll: stack.sample.isHorizontalRoll,
+                diameter: stack.sample.diameter,
+                cylinderLength: stack.sample.cylinderLength,
+                fixedDiameter: stack.sample.fixedDiameter
+            };
+        });
         
         let result;
         
@@ -982,10 +1135,17 @@ class CargoManager {
                             };
                             
                             item.mesh = this.scene3d.addCargo(meshData);
+
+                            // For horizontal rolls, sync corrected dimensions back from mesh.userData
+                            if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                                item.length = item.mesh.userData.length;
+                                item.width = item.mesh.userData.width;
+                                item.height = item.mesh.userData.height;
+                            }
                         });
                     }
                 });
-                
+
                 allPacked.push(...validPackedItems);
                 
                 // Add invalid items back to unpacked list as itemsForPacking format
@@ -1040,12 +1200,21 @@ class CargoManager {
                 
                 stack.items.forEach((item, index) => {
                     // Use actual item dimensions (which may have been rotated) instead of stack.sample
-                    const itemLength = packedItem.rotated ? item.width : item.length;
-                    const itemWidth = packedItem.rotated ? item.length : item.width;
+                    let itemLength, itemWidth;
+                    if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                        // For horizontal rolls, use cylinderLength and diameter
+                        const dims = getItemDimensions(item);  // Use item, not stack.sample
+                        itemLength = dims.width;  // width in bin packing corresponds to length in item
+                        itemWidth = dims.depth;    // depth in bin packing corresponds to width in item
+                    } else {
+                        // For other items, use rotation from bin packing
+                        itemLength = packedItem.rotated ? item.width : item.length;
+                        itemWidth = packedItem.rotated ? item.length : item.width;
+                    }
 
                     // If bin packing rotated this item, save swapped dimensions
                     // Horizontal rolls have allowRotate=false, so they won't be rotated by bin packing
-                    if (packedItem.rotated && item.type !== 'steel-coil') {
+                    if (packedItem.rotated && item.type !== 'steel-coil' && item.type !== 'roll') {
                         item.length = itemLength;
                         item.width = itemWidth;
                     }
@@ -1073,6 +1242,13 @@ class CargoManager {
                     };
                     
                     item.mesh = this.scene3d.addCargo(meshData);
+
+                    // For horizontal rolls, sync corrected dimensions back from mesh.userData
+                    if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                        item.length = item.mesh.userData.length;
+                        item.width = item.mesh.userData.width;
+                        item.height = item.mesh.userData.height;
+                    }
                 });
             });
         }
@@ -1102,6 +1278,13 @@ class CargoManager {
                     };
                     
                     item.mesh = this.scene3d.addCargo(meshData);
+
+                    // For horizontal rolls, sync corrected dimensions back from mesh.userData
+                    if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                        item.length = item.mesh.userData.length;
+                        item.width = item.mesh.userData.width;
+                        item.height = item.mesh.userData.height;
+                    }
                 });
             });
             
@@ -1137,6 +1320,13 @@ class CargoManager {
         };
         
         cargoItem.mesh = this.scene3d.addCargo(meshData);
+
+        // For horizontal rolls, sync corrected dimensions back from mesh.userData
+        if (cargoItem.isRoll && cargoItem.isHorizontalRoll && !cargoItem.fixedDiameter) {
+            cargoItem.length = cargoItem.mesh.userData.length;
+            cargoItem.width = cargoItem.mesh.userData.width;
+            cargoItem.height = cargoItem.mesh.userData.height;
+        }
     }
 
     getStatistics() {
@@ -1309,6 +1499,13 @@ class CargoManager {
 
                     item.mesh = this.scene3d.addCargo(meshData);
 
+                    // For horizontal rolls, sync corrected dimensions back from mesh.userData
+                    if (item.isRoll && item.isHorizontalRoll && !item.fixedDiameter) {
+                        item.length = item.mesh.userData.length;
+                        item.width = item.mesh.userData.width;
+                        item.height = item.mesh.userData.height;
+                    }
+
                     // If item was outside, move it outside
                     if (item.isOutside) {
                         this.scene3d.moveOutsideContainer(item.mesh);
@@ -1342,6 +1539,16 @@ class CargoManager {
                 }
                 if (cargoData.height !== undefined) {
                     item.height = cargoData.height;
+                }
+                // Update Roll-specific properties if they exist
+                if (cargoData.diameter !== undefined) {
+                    item.diameter = cargoData.diameter;
+                }
+                if (cargoData.cylinderLength !== undefined) {
+                    item.cylinderLength = cargoData.cylinderLength;
+                }
+                if (cargoData.isVerticalRoll !== undefined) {
+                    item.isVerticalRoll = cargoData.isVerticalRoll;
                 }
                 // Update rotation angle if it exists
                 if (cargoData.rotationAngle !== undefined) {
