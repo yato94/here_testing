@@ -3221,7 +3221,7 @@ class UI {
             
             // Page 1: Perspective View
             // Add plan name at the top
-            pdf.setFontSize(14);
+            pdf.setFontSize(10);
             pdf.setFont(undefined, 'bold');
             pdf.text(planName, pageWidth / 2, 8, { align: 'center' });
             
@@ -3285,7 +3285,7 @@ class UI {
             // Page 2: Top View
             pdf.addPage();
             // Add plan name at the top
-            pdf.setFontSize(14);
+            pdf.setFontSize(10);
             pdf.setFont(undefined, 'bold');
             pdf.text(planName, pageWidth / 2, 8, { align: 'center' });
             
@@ -3328,7 +3328,7 @@ class UI {
             if (!isCustomSpace) {
                 pdf.addPage();
                 // Add plan name at the top
-                pdf.setFontSize(14);
+                pdf.setFontSize(10);
                 pdf.setFont(undefined, 'bold');
                 pdf.text(planName, pageWidth / 2, 8, { align: 'center' });
 
@@ -3409,9 +3409,9 @@ class UI {
                     
                     // Add new page for this group
                     pdf.addPage();
-                    
+
                     // Add plan name at the top
-                    pdf.setFontSize(14);
+                    pdf.setFontSize(10);
                     pdf.setFont(undefined, 'bold');
                     pdf.text(planName, pageWidth / 2, 8, { align: 'center' });
                     
@@ -3516,9 +3516,13 @@ class UI {
             groups[groupId].totalWeight += item.weight;
             groups[groupId].items.push(item);
         });
-        
-        // Convert to array and sort by count
-        return Object.values(groups).sort((a, b) => b.count - a.count);
+
+        // Convert to array and sort by orderIndex (chronological order, matching UI menu)
+        return Object.values(groups).sort((a, b) => {
+            const minOrderA = Math.min(...a.items.map(item => item.orderIndex));
+            const minOrderB = Math.min(...b.items.map(item => item.orderIndex));
+            return minOrderA - minOrderB;
+        });
     }
     
     hexToRgb(hex) {
