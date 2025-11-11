@@ -68,26 +68,26 @@ class CargoManager {
         const generateGroupColor = () => {
             // Golden angle in degrees (360 / φ²)
             const goldenAngle = 137.5077640500378;
-            
+
             // Calculate hue using golden angle for even distribution
             // Start from 30 to avoid red (0) which is used for center of gravity
             const baseHue = 30 + (this.colorIndex * goldenAngle);
             const hue = baseHue % 360;
-            
+
             // Skip hues too close to red (0±30) and gray (around 0 saturation)
             let finalHue = hue;
             if (hue < 30 || hue > 330) {
                 finalHue = 30 + hue; // Shift away from red
             }
-            
+
             // High lightness for bright colors (65-70%)
             const lightness = 65 + (this.colorIndex % 2) * 5; // Alternate between 65% and 70%
-            
+
             // Good saturation for vivid but not overwhelming colors (75-85%)
             const saturation = 75 + (this.colorIndex % 3) * 5; // Cycle through 75%, 80%, 85%
-            
+
             this.colorIndex++;
-            
+
             return `hsl(${finalHue}, ${saturation}%, ${lightness}%)`;
         };
         

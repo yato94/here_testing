@@ -1185,9 +1185,8 @@ class Scene3D {
         // originalHeight is always safe to set (never swapped)
         mesh.userData.originalHeight = cargoData.height;
 
-        // Add wireframe only if less than 1000 items (performance)
-        // For steel coils, don't add wireframe as it looks better without edge lines
-        if (this.cargoMeshes.length < 1000 && cargoData.type !== 'steel-coil') {
+        // Add wireframe to all items (except steel coils which look better without edge lines)
+        if (cargoData.type !== 'steel-coil') {
             // For Roll units, only add circular edges at the bases
             if (cargoData.isRoll && !cargoData.fixedDiameter) {
                 const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });

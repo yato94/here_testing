@@ -422,15 +422,15 @@ class BinPacking3D {
         const subspaces = [];
         const canStackOnTop = maxStack === undefined || maxStack !== 0;
         
-        // Przestrzeń po prawej - pełna głębokość od pozycji jednostki
+        // Przestrzeń po prawej - pełna głębokość od początku przestrzeni
         // Pozwala na umieszczenie jednostek różnych głębokości obok siebie
         if (position.x + item.width < space.x + space.width) {
             subspaces.push({
                 x: position.x + item.width,
                 y: space.y,
-                z: position.z,
+                z: space.z,
                 width: space.x + space.width - (position.x + item.width),
-                depth: space.z + space.depth - position.z,
+                depth: space.depth,
                 height: space.height
             });
         }
@@ -512,13 +512,13 @@ class BinPacking3D {
             });
         }
         
-        // Przestrzeń z tyłu
-        if (space.z < position.z) {
+        // Przestrzeń z tyłu - tylko po lewej stronie (RIGHT pokrywa prawą stronę z pełną głębokością)
+        if (space.z < position.z && space.x < position.x) {
             subspaces.push({
                 x: space.x,
                 y: space.y,
                 z: space.z,
-                width: space.width,
+                width: position.x - space.x,
                 depth: position.z - space.z,
                 height: space.height
             });
@@ -540,13 +540,10 @@ class BinPacking3D {
     }
     
     cleanupFreeSpaces(spaces) {
-        const minVolume = 0.01; // Minimalna objętość przestrzeni
+        const minVolume = 0.0001; // Minimalna objętość przestrzeni (100ml - maksymalna precyzja)
         const cleaned = [];
-        
-        // Limit number of free spaces to prevent performance issues
-        const maxFreeSpaces = 100;
-        
-        // Sort spaces by volume (largest first) and take only the most promising ones
+
+        // Sort spaces by volume (largest first) - no limit for maximum precision
         const sortedSpaces = spaces
             .filter(space => {
                 const volume = space.width * space.depth * space.height;
@@ -556,8 +553,7 @@ class BinPacking3D {
                 const volumeA = a.width * a.depth * a.height;
                 const volumeB = b.width * b.depth * b.height;
                 return volumeB - volumeA;
-            })
-            .slice(0, maxFreeSpaces);
+            });
         
         for (const space of sortedSpaces) {
             // Sprawdź czy przestrzeń nie jest całkowicie zajęta przez użyte przestrzenie
@@ -573,12 +569,7 @@ class BinPacking3D {
                 cleaned.push(space);
             }
         }
-        
-        // Limit merging for performance
-        if (cleaned.length > 50) {
-            return cleaned.slice(0, 50);
-        }
-        
+
         // Połącz sąsiadujące przestrzenie jeśli to możliwe
         return this.mergeFreeSpaces(cleaned);
     }
@@ -593,21 +584,16 @@ class BinPacking3D {
     }
     
     mergeFreeSpaces(spaces) {
-        // Skip merging if too many spaces (performance optimization)
-        if (spaces.length > 30) {
-            return spaces;
-        }
-        
         const merged = [];
         const used = new Set();
-        
+
         for (let i = 0; i < spaces.length; i++) {
             if (used.has(i)) continue;
-            
+
             let current = { ...spaces[i] };
             let mergeCount = 0;
-            const maxMerges = 5; // Limit merges per space
-            
+            const maxMerges = Infinity; // Unlimited merges for maximum precision
+
             for (let j = i + 1; j < spaces.length && mergeCount < maxMerges; j++) {
                 if (used.has(j)) continue;
                 

@@ -1282,8 +1282,8 @@ class UI {
                     }
                     
                     if (addedCount > 0) {
-                        // Auto-arrange only the new group if total items <= 50 for performance
-                        const result = (this.cargoManager.cargoItems.length <= 50 && newGroupId) 
+                        // Auto-arrange the new group or all items
+                        const result = (newGroupId)
                             ? this.cargoManager.autoArrangeGroup(newGroupId)
                             : this.cargoManager.autoArrange();
                         
@@ -1354,8 +1354,8 @@ class UI {
                     }
                     
                     if (addedCount > 0) {
-                        // Auto-arrange only the new group if total items <= 50 for performance
-                        const result = (this.cargoManager.cargoItems.length <= 50 && newGroupId) 
+                        // Auto-arrange the new group or all items
+                        const result = (newGroupId)
                             ? this.cargoManager.autoArrangeGroup(newGroupId)
                             : this.cargoManager.autoArrange();
                         
