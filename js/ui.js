@@ -2604,6 +2604,11 @@ class UI {
         this.updateStatistics();
         this.updateAxleIndicators();
 
+        // Update 3D axle load visualization if enabled
+        if (this.scene3d.showAxleLoads) {
+            this.scene3d.updateAxleLoadVisualization();
+        }
+
         // Refresh UI if loading/unloading methods changed (safe - no infinite loop)
         if (parameter === 'loadingMethods' || parameter === 'unloadingMethods') {
             this.updateLoadedUnitsList();
