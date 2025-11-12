@@ -1501,6 +1501,19 @@ body {
     flex-wrap: nowrap;
 }
 
+.maps-section {
+    flex: 0 0 auto;
+    padding: 0 1rem 0 0.75rem;
+    border-left: 1px solid rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    height: 50px;
+}
+
+.maps-section a {
+    text-decoration: none;
+}
+
 .spacer-section {
     display: none;
 }
@@ -2788,16 +2801,38 @@ body {
 /* Responsive - Modern approach */
 /* Panele zachowują swoją szerokość, tylko przestrzeń 3D się kurczy */
 
+/* Hide button text in top bar when it would collide with right panel */
+@media (max-width: 1500px) {
+    .scene-controls .btn span,
+    .maps-section a span {
+        display: none;
+    }
+
+    .scene-controls .btn,
+    .maps-section a.btn {
+        padding: 0.5rem;
+        min-width: auto;
+    }
+
+    .scene-controls {
+        padding: 0 0.5rem;
+    }
+
+    .maps-section {
+        padding: 0 0.5rem 0 0.5rem;
+    }
+}
+
 @media (max-width: 1024px) {
     .main-content {
         position: relative;
     }
-    
+
     .left-panel {
         width: 280px;
         padding: 1rem;
     }
-    
+
     .right-panel {
         position: absolute;
         right: 0;
@@ -2809,11 +2844,11 @@ body {
         transition: transform 0.3s ease;
         padding: 1rem;
     }
-    
+
     .right-panel.collapsed {
         transform: translateX(100%);
     }
-    
+
     .toggle-right-panel {
         position: absolute;
         right: 10px;
